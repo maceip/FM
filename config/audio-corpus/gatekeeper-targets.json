@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "target_sets": {
+    "audio13": {
+      "description": "Raw-audio gatekeeper heads consumed by AudioGatekeepingModel.",
+      "labels": [
+        "add_to_memory",
+        "add_to_list",
+        "define_term",
+        "query_photos",
+        "create_calendar_event",
+        "create_doc",
+        "provide_person_context",
+        "provide_event_context",
+        "deep_research",
+        "provide_insight",
+        "browsing_agent",
+        "call_agent",
+        "add_timer"
+      ]
+    },
+    "text19": {
+      "description": "BERT output contract consumed by BertClassifierGatekeepingModel: 13 skill heads plus 6 screen signals.",
+      "labels": [
+        "add_to_memory",
+        "add_to_list",
+        "define_term",
+        "query_photos",
+        "create_calendar_event",
+        "create_doc",
+        "provide_person_context",
+        "provide_event_context",
+        "deep_research",
+        "provide_insight",
+        "browsing_agent",
+        "call_agent",
+        "add_timer",
+        "is_shopping_cart",
+        "is_checkout_page",
+        "is_product_details",
+        "is_search_results",
+        "is_travel_category",
+        "is_shopping_category"
+      ]
+    }
+  },
+  "corpus_head_to_skill": {
+    "timer": ["add_timer"],
+    "list": ["add_to_list"],
+    "search": ["define_term", "deep_research"],
+    "calendar": ["create_calendar_event"],
+    "person": ["provide_person_context"],
+    "event": ["provide_event_context"],
+    "device_control": [],
+    "near_miss": [],
+    "speech_non_command": [],
+    "ambient_non_speech": [],
+    "human_non_speech": []
+  }
+}

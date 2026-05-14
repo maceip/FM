@@ -1,0 +1,65 @@
+# Production signing material must never be committed (debug keystore is an explicit exception).
+config/signing/*.jks
+config/signing/*.p12
+config/signing/*upload*.keystore
+config/signing/*release*.keystore
+!config/signing/genesis-debug.keystore
+
+# Gradle
+.gradle/
+build/
+**/build/
+gradle-app.setting
+.gradletasknamecache
+
+# Android / NDK / native build cache
+.cxx/
+local.properties
+*.apk
+*.aab
+*.dex
+*.ap_
+captures/
+proguard/
+
+# Kotlin compiler caches
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.fleet/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python virtualenvs (used for litert conversion + scripts)
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+
+# Test / smoke run artifacts
+artifacts/
+/tmp/
+
+# Logs
+*.log
+hs_err_pid*.log
+
+# Recovered cosmo assets (provisioned via scripts/download-models.sh; SHA-256
+# verified against app/src/main/assets/model-manifest.json and the SODA pack
+# manifest. Not tracked in git — GitHub rejects files >100MB and the assets
+# come from ~/Downloads/cosmo_recovered_large_assets/ and
+# ~/Downloads/cosmo_recovered_native_libs/).
+app/src/main/assets/models/*.tflite
+app/src/main/assets/soda/*.zip
+app/src/main/jniLibs/arm64-v8a/*.so
+app/libs/*.jar
+
+# Misplaced design artifacts at repo root
+/stitch_*.zip

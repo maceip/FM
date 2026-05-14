@@ -1,0 +1,22 @@
+-keepattributes Signature,InnerClasses,EnclosingMethod,*Annotation*
+
+-keep class com.google.research.air.cosmo.setting.proto.** { *; }
+-keep class com.google.research.air.cosmo.logging.** { *; }
+-keep class com.google.ai.edge.aicore.** { *; }
+-keep class com.google.ai.edge.litertlm.** { *; }
+-keep class com.google.mlkit.genai.** { *; }
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keep class * extends androidx.work.ListenableWorker { *; }
+-keep class androidx.hilt.work.HiltWorkerFactory { *; }
+-keep class androidx.room.RoomDatabase { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep class com.google.protobuf.** { *; }
+-keep class com.google.firebase.analytics.** { *; }
+-keep class net.zetetic.** { *; }
+-keep class net.sqlcipher.** { *; }
+-dontwarn com.google.ai.edge.aicore.**
+-dontwarn com.google.ai.edge.litertlm.**
+-dontwarn com.google.mlkit.genai.**
+-dontwarn net.zetetic.**
+-dontwarn net.sqlcipher.**

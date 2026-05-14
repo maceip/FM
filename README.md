@@ -1,0 +1,157 @@
+# FM
+
+**An ambient agent with local on-device intelligence.**
+
+FM listens, watches, and acts on a phone without sending audio off the device
+for the gatekeeping decision. It's a clean-room reimplementation of cosmo
+(Google's research ambient assistant), built from publicly recoverable
+artifacts under DMCA §1201(f) interoperability provisions. Ambient mic →
+on-device ASR → on-device directedness classifier → on-device intent
+extraction → on-device LLM (with remote fallback) → action dispatch.
+
+> ⚠️ Not affiliated with Google. Recovered models and JNI shims sourced from
+> the cosmo APK; clean-room Kotlin reimplementation around them.
+
+## Capabilities
+
+Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned or deferred.
+
+### Capture sources
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| Ambient microphone | 🟩🟩🟩🟩🟩 | Per-source `SodaSession`; recovered SODA blend; AMBIENT_ONESHOT + OPEN_MIC |
+| Pixel Buds (Bluetooth SBC) | 🟩🟩🟩🟩🟩 | `MediaCodec`-based decoder; no vendored `libsbcdecoder_jni.so` needed |
+| Device / media audio | 🟩🟩🟩🟩🟩 | `AudioSource = REMOTE_SUBMIX` |
+| Call audio | 🟩🟩🟩🟩🟩 | `AudioSource = VOICE_CALL` |
+| Watch audio (Wear OS) | 🟩🟩🟩🟩🟩 | Streams over `WearableAudioStreamService` |
+| Screen text (accessibility-driven) | 🟩🟩🟩🟩🟩 | Periodic capture |
+| Screen interactions (clicks, focus, scroll) | 🟩🟩🟩🟩🟩 | Accessibility event listener |
+| Notifications | 🟩🟩🟩🟩🟩 | `NotificationListenerService` |
+| Location | 🟩🟩🟩🟩🟩 | Coarse + fine permission gated |
+| Glass / XR projected capture | 🟨🟨🟨⬜⬜ | Service binds; downstream consumer not wired |
+| Camera (image analysis frames) | 🟨🟨🟨⬜⬜ | Frames captured; prompt-grounding consumer not built |
+| AOC nanoapp audio transport | 🟨🟨⬜⬜⬜ | Routing + Context Hub binding live; callback subclass needs platform-signed compile or bytecode-gen |
+
+### On-device speech (SODA)
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled |
+| Magic Mic / IntendedSpeech gate | 🟩🟩🟩🟩🟩 | `intendedQueryScore ≥ intendedQueryThreshold` becomes a `DirectednessEvent` |
+| Endpointer / punctuation / denorm / G2P | 🟩🟩🟩🟩🟩 | Internal to SODA; transcripts arrive complete |
+| Voice Match (speaker ID) | 🟨🟨⬜⬜⬜ | JNI stub + config plumbing; enrollment UI not ported |
+| Hotword event routing | 🟨🟨⬜⬜⬜ | Events arrive at callback; logged-only, no action wiring |
+| Diarization | ⬜⬜⬜⬜⬜ | Bundled in pack; config bit not enabled |
+
+### Gatekeeping (directedness + skill classification)
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| Unified `Gatekeeper` (single dispatch) | 🟩🟩🟩🟩🟩 | Owns subscriptions; C1 mutex via backend type-filter |
+| BERT classifier (CPU + Tensor G4 + Tensor G5) | 🟩🟩🟩🟩🟩 | Combined BERT + regex fusion |
+| C9 selector-routed dispatch | 🟩🟩🟩🟩🟩 | Backend returns null for non-native input type — that IS the mutex |
+| Conformer EdgeTPU audio backend | 🟩🟩🟩🟩⬜ | Code path bundled; activation gated on Pixel + Darwinn proof |
+| Inherent (joint audio→intent) backend | 🟩🟩⬜⬜⬜ | Wired; real model produced by the separate `~/inherent` project |
+| MediaTek Dimensity (mt6989) BERT variant | 🟩⬜⬜⬜⬜ | Manifest slot reserved; AOT pipeline drafted; model not built yet |
+
+### Intent + fulfillment
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| LLM-backed intent extractor (second `Gatekeeper.output` subscriber) | 🟩🟩🟩🟩🟩 | Cosmo `{reasoning, final_answer}` parse path; context-gather from recent transcripts + screen interactions |
+| Skill catalog (22 action types from `filtered_skill_schema.textproto`) | 🟩🟩🟩🟩🟩 | Schema-driven, required args + trigger regexes + permission gates |
+| Fulfillment runner + confirmation policy | 🟩🟩🟩🟩⬜ | Functional end-to-end; single action handler awaiting per-subtype split |
+| Browsing agent surface (TaskMonitor) | 🟩🟩🟩🟩🟩 | Mariner-style prompt/response rendering |
+
+### LLM clients
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| Public AICore (Gemini Nano via `GenerativeModel`) | 🟩🟩🟩🟩🟩 | Production default when AICore feature available |
+| Simulation LLM (deterministic test) | 🟩🟩🟩🟩🟩 | Test fixture |
+| LiteRT-LM (on-device Gemma bundle) | 🟩🟩🟩⬜⬜ | Needs official Gemma 4 `.litertlm` bundle provisioning |
+| Remote inference (Oak session) | 🟩🟩🟩⬜⬜ | Needs endpoint + cert pin + audience config |
+| Network-aware fallback selector | 🟩🟩🟩🟩🟩 | Local / remote / hybrid routing |
+
+### Memory + state
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| Per-source ephemeral buffers (23 qualifiers) | 🟩🟩🟩🟩🟩 | Timestamp-based eviction; max age tracks settings |
+| Encrypted persistent context store | 🟩🟩🟩🟩🟩 | Room + SQLCipher; Keystore-wrapped passphrase |
+| State probe (`CosmoStateSource`) | 🟩🟩🟩🟩🟩 | Cosmo-aligned 2-method interface |
+| `CosmoStateManager` (snooze, low-battery, active hours) | 🟩🟩🟩🟩🟩 | Genesis-only convenience |
+| Settings DataStore (60-field protobuf, encrypted) | 🟩🟩🟩🟩🟩 | `StateFlow<CosmoSetting>` surface |
+| Semantic search over context store (Gecko embeddings) | ⬜⬜⬜⬜⬜ | Architectural hook exists (`queryByEmbedding`); model + impl deferred |
+
+### Safety + observability
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| Telemetry catalog (78 tags, 309 Firebase events) | 🟩🟩🟩🟩🟩 | Schema-backed; fail-closed on undocumented events |
+| Runtime permission helper + rationale | 🟩🟩🟩🟩🟩 | DataStore-backed history; routes to settings for permanent denials |
+| Battery-aware work scheduling | 🟩🟩🟩🟩🟩 | WorkManager with unmetered + battery-not-low + idle constraints |
+| StrictMode + ANR watchdog (debug) | 🟩🟩🟩🟩🟩 | Debug-only diagnostics |
+| Memory pressure trimming | 🟩🟩🟩🟩🟩 | Ephemeral buffers cleared under Android trim callbacks |
+| **CaMeL trust layer (prompt-injection defense)** | 🟩⬜⬜⬜⬜ | Architecturally placed in `docs/architecture.md` §12; reference primitives mapped to Kotlin; no code yet |
+
+### UI
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| Nav3 with per-tab stacks + predictive back | 🟩🟩🟩🟩🟩 | `NavDisplay`; adaptive support-pane scene strategy for foldables/tablets |
+| 24 Hilt-multibound debug panels | 🟩🟩🟩🟩🟩 | Live controller jobs, settings, LLM stats, gatekeeper output, buffer sizes, skill registry, manifest state |
+| Route-state JSON persistence | 🟩🟩🟩🟩🟩 | TaskMonitor token round-trip, corrupted route rejection, tab-history restore |
+| Glass / XR surface | 🟩🟩🟩🟩⬜ | Activity bound; capture consumer wiring partial |
+
+### Voice output (intentionally deferred)
+
+| Subsystem | Progress | Notes |
+|---|---|---|
+| VoiceLM / SoundStream (generative voice) | ⬜⬜⬜⬜⬜ | Recovered to disk; not bundled; one asset truncated in recovery |
+| Vogo native lib (`libvogo_jni.so`) | ⬜⬜⬜⬜⬜ | Recovered; not bundled |
+| `lib/tts/*` (TTS interface, AudioRenderer/Resampler) | ⬜⬜⬜⬜⬜ | Not ported. Architectural slot reserved |
+
+---
+
+## Build
+
+```bash
+./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest
+./gradlew :app:installDebug   # on a connected device
+```
+
+CI gates: `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`.
+The release path additionally runs `scripts/verify-phase6-release-gates.sh`
+(strict model-manifest verification, architecture-delta check, signing config,
+relocation safety).
+
+## Docs
+
+- [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including CaMeL trust-layer placement (§12) and recovered-but-unwired surface inventory (§14)
+- [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders
+- [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers (oldest first)
+- [`docs/aicore-api-gap.md`](docs/aicore-api-gap.md) — public AICore feature-selection limits
+- [`docs/remote-inference-contract.md`](docs/remote-inference-contract.md) — issuer + inference HTTP contract
+- [`docs/release-signing-policy.md`](docs/release-signing-policy.md) — production signing inputs
+
+External:
+
+- Recovery-level cosmo internals (smali / proto fields / asset bytes): `~/cosmo-dev/repo/docs/*_stack_map.md`
+- Inherent (joint audio→intent training pipeline): `~/inherent/contracts/runtime_contract.md`
+- CaMeL paper: [arxiv 2503.18813](https://arxiv.org/abs/2503.18813) — reference impl: [google-research/camel-prompt-injection](https://github.com/google-research/camel-prompt-injection)
+
+## Provenance
+
+Models, JNI binaries, and SODA language packs come from the cosmo APK recovery
+(`~/Downloads/cosmo_recovered_large_assets/`, `~/Downloads/cosmo_recovered_native_libs/`).
+All recovered artifacts are SHA-256 verified at build time
+(`scripts/download-models.sh --verify-only`, `scripts/verify-soda-assets.sh`).
+Asset coverage and recovery completeness: `~/Downloads/cosmo_artifact_integrity/`.
+
+The Kotlin app code is a clean-room reimplementation. The
+`com.google.research.air.cosmo` package namespace mirrors cosmo's recovered
+bytecode to keep the architecture-delta citations readable; class-level
+behavior is reauthored from the smali reference.

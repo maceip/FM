@@ -1,0 +1,111 @@
+{
+  "version": "0.1.0",
+  "backend": "litert",
+  "artifact_format": "tflite",
+  "training_hash": "nogit:c344b1c7d0cdfe10",
+  "input_tensor": "mel_spectrogram",
+  "output_tensor": "intent_output",
+  "head_order": [
+    "isInteresting",
+    "hasAddToListIntent",
+    "hasTermSearchQuery",
+    "hasPhotoQuery",
+    "hasCalendarEvent",
+    "hasCreateDocIntent",
+    "hasPersonContext",
+    "hasEventContext",
+    "hasDeepResearchIntent",
+    "hasInsightIntent",
+    "hasBrowsingAgentIntent",
+    "hasCallingAgentIntent",
+    "hasStartTimerIntent"
+  ],
+  "threshold_keys_in_order": [
+    "is_interesting",
+    "has_add_to_list_intent",
+    "has_term_search_query",
+    "has_photo_query",
+    "has_calendar_event",
+    "has_create_doc_intent",
+    "has_person_context",
+    "has_event_context",
+    "has_deep_research_intent",
+    "has_insight_intent",
+    "has_browsing_agent_intent",
+    "has_calling_agent_intent",
+    "has_start_timer_intent"
+  ],
+  "default_thresholds": {
+    "is_interesting": 0.57,
+    "has_add_to_list_intent": 0.65,
+    "has_term_search_query": 0.9,
+    "has_photo_query": 0.9,
+    "has_calendar_event": 0.9,
+    "has_create_doc_intent": 0.9,
+    "has_person_context": 0.56,
+    "has_event_context": 0.74,
+    "has_deep_research_intent": 0.9,
+    "has_insight_intent": 0.9,
+    "has_browsing_agent_intent": 0.9,
+    "has_calling_agent_intent": 0.9,
+    "has_start_timer_intent": 0.9
+  },
+  "artifact_size_bytes": 27960,
+  "reports": {
+    "onnx_parity": "artifacts/model-groups/001/export/litert/reports/onnx_parity.json",
+    "delegate_cpu": "artifacts/model-groups/001/export/litert/delegates/cpu.json"
+  },
+  "config": {
+    "model": {
+      "backbone": "small_conformer",
+      "num_heads": 13,
+      "hidden_size": 32,
+      "num_layers": 0,
+      "num_attention_heads": 4,
+      "conv_kernel_size": 7,
+      "mel_bins": 128,
+      "max_frames": 3000
+    },
+    "training": {
+      "batch_size": 2,
+      "learning_rate": 0.0003,
+      "weight_decay": 0.01,
+      "warmup_steps": 0,
+      "max_steps": 4,
+      "eval_every_steps": 2,
+      "save_every_steps": 2,
+      "loss": "focal_bce",
+      "focal_gamma": 2.0,
+      "class_weights": "balanced",
+      "train_manifest": "artifacts/model-groups/001/work/mels/train_manifest.csv",
+      "eval_manifest": "artifacts/model-groups/001/work/mels/eval_manifest.csv",
+      "num_workers": 0,
+      "device": "mps",
+      "seed": 1337
+    },
+    "export": {
+      "backend": "tflite",
+      "delegates": [
+        "cpu"
+      ],
+      "quantization": "int8",
+      "representative_dataset_size": 4,
+      "target_size_mb": 50,
+      "output_path": "artifacts/smoke/inherent.tflite",
+      "metadata_path": "artifacts/smoke/inherent.metadata.json",
+      "onnx_path": "artifacts/smoke/inherent.onnx",
+      "onnx_metadata_path": "artifacts/smoke/inherent.onnx.metadata.json",
+      "mlx_dir": "artifacts/smoke/mlx",
+      "litertlm_path": "artifacts/smoke/inherent.litertlm",
+      "onnx_opset": 17,
+      "onnx_sample_frames": 50,
+      "onnx_static_frames": 50,
+      "strict_tensor_names": false,
+      "parity_atol": 0.0001
+    }
+  },
+  "tflite_size_bytes": 27960,
+  "delegates": [
+    "cpu"
+  ]
+}

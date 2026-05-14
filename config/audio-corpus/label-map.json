@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "heads": {
+    "intent_positive": {
+      "timer": ["timer", "alarm", "countdown", "remind me in"],
+      "list": ["list", "shopping", "grocery", "todo", "task"],
+      "search": ["search", "look up", "find", "web", "google"],
+      "calendar": ["calendar", "meeting", "schedule", "invite", "appointment"],
+      "person": ["who is", "contact", "person", "name"],
+      "event": ["what happened", "event", "when is", "where is"],
+      "device_control": ["turn on", "turn off", "volume", "lights", "play", "pause"],
+      "simple_command": ["yes", "no", "stop", "go", "left", "right"]
+    },
+    "negative": {
+      "speech_non_command": ["conversation", "reading", "meeting", "lecture", "story"],
+      "speech_present": ["speech", "voice", "speaker"],
+      "not_cosmo_intent": ["keyword without assistant intent"],
+      "near_miss": ["call", "timer", "calendar", "list", "search", "meeting", "remind", "message"],
+      "ambient_event": ["audio event", "environmental sound"],
+      "ambient_non_speech": ["appliance", "vehicle", "music", "crowd", "street", "animal", "weather"],
+      "human_non_speech": ["cough", "laugh", "sneeze", "breath", "cry", "yawn", "scream"],
+      "music": ["music", "instrument", "song"],
+      "vehicle": ["car", "bus", "train", "truck", "motorcycle"],
+      "appliance": ["vacuum", "dishwasher", "washing machine", "alarm"]
+    },
+    "domain": {
+      "buds_domain": ["in_ear", "earphone", "body_conduction", "near_field"],
+      "glasses_domain": ["glasses", "head_worn", "projected_capture"],
+      "watch_domain": ["wearable", "wrist", "far_field"],
+      "local_android_peer": ["android_peer", "lan_peer", "nearby_device"],
+      "home": ["home", "kitchen", "living room"],
+      "office": ["office", "workplace", "desk"],
+      "street": ["street", "road", "sidewalk"],
+      "transport": ["train", "bus", "car"],
+      "cafe": ["cafe", "restaurant"],
+      "park": ["park", "outdoor"],
+      "construction": ["construction", "jackhammer", "drilling"],
+      "siren": ["siren", "emergency vehicle"],
+      "crowd": ["crowd", "public place"]
+    }
+  },
+  "near_miss_policy": {
+    "description": "A near miss contains assistant-ish trigger terms but is not an instruction to Cosmo.",
+    "source_datasets": ["ami_meeting_corpus", "icsi_meeting_corpus", "common_voice", "librispeech"],
+    "terms": ["call", "timer", "calendar", "list", "search", "meeting", "remind", "message"],
+    "reject_if_matches": [
+      "^(hey|ok|okay)\\s+(cosmo|google|assistant)\\b",
+      "\\b(set|start|create|add|search|find|call|text|email|schedule|remind)\\s+(a|an|the|me|my)?\\b"
+    ],
+    "manual_review_required": true
+  },
+  "split_policy": {
+    "speaker_disjoint": true,
+    "device_disjoint_for_eval": true,
+    "first_party_gold_eval_min_percent": 10,
+    "synthetic_max_percent_per_head": 30,
+    "noncommercial_allowed_only_in_profile": "research_eval"
+  }
+}

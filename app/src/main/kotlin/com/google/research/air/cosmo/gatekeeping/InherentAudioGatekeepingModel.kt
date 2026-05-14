@@ -1,0 +1,202 @@
+package com.google.research.air.cosmo.gatekeeping
+
+import android.content.Context
+import com.google.research.air.cosmo.gatekeeping.models.AudioGatekeeperLiteRtImpl
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
+import javax.inject.Inject
+import javax.inject.Singleton
+import org.json.JSONObject
+
+private fun inherentMetadataTextLoader(context: Context): () -> String? = {
+    runCatching {
+        context.assets.open("models/inherent.metadata.json").bufferedReader().use { it.readText() }
+    }.getOrNull()
+}
+
+@Singleton
+class InherentAudioGatekeepingModel internal constructor(
+    private val loadAssetBytes: (String) -> ByteArray?,
+    private val loadMetadataText: () -> String?,
+    private val nativeCreate: (ByteArray, Boolean) -> Long,
+    private val nativeRun: (Long, FloatBuffer, FloatBuffer) -> Boolean,
+    private val nativeDestroy: (Long) -> Unit
+) : GatekeepingModel {
+    @Inject
+    constructor(
+        @ApplicationContext context: Context
+    ) : this(
+        loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context),
+        loadMetadataText = inherentMetadataTextLoader(context),
+        nativeCreate = { modelBuffer, useNpu -> AudioGatekeeperLiteRtImpl.nativeCreate(modelBuffer, useNpu) },
+        nativeRun = { handle, input, output -> AudioGatekeeperLiteRtImpl.nativeRun(handle, input, output) },
+        nativeDestroy = { handle -> AudioGatekeeperLiteRtImpl.nativeDestroy(handle) }
+    )
+
+    private var frontendHandle: Long = 0L
+    private var backendHandle: Long = 0L
+    private val thresholds: FloatArray by lazy { loadThresholds() }
+
+    override suspend fun predict(input: String): GatekeepingResult =
+        throw UnsupportedOperationException("Inherent audio gatekeeper does not support text prediction")
+
+    override suspend fun predict(pcm: ByteArray): GatekeepingResult {
+        val scores =
+            runCatching { run(pcm) }
+                .getOrElse { error ->
+                    return unavailable(error.message ?: "inherent_unavailable")
+                }
+        val detected = mapScores(scores)
+        return GatekeepingResult(
+            detectedSkills = detected,
+            modelId = "inherent_v0",
+            detectedBy = if (detected.isEmpty()) "none" else "audio_gatekeeper",
+            triggeredFulfillment = detected.isNotEmpty(),
+            input = "Ambient raw audio: latest buffered PCM window",
+            inputSource = GatekeepingInputSource.AMBIENT_AUDIO,
+            detector = if (detected.isEmpty()) GatekeepingDetector.NONE else GatekeepingDetector.AUDIO_GATEKEEPER
+        )
+    }
+
+    override fun close() {
+        val currentFrontend = frontendHandle
+        val currentBackend = backendHandle
+        frontendHandle = 0L
+        backendHandle = 0L
+        if (currentFrontend != 0L) runCatching { nativeDestroy(currentFrontend) }
+        if (currentBackend != 0L) runCatching { nativeDestroy(currentBackend) }
+    }
+
+    private fun run(pcm: ByteArray): FloatArray {
+        val frontendInput = pcm16ToFloatBuffer(pcm)
+        val melBuffer =
+            ByteBuffer
+                .allocateDirect(MAX_FRAMES * MEL_BINS * Float.SIZE_BYTES)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer()
+        if (!nativeRun(ensureFrontend(), frontendInput, melBuffer)) {
+            failUnavailable("inherent_frontend_run_failed")
+        }
+
+        val output =
+            ByteBuffer
+                .allocateDirect(NUM_INTENTS * Float.SIZE_BYTES)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer()
+        melBuffer.position(0)
+        if (!nativeRun(ensureBackend(), melBuffer, output)) {
+            failUnavailable("inherent_native_run_failed")
+        }
+        output.position(0)
+        val scores = FloatArray(NUM_INTENTS) { output.get() }
+        if (scores.any { !it.isFinite() }) {
+            failUnavailable("inherent_invalid_output")
+        }
+        return scores
+    }
+
+    private fun ensureFrontend(): Long {
+        if (frontendHandle != 0L) return frontendHandle
+        val bytes = loadAssetBytes(GatekeeperModelIds.AUDIO_FRONTEND)
+            ?: failUnavailable("inherent_frontend_unavailable")
+        val created = nativeCreate(bytes, false)
+        if (created == 0L) failUnavailable("inherent_frontend_cpu_create_failed")
+        frontendHandle = created
+        return created
+    }
+
+    private fun ensureBackend(): Long {
+        if (backendHandle != 0L) return backendHandle
+        val bytes = loadAssetBytes(GatekeeperModelIds.INHERENT_V0)
+            ?: failUnavailable("inherent_asset_unavailable")
+        val created = nativeCreate(bytes, false)
+        if (created == 0L) failUnavailable("inherent_litert_cpu_create_failed")
+        backendHandle = created
+        return created
+    }
+
+    private fun pcm16ToFloatBuffer(pcm: ByteArray): FloatBuffer {
+        val output =
+            ByteBuffer
+                .allocateDirect(MAX_SAMPLES * Float.SIZE_BYTES)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer()
+        var written = 0
+        var index = 0
+        while (index + 1 < pcm.size && written < MAX_SAMPLES) {
+            val sample = ((pcm[index + 1].toInt() shl 8) or (pcm[index].toInt() and 0xff)).toShort().toInt()
+            output.put(sample / PCM_16BIT_SCALE)
+            written += 1
+            index += 2
+        }
+        while (written < MAX_SAMPLES) {
+            output.put(0f)
+            written += 1
+        }
+        output.position(0)
+        return output
+    }
+
+    private fun mapScores(scores: FloatArray): Map<String, Float> =
+        INDEX_TO_SKILLS.entries
+            .filter { (index, _) -> index < scores.size && scores[index] >= thresholds[index] }
+            .associate { (index, skill) -> skill to scores[index] }
+
+    private fun loadThresholds(): FloatArray {
+        val json = loadMetadataText()?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return DEFAULT_THRESHOLDS
+        val array = json.optJSONArray("thresholds")
+        if (array != null && array.length() == NUM_INTENTS) {
+            return FloatArray(NUM_INTENTS) { index -> array.optDouble(index, DEFAULT_THRESHOLDS[index].toDouble()).toFloat() }
+        }
+        val keys = json.optJSONArray("threshold_keys_in_order")
+        val thresholdsByKey = json.optJSONObject("default_thresholds")
+        if (keys == null || thresholdsByKey == null || keys.length() != NUM_INTENTS) return DEFAULT_THRESHOLDS
+        return FloatArray(NUM_INTENTS) { index ->
+            val key = keys.optString(index)
+            thresholdsByKey.optDouble(key, DEFAULT_THRESHOLDS[index].toDouble()).toFloat()
+        }
+    }
+
+    private fun unavailable(reason: String): GatekeepingResult =
+        GatekeepingResult(
+            detectedSkills = emptyMap(),
+            modelId = "inherent_unavailable:$reason",
+            detectedBy = "none",
+            triggeredFulfillment = false,
+            input = "Ambient raw audio: latest buffered PCM window",
+            inputSource = GatekeepingInputSource.AMBIENT_AUDIO,
+            detector = GatekeepingDetector.NONE
+        )
+
+    private fun failUnavailable(reason: String): Nothing = throw IllegalStateException(reason)
+
+    companion object {
+        const val METADATA_ASSET_PATH = "models/inherent.metadata.json"
+        const val MEL_BINS: Int = 128
+        const val MAX_FRAMES: Int = 3_000
+        const val MAX_SAMPLES: Int = 960_000
+        const val NUM_INTENTS: Int = 13
+        private const val PCM_16BIT_SCALE: Float = 32_768.0f
+
+        private val DEFAULT_THRESHOLDS = FloatArray(NUM_INTENTS) { 0.5f }
+
+        private val INDEX_TO_SKILLS =
+            mapOf(
+                0 to "add_to_memory",
+                1 to "add_to_list",
+                2 to "define_term",
+                3 to "query_photos",
+                4 to "create_calendar_event",
+                5 to "create_doc",
+                6 to "provide_person_context",
+                7 to "provide_event_context",
+                8 to "deep_research",
+                9 to "provide_insight",
+                10 to "browsing_agent",
+                11 to "call_agent",
+                12 to "add_timer"
+            )
+    }
+}

@@ -1,0 +1,14 @@
+<resources>
+    <string name="accessibility_service_label">CosmoAccessibilityService</string>
+    <string name="app_name">Cosmo Genesis</string>
+    <string name="cosmo_active_hours">Cosmo active hours</string>
+    <string name="cosmo_disabled">Cosmo disabled</string>
+    <string name="cosmo_enabled">Cosmo enabled</string>
+    <string name="cosmo_glass_title">Cosmo Glass Activity</string>
+    <string name="cosmo_hours_description">Set the capture and fulfillment window.</string>
+    <string name="cosmo_logo_description">Cosmo</string>
+    <string name="cosmo_start_time">Cosmo start time</string>
+    <string name="cosmo_thinking">Cosmo thinking</string>
+    <string name="cosmo_version">0.1-genesis</string>
+    <string name="notification_service_label">Cosmo Notification Capture</string>
+</resources>

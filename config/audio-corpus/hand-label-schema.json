@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "required_fields": [
+    "clip_id",
+    "recording_path",
+    "captured_at_iso8601",
+    "consent_id",
+    "speaker_id",
+    "device_type",
+    "capture_path",
+    "environment",
+    "split",
+    "primary_label",
+    "labeler_id",
+    "review_state"
+  ],
+  "fields": {
+    "clip_id": "Stable UUID for this clip.",
+    "recording_path": "Relative path under the private corpus root. Never commit raw audio to git.",
+    "captured_at_iso8601": "Timestamp for capture provenance.",
+    "consent_id": "Consent/provenance reference controlled outside the repo.",
+    "speaker_id": "Pseudonymous speaker id; must be stable enough for speaker-disjoint splits.",
+    "device_type": "phone_mic | pixel_buds | watch | glasses | local_android_peer | other",
+    "capture_path": "ambient_audio | buds_audio | watch_audio | glasses_audio | device_audio | local_network",
+    "environment": "home | office | car | street | cafe | meeting | noisy_public | quiet | other",
+    "transcript": "Verbatim transcript if speech is present.",
+    "primary_label": "timer | list | search | calendar | person | event | device_control | near_miss | speech_non_command | ambient_non_speech | human_non_speech",
+    "secondary_labels": "Optional array of extra labels from label-map.json.",
+    "intent_slots": "Optional object for timer/list/search/calendar/person/event slot labels.",
+    "near_miss_terms": "Trigger-like words present in a non-command utterance.",
+    "license_category": "Always first_party for this source.",
+    "split": "train | val | test | gold_eval",
+    "labeler_id": "Pseudonymous labeler id.",
+    "review_state": "raw | labeled | reviewed | rejected",
+    "notes": "Freeform annotation notes."
+  },
+  "quality_gates": [
+    "No clip enters train/val/test until review_state is reviewed.",
+    "No clip enters gold_eval unless captured on target-like hardware or local Android peer.",
+    "Gold eval must be speaker-disjoint and device-disjoint from train.",
+    "Synthetic positives cannot replace first-party positives for a head marked critical."
+  ]
+}

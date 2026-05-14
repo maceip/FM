@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package cosmo.setting;
+
+option java_multiple_files = true;
+option java_package = "com.google.research.air.cosmo.setting.proto";
+
+message CosmoSetting {
+  bool screen_context_enabled = 1;
+  bool ambient_audio_enabled = 2;
+  bool update_keep_enabled = 3;
+  bool suggest_calendar_enabled = 4;
+  bool suggest_mariner_enabled = 5;
+  bool suggest_call_agent_enabled = 6;
+  bool suggest_photos_enabled = 7;
+  bool suggest_deep_research_enabled = 8;
+  bool cosmo_insights_enabled = 9;
+  bool suggest_docs_enabled = 10;
+  bool record_memories_enabled = 11;
+  bool define_terms_enabled = 12;
+  bool provide_person_context_enabled = 13;
+  bool provide_event_context_enabled = 14;
+  int32 ephemeral_buffer_duration_min = 15;
+  bool global_cosmo_enabled = 16;
+  bool suggest_google_searches_enabled = 17;
+  repeated string blocked_packages = 18;
+  bool notification_capture_enabled = 19;
+  bool voice_match_enabled = 20;
+  bool suggest_timer_enabled = 21;
+  bool media_audio_enabled = 22;
+  bool connect_to_glass_enabled = 23;
+  bool location_capture_enabled = 24;
+  bool voice_match_enrolled = 25;
+  int32 max_raw_audio_in_fulfillment_sec = 26;
+  bool glasses_camera_enabled = 27;
+  bool analytics_enabled = 28;
+  bool provide_recall_enabled = 29;
+  bool watch_audio_enabled = 30;
+  bool batch_mode_enabled = 31;
+  bool camera_enabled = 32;
+  bool buds_audio_enabled = 33;
+  int32 cosmo_start_day_time = 34;
+  int32 cosmo_end_day_time = 35;
+  int64 snooze_until_time_epoch_ms = 36;
+  bool screen_interaction_capture_enabled = 37;
+  bool developer_mode_enabled = 38;
+  bool developer_mode_unlocked = 39;
+  float cosmo_transparency_level = 40;
+  int64 snooze_until_timestamp_ms = 41;
+  bool on_device_transcription_enabled = 42;
+  bool stream_to_watch_enabled = 43;
+  bool auto_snooze_enabled = 44;
+  bool intent_extraction_enabled = 45;
+  bool use_nanoapp_audio_enabled = 46;
+  ProcessingMode processing_mode = 47;
+  FulfillmentModel fulfillment_model = 48;
+  bool device_control_enabled = 49;
+  bool raw_audio_gatekeeper_enabled = 50;
+  bool suggest_navigation_enabled = 51;
+  bool gatekeeper_enabled = 52;
+  bool suggest_add_task_enabled = 53;
+  bool suggest_mail_enabled = 54;
+  bool invoke_agent_q_enabled = 55;
+  int32 batch_processing_interval_mins = 56;
+  bool altair_sync_enabled = 57;
+  bool draft_sms_enabled = 58;
+  bool play_music_enabled = 59;
+}
+
+enum ProcessingMode {
+  PROCESSING_MODE_REALTIME = 0;
+  PROCESSING_MODE_BATCH = 1;
+  PROCESSING_MODE_HYBRID = 2;
+}
+
+enum FulfillmentModel {
+  FULFILLMENT_MODEL_NETWORK_AWARE = 0;
+  FULFILLMENT_MODEL_LOCAL = 1;
+  FULFILLMENT_MODEL_SERVER = 2;
+}

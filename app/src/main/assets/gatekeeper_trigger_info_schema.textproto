@@ -1,0 +1,6 @@
+type: OBJECT
+properties { key: "trigger_descriptions" value { type: ARRAY items { type: STRING } } }
+properties { key: "trigger_strings" value { type: ARRAY items { type: STRING } } }
+property_ordering: "trigger_descriptions"
+property_ordering: "trigger_strings"
+title: "GatekeeperTriggerInfo"

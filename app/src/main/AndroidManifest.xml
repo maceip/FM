@@ -1,0 +1,232 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <permission
+        android:name="com.google.research.air.cosmo.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:protectionLevel="signature" />
+    <permission
+        android:name="com.google.research.air.cosmo.permission.BIND_GBOARD_SUGGESTIONS"
+        android:protectionLevel="signature" />
+
+    <!--
+        ACCESS_CONTEXT_HUB is a signature/privileged permission as of API 30. Regular apps will
+        not be granted it; cosmo runs as a platform-signed Google internal build. Genesis
+        declares it so [NanoAppClient]'s AOC binding can attempt the path on devices that DO
+        grant it (e.g., AOSP test builds, rooted Pixels with platform-signed APK); fallback to
+        mic recording is automatic via the false return from `RecordServiceManager.startAocRecording`
+        when the permission is denied or `ContextHubManager` rejects the call.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_CONTEXT_HUB"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="com.google.android.apps.aicore.service.BIND_SERVICE" />
+    <uses-permission android:name="com.google.research.air.experiences.glimmer.altair.permission.WRITE_COSMO_CONTEXT" />
+
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <queries>
+        <package android:name="com.google.android.apps.photos" />
+        <package android:name="com.google.research.air.frameworks.intent.memorylabs" />
+        <package android:name="com.google.android.apps.aipex.memora" />
+        <package android:name="com.google.research.air.experiences.glimmer.altair" />
+        <package android:name="com.google.android.glasses.core" />
+        <package android:name="com.google.android.projection.core" />
+        <package android:name="com.google.ambient.streaming" />
+        <package android:name="com.google.android.aicore" />
+        <package android:name="com.google.android.apps.aicore" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="androidx.window.extensions.layout.EngagementModeService" />
+        </intent>
+        <intent>
+            <action android:name="androidx.xr.projected.ACTION_ENGAGEMENT_BIND" />
+        </intent>
+        <intent>
+            <action android:name="androidx.xr.projected.ACTION_BIND" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".CosmoApp"
+        android:allowBackup="false"
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name"
+        android:roundIcon="@android:drawable/sym_def_app_icon"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:theme="@style/AppTheme"
+        android:enableOnBackInvokedCallback="true"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".ui.mainscreen.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".fulfillment.DoubleTapActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
+
+        <activity
+            android:name=".glasses.CosmoGlassActivity"
+            android:exported="false"
+            android:label="@string/cosmo_glass_title"
+            android:launchMode="singleInstance"
+            android:requiredDisplayCategory="android.hardware.display.category.XR_PROJECTED"
+            tools:targetApi="34" />
+
+        <activity
+            android:name=".fulfillment.actions.mariner.TaskMonitorActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".lib.record.RecordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".lib.wearable.WearableAudioStreamService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".ui.surfaces.CosmoQuickSettingsTileService"
+            android:exported="true"
+            android:icon="@android:drawable/ic_btn_speak_now"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".lib.wearable.WearableService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/cosmowear"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".notificationcapture.NotificationCaptureService"
+            android:exported="true"
+            android:label="@string/notification_service_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".accessibility.CosmoAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <service
+            android:name=".gboard.GBoardSuggestionsService"
+            android:exported="true"
+            android:permission="com.google.research.air.cosmo.permission.BIND_GBOARD_SUGGESTIONS">
+            <intent-filter>
+                <action android:name="com.google.research.air.cosmo.gboard.bind" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".setting.CosmoStateUpdateReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".lib.performance.LifeboatReceiver"
+            android:exported="false"
+            android:process=":primes_lifeboat" />
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <uses-native-library
+            android:name="libedgetpu_util.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libedgetpu_client.google.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL-car.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL-pixel.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libopenxr.google.so"
+            android:required="false" />
+    </application>
+</manifest>
