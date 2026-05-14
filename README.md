@@ -132,6 +132,7 @@ relocation safety).
 
 - [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including CaMeL trust-layer placement (§12) and recovered-but-unwired surface inventory (§14)
 - [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders
+- [`docs/camel-port-notes.md`](docs/camel-port-notes.md) — per-AST-node CaMeL port-fidelity reference (read when the implementing workstream picks up §12)
 - [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers (oldest first)
 - [`docs/aicore-api-gap.md`](docs/aicore-api-gap.md) — public AICore feature-selection limits
 - [`docs/remote-inference-contract.md`](docs/remote-inference-contract.md) — issuer + inference HTTP contract

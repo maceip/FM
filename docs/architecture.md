@@ -771,6 +771,7 @@ the slots visible so that:
 |---|---|
 | The current system architecture (this doc) | `docs/architecture.md` |
 | The C1–C9 contract rules + PR0–PR6 marching orders | `docs/architecture-delta.md` |
+| Per-AST-node CaMeL port reference (for the implementing workstream) | `docs/camel-port-notes.md` |
 | Active blockers / not-yet-resolved issues | `docs/blocker-register.md` |
 | AICore public-API surface limits | `docs/aicore-api-gap.md` |
 | Audio training corpus plan | `docs/audio-corpus-plan.md` |
