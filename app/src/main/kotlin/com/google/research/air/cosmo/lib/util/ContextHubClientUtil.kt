@@ -125,14 +125,17 @@ internal constructor(
         }
 
         @JvmStatic
+        @android.annotation.SuppressLint("PrivateApi")
         internal fun contextHubInfoClass(): Class<*> =
             Class.forName("android.hardware.location.ContextHubInfo")
 
         @JvmStatic
+        @android.annotation.SuppressLint("PrivateApi")
         internal fun contextHubClientCallbackClass(): Class<*> =
             Class.forName("android.hardware.location.ContextHubClientCallback")
 
         @JvmStatic
+        @android.annotation.SuppressLint("PrivateApi")
         internal fun nanoAppMessageClass(): Class<*> =
             Class.forName("android.hardware.location.NanoAppMessage")
 

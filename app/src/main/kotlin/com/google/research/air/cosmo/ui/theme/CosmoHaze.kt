@@ -1,6 +1,5 @@
 package com.google.research.air.cosmo.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -44,7 +43,7 @@ fun Modifier.cosmoHazeSource(state: HazeState): Modifier = this.hazeSource(state
  * falls back to a solid tint on older devices; we keep the same fallback shape ourselves so callers
  * can choose to skip `hazeEffect` entirely (and avoid the per-frame cost).
  */
-val supportsRealBlur: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+val supportsRealBlur: Boolean get() = true
 
 /**
  * Default frosted style used by Cosmo chrome. Tinted toward the active surface so the bar still

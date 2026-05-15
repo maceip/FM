@@ -1,7 +1,6 @@
 package com.google.research.air.cosmo.ui.theme
 
 import android.app.WallpaperManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Composable
@@ -57,21 +56,16 @@ fun rememberWallpaperPalette(): WallpaperPalette {
         val manager = WallpaperManager.getInstance(context)
         palette = manager.snapshotPalette()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            val listener = WallpaperManager.OnColorsChangedListener { _, _ ->
-                palette = manager.snapshotPalette()
-            }
-            manager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
-            onDispose { manager.removeOnColorsChangedListener(listener) }
-        } else {
-            onDispose { }
+        val listener = WallpaperManager.OnColorsChangedListener { _, _ ->
+            palette = manager.snapshotPalette()
         }
+        manager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
+        onDispose { manager.removeOnColorsChangedListener(listener) }
     }
     return palette
 }
 
 private fun WallpaperManager.snapshotPalette(): WallpaperPalette {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return WallpaperPalette.Empty
     val colors = getWallpaperColors(WallpaperManager.FLAG_SYSTEM) ?: return WallpaperPalette.Empty
     return WallpaperPalette(
         primary = Color(colors.primaryColor.toArgb()),

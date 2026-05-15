@@ -38,12 +38,7 @@ No backend services, no Docker, no Node.js. See `README.md` for capability matri
    (`scripts/provision-from-recovery.sh`) and are not available in Cloud Agent VMs.
    Always pass `-x verifyCosmoReleaseModelManifest -x verifySodaAssets` when building.
 
-2. **Pre-existing lint/detekt/ktlint issues**: The codebase has existing issues in
-   detekt (15 weighted), ktlint (3 issues in `build.gradle.kts`), and Android lint
-   (MissingPermission, PrivateApi, ObsoleteSdkInt). These are pre-existing in the
-   main branch. The detekt baseline at `config/detekt/baseline.xml` is empty.
-
-3. **Pre-existing test failure**: `GatekeeperModelManifestDriftTest.manifestAndKotlinMapAgreeOnEveryEntry`
+2. **Pre-existing test failure**: `GatekeeperModelManifestDriftTest.manifestAndKotlinMapAgreeOnEveryEntry`
    fails due to drift between `model-manifest.json` (8 entries) and the test's hardcoded
    list (7 entries — missing `INHERENT_V0`). 131 of 132 tests pass.
 

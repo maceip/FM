@@ -126,6 +126,7 @@ constructor(
             )
     }
 
+    @Suppress("ReturnCount")
     private fun sendMessageToNanoApp(message: Int): Boolean {
         val util = contextHubClientUtil ?: run {
             Log.i(TAG, "CHRE is not supported.")

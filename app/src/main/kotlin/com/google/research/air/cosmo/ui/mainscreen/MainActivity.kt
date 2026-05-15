@@ -43,6 +43,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -877,7 +878,7 @@ private fun CaptureScreen(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val scope = rememberCoroutineScope()
-    var refreshPermissions by remember { mutableStateOf(0) }
+    var refreshPermissions by remember { mutableIntStateOf(0) }
     var permissionStates by remember { mutableStateOf<List<RuntimePermissionState>>(emptyList()) }
     val permissions =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -999,7 +1000,7 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val scope = rememberCoroutineScope()
-    var refreshPermissions by remember { mutableStateOf(0) }
+    var refreshPermissions by remember { mutableIntStateOf(0) }
     var permissionStates by remember { mutableStateOf<List<RuntimePermissionState>>(emptyList()) }
     val permissions =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {

@@ -22,6 +22,7 @@ import kotlin.math.abs
  * Apply to the outer Box that positions the orb/tab surface. The surface reads [state.offset] for
  * its position via `Modifier.offset { state.offset.value.toIntOffset() }`.
  */
+@Suppress("CyclomaticComplexMethod")
 fun Modifier.edgeDockable(
     state: EdgeDockState,
     onTap: () -> Unit = {},
@@ -41,40 +42,21 @@ fun Modifier.edgeDockable(
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             val downTime = System.currentTimeMillis()
-            val startPosition = state.offset.value
             var totalDisplacement = Offset.Zero
             var lastPosition = down.position
             var lastTime = downTime
-            var consumed = false
 
+            @Suppress("LoopWithTooManyJumpStatements")
             while (true) {
                 val event = awaitPointerEvent()
                 val change: PointerInputChange = event.changes.firstOrNull() ?: break
 
                 if (!change.pressed) {
-                    val upTime = System.currentTimeMillis()
-                    val duration = upTime - downTime
-                    val displacement = totalDisplacement.getDistance()
-                    val dt = (upTime - lastTime).coerceAtLeast(1)
-                    val velocity = (change.position - lastPosition) / (dt.toFloat() / 1000f)
-
-                    when {
-                        displacement < tapMaxPx && duration < PresenceTokens.Motion.tapMaxDurationMs -> {
-                            onTap()
-                        }
-                        displacement < longPressMaxPx && duration >= PresenceTokens.Motion.longPressMinDurationMs -> {
-                            onLongPress()
-                        }
-                        abs(velocity.x) > flickThresholdPx && isAwayFromCenter(state, velocity) -> {
-                            onDismiss()
-                        }
-                        abs(velocity.x) > expandThresholdPx && isTowardCenter(state, velocity) -> {
-                            onExpand()
-                        }
-                        else -> {
-                            scope.launch { state.snapToNearest() }
-                        }
-                    }
+                    classifyRelease(
+                        downTime, totalDisplacement, lastPosition, lastTime,
+                        change, tapMaxPx, longPressMaxPx, flickThresholdPx, expandThresholdPx,
+                        state, scope, onTap, onLongPress, onDismiss, onExpand
+                    )
                     break
                 }
 
@@ -87,10 +69,41 @@ fun Modifier.edgeDockable(
                     lastPosition = change.position
                     lastTime = System.currentTimeMillis()
                     change.consume()
-                    consumed = true
                 }
             }
         }
+    }
+}
+
+private fun classifyRelease(
+    downTime: Long,
+    totalDisplacement: Offset,
+    lastPosition: Offset,
+    lastTime: Long,
+    change: PointerInputChange,
+    tapMaxPx: Float,
+    longPressMaxPx: Float,
+    flickThresholdPx: Float,
+    expandThresholdPx: Float,
+    state: EdgeDockState,
+    scope: kotlinx.coroutines.CoroutineScope,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onDismiss: () -> Unit,
+    onExpand: () -> Unit
+) {
+    val upTime = System.currentTimeMillis()
+    val duration = upTime - downTime
+    val displacement = totalDisplacement.getDistance()
+    val dt = (upTime - lastTime).coerceAtLeast(1)
+    val velocity = (change.position - lastPosition) / (dt.toFloat() / 1000f)
+
+    when {
+        displacement < tapMaxPx && duration < PresenceTokens.Motion.tapMaxDurationMs -> onTap()
+        displacement < longPressMaxPx && duration >= PresenceTokens.Motion.longPressMinDurationMs -> onLongPress()
+        abs(velocity.x) > flickThresholdPx && isAwayFromCenter(state, velocity) -> onDismiss()
+        abs(velocity.x) > expandThresholdPx && isTowardCenter(state, velocity) -> onExpand()
+        else -> scope.launch { state.snapToNearest() }
     }
 }
 

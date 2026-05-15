@@ -5,7 +5,6 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.research.air.cosmo.di.ApplicationScope
 import dagger.Binds
@@ -92,7 +91,7 @@ constructor(
                         socket.connect()
                         _state.value = BudsProviderState.Streaming
                         streamAudio(socket)
-                    } catch (security: SecurityException) {
+                    } catch (@Suppress("SwallowedException") security: SecurityException) {
                         _state.value = BudsProviderState.Failed("Bluetooth permission denied")
                     } catch (io: IOException) {
                         _state.value = BudsProviderState.Failed(io.message ?: "Bluetooth socket failed")
@@ -144,8 +143,7 @@ constructor(
     }
 
     private fun hasBluetoothConnectPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
     companion object {
         private const val AUDIO_BUFFER_SIZE = 0x800
