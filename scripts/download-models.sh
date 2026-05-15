@@ -8,10 +8,11 @@ MODELS_DIR="${ROOT_DIR}/app/src/main/assets/models"
 MANIFEST="${DEFAULT_MANIFEST}"
 VERIFY_ONLY=0
 ALLOW_EMPTY=0
+ALLOW_MISSING_BINARIES=0
 
 usage() {
   cat >&2 <<'EOF'
-usage: scripts/download-models.sh [--manifest path] [--verify-only] [--allow-empty]
+usage: scripts/download-models.sh [--manifest path] [--verify-only] [--allow-empty] [--allow-missing-binaries]
 
 Reads app/src/main/assets/model-manifest.json by default. Each manifest entry must
 declare id, filename, delivery, sha256, sizeBytes, mediaType, and required.
@@ -32,6 +33,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --allow-empty)
       ALLOW_EMPTY=1
+      shift
+      ;;
+    --allow-missing-binaries)
+      ALLOW_MISSING_BINARIES=1
       shift
       ;;
     -h | --help)
@@ -153,6 +158,10 @@ while IFS=$'\t' read -r model_id filename delivery url sha256 size_bytes require
   if [[ "${VERIFY_ONLY}" -eq 1 || "${delivery}" == "bundled" ]]; then
     if [[ ! -f "${target}" ]]; then
       if [[ "${required}" == "true" ]]; then
+        if [[ "${ALLOW_MISSING_BINARIES}" -eq 1 ]]; then
+          echo "WARNING: required model missing but tolerated (--allow-missing-binaries): ${filename}" >&2
+          continue
+        fi
         echo "required model is missing: ${filename}" >&2
         exit 66
       fi

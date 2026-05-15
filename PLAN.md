@@ -162,7 +162,7 @@ against the shared `emu.devkeys.net` service. The script:
 2. Installs + launches the named activity inside the remote emulator.
 3. Captures logcat + screen recording for the requested run window.
 4. **Fails if logcat matches `FATAL|ANR|CRASH|Exception|test.*fail|AssertionError`** within the window.
-5. Downloads the recording + logs to `artifacts/emu-<jobid>/` for review.
+5. Downloads the recording + logs to `artifacts/emu-run/job-<id>/` for review.
 
 If the emu run passes → task counts as done. If the recording doesn't
 show the expected behavior — even if no crash fired — the task is **not
@@ -179,6 +179,69 @@ test is a failed emu run.
 
 For each Tier N item below, the **Emu gate** column names what the emu
 run must do to count as proof.
+
+#### Known emu substrate constraints
+
+The emu (`emu.devkeys.net`) is **Pixel 5 / API 35 / x86_64**. The
+recovered cosmo binaries are **arm64-v8a only**. Practical implications:
+
+- **SODA native runtime (`libsoda_dev_jni.so`) cannot load on emu** — the
+  on-device half of the speech stack is silently skipped on every emu run.
+  `JniSodaCapability.isAvailable` returns false → gatekeeping falls
+  through to the always-text path. This is fine: the emu still validates
+  app boot, Hilt graph, MainActivity render, ContextStore open, ContextHub
+  degradation, and any text-only Gatekeeper / Fulfillment / IntentExtractor
+  / LLM-client behavior.
+- **EdgeTPU Conformer + AOC nanoapp cannot be exercised on emu** —
+  both depend on Tensor / platform-signed paths the emu doesn't have.
+  Both report unavailable correctly during emu validation, which IS the
+  expected behavior. Real activation only happens on real Pixel.
+- **CI runner doesn't have the recovered binaries** (TFLites, SODA packs,
+  .so files) — they're gitignored and provisioned via
+  `scripts/provision-from-recovery.sh` from `~/Downloads/cosmo_recovered_*`,
+  which the runner doesn't have. CI's `scripts/download-models.sh
+  --verify-only --allow-missing-binaries` tolerates this. Binary
+  distribution for CI is a known open problem (Tier 6+ item: hosted
+  release-asset bundle or Azure blob — see PLAN.md §16 future work).
+
+#### Validation baseline (job 3f7ce1f2247a433ead14d1f5889fb698, 2026-05-15)
+
+A local-from-developer emu run of `MainActivity` for 90s on current `main`
+produced these findings (full artifacts at
+`artifacts/emu-run/job-3f7ce1f2247a433ead14d1f5889fb698/`):
+
+✅ **Confirmed live by lifecycle log emissions:**
+- App process boots; ART runtime loads (`-Xcheck:jni`, `CollectorTypeCMC GC`)
+- Hilt `SingletonComponent` graph builds; injects through `MainActivity` → `ContextEventDao` → `PeriodicScreenCaptor` chain
+- `MainActivity.onCreate` runs at `MainActivity.kt:128`
+- `COSMO-Profiling` debug diagnostics initialize
+- `LeakCanary` is running and ready (debug build canary active)
+- `WorkManager` initialized; `SystemJobScheduler` enabled
+- `ProfileInstaller` installs the baseline profile
+- `ContextHubClientUtil` correctly reports "ContextHubManager not available on this device" (expected for emu)
+- `NanoAppClient` correctly degrades with the documented "ContextHubClientCallback is a class; cannot subclass without bytecode gen" message
+- `JniSodaCapability.isAvailable` is called (SODA controller attempted to start) but library load fails as expected on x86_64 emu
+
+⚠️ **Real issues surfaced:**
+- **`StrictMode` caught disk-read-on-main-thread** during `ContextStoreModule.provideDatabase(ContextStore.kt:391)` — the encrypted SQLCipher Room database opens eagerly via Hilt injection through `injectMainActivity → contextEventDao → SwitchingProvider`. **This is a real bug.** Likely fix: wrap as `Lazy<ContextStore>` or `Provider<ContextStore>` so the first DB open happens off-main-thread. (Tier 5.3-adjacent.)
+- **165 frames skipped** (`Choreographer: Skipped 165 frames!`) + 2 `HWUI: Davey!` 2.8s frame drops — cold-start jank caused by the same eager DI chain.
+
+🟡 **Not exercised by 90s MainActivity launch** (need explicit user flow / test fixture):
+- `Gatekeeper.start()` — tag never appeared
+- `IntentExtractor.start()` — tag never appeared
+- BERT model loading via TFLite
+- AICore wrapper / LLM invocation (no LLM calls in idle state)
+- Fulfillment runner (no user query fired)
+- Presence surfaces (no UI navigation; MainActivity is the Nav3 home, not Presence)
+- 22 fulfillment action types
+- Telemetry event emission (Firebase Analytics disabled — no `google-services.json` in debug build)
+
+The validation baseline confirms Tier 0.4 + Tier 0.6 ✅ but leaves Tier 1
+through Tier 5 items as **claimed-but-unexercised** until interactive
+flows (text input, voice, permission grants) are scripted via instrumented
+tests or `GatekeeperDebugReceiver` adb broadcasts. The natural next-step
+work is Tier 1.2 (text input → timer flow) — that's the smallest end-to-end
+exercise of the full stack.
 
 ---
 
