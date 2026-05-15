@@ -30,8 +30,7 @@ failures before they build, upload, launch, and manually review a recording.
 
 This is the cheapest confidence gain.
 
-- Fix the currently failing `:app:testDebugUnitTest` drift check before adding
-  more infrastructure.
+- Keep the manifest drift check green before adding more infrastructure.
 - Remove `|| true` from the GitHub unit-test step once the suite is green.
 - Keep lint/detekt best-effort only if there is a specific known blocker; avoid
   swallowing all new failures.
@@ -143,8 +142,7 @@ The core-code path should stay mostly pure JVM.
 
 ## Immediate next PRs
 
-1. Fix `GatekeeperModelManifestDriftTest` and make `:app:testDebugUnitTest`
-   required in CI.
+1. Make `:app:testDebugUnitTest` required in CI now that the manifest drift gate is green.
 2. Add semantic assertions to the existing orb/tab Compose JVM tests.
 3. Pilot official Compose Preview Screenshot Testing on `CardStackSurface`.
 4. Add a short `docs/testing.md` command matrix once the first three are green.
