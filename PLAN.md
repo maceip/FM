@@ -762,7 +762,13 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
 **User-ready (= ask a real person to install + use it day-to-day): no.** V+M leaves at least these gaps before users:
 
 1. **Crash reporting** — Firebase Analytics is disabled (no `google-services.json` in debug build per baseline emu log). With no crash reporter, the first user-side crash is invisible. Need: Firebase Crashlytics integration OR a self-hosted alternative (Sentry self-host, Bugsnag-style endpoint to the M4.3 server) tied to the privacy posture.
-2. **Production release signing + distribution** — `releaseInternal` works (V5.6) but it's debug-signed. No production keystore is set up (`config/signing/*release*.keystore` is gitignored, no committed production cert). No distribution channel chosen (Play Store internal track? Firebase App Distribution? signed sideload?). Without this, "ask someone to install" means "give them an unsigned/dev-signed APK", which most Android devices will refuse outside developer mode.
+2. **Production release signing + distribution** — `releaseInternal` does not
+   currently build: `./gradlew :app:assembleReleaseInternal` fails in R8 with
+   missing SODA/Flogger/protobuf/desugar classes, with generated guidance at
+   `app/build/outputs/mapping/releaseInternal/missing_rules.txt`. After that
+   is fixed, production signing/distribution still remains: no production
+   keystore is set up (`config/signing/*release*.keystore` is gitignored, no
+   committed production cert), and no distribution channel is chosen.
 3. **User feedback loop** — no in-app feedback form, no telemetry endpoint for "this didn't work" reports. The 4 must-pass privacy tests assume the user has no need to phone home; some opt-in feedback path is necessary or you only hear about bugs through word-of-mouth.
 4. **Real-device battery proof** — V5.2 is gated on Pixel arrival; until proven, sustained-use battery is unknown. 3%/day target may not hold; without it, users will uninstall after a day.
 5. **Full data-wipe** — M2.9 covers "forget last N minutes" per source. There's no "delete everything" / GDPR-style flow that wipes ContextStore + buffers + speakerInfo + settings + cached LLM responses in one action. Required for trust.
@@ -881,7 +887,7 @@ right lane is chosen each time, logged with the reason.
 | 5.3 | Memory pressure trim: `Application.onTrimMemory(TRIM_MEMORY_RUNNING_LOW/CRITICAL)` clears byte buffers; `_BACKGROUND` clears writable ephemeral buffers | ✅ `MemoryPressureTrimmer` wired | emu run: `adb shell am send-trim-memory <pkg> RUNNING_CRITICAL` → `lib/performance/MemoryPressureTrimmer:` log line confirms clear |
 | 5.4 | ANR watchdog (debug only): 5s main-thread stall triggers stack dump | ✅ `DebugDiagnostics` wired | emu run: inject a deliberate 6s stall → screen.mp4 shows no ANR popup (watchdog dumps before system ANR triggers); log has watchdog stack |
 | 5.5 | StrictMode (debug only): 0 violations in a 30-min monkey test | ✅ wired; monkey test not regression-run | emu run: `adb shell monkey -p <pkg> 1000` → logcat has 0 `StrictMode` violations |
-| 5.6 | R8 release build green; APK ≤ 45 MB after minification; no missing-class warnings | ✅ `:app:assembleRelease` working; APK size healthy | emu run installs `releaseInternal` APK (release minification, debug signing); launches; no missing-class crashes |
+| 5.6 | R8 release build green; APK ≤ 45 MB after minification; no missing-class warnings | 🔴 `./gradlew :app:assembleReleaseInternal` fails in `minifyReleaseInternalWithR8` on missing SODA/Flogger/protobuf/desugar classes; see `missing_rules.txt` | emu run installs `releaseInternal` APK (release minification, debug signing); launches; no missing-class crashes |
 | 5.7 | Cert pinning + cleartext disabled (`AndroidManifest.xml usesCleartextTraffic="false"`) + non-launcher activities not exported | ✅ wired | emu run: instrumented test attempts cleartext HTTP — fails as expected |
 | 5.8 | Permission posture passes a Play Store policy self-check: every dangerous permission has rationale, accessibility service shows justification, foreground service has correct type bitmask | ⚠️ posture mostly correct; self-check not formalized | (no emu gate; CI script `scripts/verify-phase6-release-gates.sh` covers the static checks) |
 | 5.9 | Encrypted ContextStore (Room + SQLCipher) round-trips data; backup-extraction yields ciphertext only | ✅ wired | emu run: instrumented test inserts → adb pull the `.db` → `file` reports SQLCipher header / data not readable as plain SQLite |
@@ -1097,14 +1103,18 @@ not for the MediaTek Dimensity 9300 used in Xiaomi 15T Pro and others.
 into `app/src/main/assets/models/`, update the manifest hash + size; the
 backend selector picks it automatically.
 
-### 6.4 Release APK size + posture
+### 6.4 Release APK build + posture
 
-**Observation:** debug APK currently ~82 MB (with bundled SODA packs +
-BERT variants); release APK ~16 MB after R8. Both healthy.
+**Blocker:** release build is not currently green. A fresh
+`./gradlew :app:assembleReleaseInternal` on 2026-05-15 failed in
+`minifyReleaseInternalWithR8` due missing classes from the recovered SODA /
+Flogger / protobuf / desugar surface. R8 generated suggested rules at
+`app/build/outputs/mapping/releaseInternal/missing_rules.txt`.
 
-**Mitigation:** none needed; R8 + baseline profiles in Phase 5 keep this in
-range. Verify each milestone with `./gradlew assembleRelease -P` and check
-APK analyzer output.
+**Mitigation:** add the minimum correct keep/dontwarn rules or restore the
+missing compile-time stubs, then rerun `:app:assembleReleaseInternal` and
+install the produced APK on emu. Only after that passes should APK size,
+signing, and distribution be treated as release-readiness work.
 
 ---
 
