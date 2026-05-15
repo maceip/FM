@@ -271,6 +271,9 @@ Treat §3.0a as a work queue, not as proof that the app is ready. Current
   `AudioCaptors.kt:224` missing Bluetooth permission handling). In CI, unit
   tests and lint/detekt are still best-effort (`|| true`), so a green PR does
   not yet mean Tier 0 is green.
+- The CI hard gate also runs `scripts/verify-relocation-safety.sh`, which
+  fails today on checked-in `~/cosmo-dev` and `/Users/mac/cosmo-dev`
+  references in `reference/`, `LAYOUT.md`, docs, and helper scripts.
 - The Home "Ask" path is not a free-text user input. `MainActivity.kt:642-646`
   has hardcoded `Ask` / `Batch` buttons; the Ask button calls
   `handleUserQuery("summarize what I should do next", "")`. Tier 1 is blocked
@@ -775,7 +778,7 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
 
 | # | Item | Status | Emu gate |
 |---|---|---|---|
-| 0.1 | `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug` green on every PR | 🔴 local run currently fails: `detekt` has 15 weighted issues; `:app:testDebugUnitTest` has 132 tests / 1 failed (`GatekeeperModelManifestDriftTest`); `lintDebug` has 14 errors. CI also marks unit tests and lint/detekt best-effort via `|| true` | CI runs the four commands as hard gates; both Kotlin + Java sources clean |
+| 0.1 | PR hard gates green: relocation safety, compile, detekt, lint, unit tests, assembleDebug | 🔴 current hard gate fails at `scripts/verify-relocation-safety.sh`; local Gradle also fails (`detekt` 15 weighted issues; `:app:testDebugUnitTest` 132 tests / 1 failed; `lintDebug` 14 errors). CI still marks unit tests and lint/detekt best-effort via `|| true` | CI runs relocation safety + the four Gradle commands as hard gates; both Kotlin + Java sources clean |
 | 0.2 | `scripts/dev-loop.sh` launches FM on a connected device, streams logs, exits cleanly when interrupted | ✅ smoke-tested via `--help`; not exercised end-to-end on hardware | Run `dev-loop.sh --no-logs --no-launch --apk-only` against emu — APK produced, size sane |
 | 0.3 | `scripts/emu-ci-run.sh` integrated into PR CI; fails on any FATAL/ANR within a 60s run window | ⚠️ script exists; CI not yet calling it on every PR | A PR opens with a deliberate crash injection → emu-ci-run reports FATAL → PR fails |
 | 0.4 | `MainActivity` launches and renders the Home destination of Nav3 without exception | ✅ build succeeds; live behavior unverified on emu | emu-ci-run launches MainActivity for 30s; no `FATAL` in logcat; screen.mp4 shows non-blank Home screen |
@@ -1008,7 +1011,8 @@ For per-component status, see [`docs/architecture.md`](docs/architecture.md)
   bundle provisioned by default and remote inference still needs a live server
   endpoint.
 - **M4/release readiness is not green.** Privacy tests are partial, final
-  visual pass is not done, local `detekt` currently fails with 15 weighted
+  visual pass is not done, relocation safety fails on checked-in
+  `~/cosmo-dev` references, local `detekt` currently fails with 15 weighted
   issues, unit tests fail on gatekeeper manifest drift, `lintDebug` fails with
   14 errors, and release gates still need separate cleanup.
 
