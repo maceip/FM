@@ -15,7 +15,7 @@ Ship a standalone Android ambient assistant that can:
 - Capture permitted context and recall it.
 - Enforce privacy toggles in code, not just in UI.
 
-The recovered cosmo APK and `~/cosmo-dev` are reference evidence only. They
+The recovered cosmo APK and `$COSMO_DEV_ROOT` are reference evidence only. They
 can answer "what did cosmo do?" They are not a work queue.
 
 ## Current Truth
@@ -241,8 +241,9 @@ PR moves the milestone forward or adds scope.
 
 These facts were checked on `main` / the audit branch on 2026-05-15:
 
-- `scripts/verify-relocation-safety.sh` fails on checked-in `~/cosmo-dev` and
-  `/Users/mac/cosmo-dev` references.
+- `scripts/verify-relocation-safety.sh` failed on checked-in developer-local
+  recovery paths; this branch replaces them with repo references or
+  `COSMO_DEV_ROOT` / `INHERENT_ROOT`.
 - `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`
   fails immediately at detekt with 15 weighted issues.
 - `./gradlew :app:testDebugUnitTest` fails: 132 tests, 1 failed

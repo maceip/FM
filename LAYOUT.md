@@ -83,15 +83,15 @@ namespace stays cosmo for parity.
 | `~/Downloads/cosmo_baksmali/` | Disassembled smali (~2.5 GB) | Read-only reference; gigantic; not a source of truth for genesis code | Cited by line in `architecture-delta.md` and `docs/camel-port-notes.md` |
 | `~/Downloads/cosmo_recovered_services/` | META-INF/services descriptors | Cosmo APK extraction byproduct | Reference only |
 | `~/Downloads/cosmo_artifact_integrity/` | SHA-256 hashes + recovery ledger | Recovery audit trail | Verified at runtime by `app/src/main/assets/model-manifest.json` SHA-256 checks |
-| `~/cosmo-dev/repo/docs/*_stack_map.md` | Substrate maps (audio, text, image, llm, dagger graph, settings, telemetry, UI surface) | Cosmo recovery documentation; authored by recovery work; updated occasionally | See "Consolidation roadmap" below — proposal to copy critical stack maps into `~/neural/reference/` |
-| `~/cosmo-dev/repo/docs/architecture.md` | Upstream cosmo architecture (179 lines) | Reference for the delta; rarely changes | Cited from `architecture-delta.md` as the source it's a delta against |
-| `~/cosmo-dev/WS4/docs/ws4-known-gaps.md` | Workstream-level intentional non-goals | Workstream organization; predates FM rename | Cited from `architecture.md §15` |
+| `$COSMO_DEV_ROOT/repo/docs/*_stack_map.md` | Substrate maps (audio, text, image, llm, dagger graph, settings, telemetry, UI surface) | Cosmo recovery documentation; authored by recovery work; updated occasionally | See "Consolidation roadmap" below — proposal to copy critical stack maps into `~/neural/reference/` |
+| `$COSMO_DEV_ROOT/repo/docs/architecture.md` | Upstream cosmo architecture (179 lines) | Reference for the delta; rarely changes | Cited from `architecture-delta.md` as the source it's a delta against |
+| `$COSMO_DEV_ROOT/WS4/docs/ws4-known-gaps.md` | Workstream-level intentional non-goals | Workstream organization; predates FM rename | Cited from `architecture.md §15` |
 | `~/inherent/` | Joint audio→intent training pipeline (separate Python project) | Distinct workstream with its own git repo, training infra, dependencies | Output (`inherent.tflite` + `inherent.metadata.json`) drops into `~/neural/app/src/main/assets/models/` when ready. Contract: `~/inherent/contracts/runtime_contract.md` |
-| `~/cosmo-dev/litert_aot_bert_work/` | MediaTek AOT compile pipeline drafts | Vendor-toolchain experiments; per-machine setup | Output (`bert_v0_mt6989.tflite`) drops into `~/neural/app/src/main/assets/models/` when produced |
-| `~/cosmo-dev/mtk_npu_work/` | MediaTek NPU exploration | Same — vendor experiments | Same drop pattern |
-| `~/cosmo-dev/soda-jni-test/` | Standalone SODA JNI smoke test (separate Gradle project) | Isolation for SODA native-lib debugging | Reference only; learnings inform `~/neural/app/src/main/cpp/soda/soda_jni.cc` |
-| `~/cosmo-dev/cosmo-soda-interop/` | SODA interop tooling | Cross-project interop experiments | Reference only |
-| `~/cosmo-dev/emu-provision/` | Emulator provisioning for `emu.devkeys.net` | Remote emulator service (separate from local dev loop) | Used by `~/neural/scripts/emu-ci-run.sh` for CI runs against the remote service |
+| `$COSMO_DEV_ROOT/litert_aot_bert_work/` | MediaTek AOT compile pipeline drafts | Vendor-toolchain experiments; per-machine setup | Output (`bert_v0_mt6989.tflite`) drops into `~/neural/app/src/main/assets/models/` when produced |
+| `$COSMO_DEV_ROOT/mtk_npu_work/` | MediaTek NPU exploration | Same — vendor experiments | Same drop pattern |
+| `$COSMO_DEV_ROOT/soda-jni-test/` | Standalone SODA JNI smoke test (separate Gradle project) | Isolation for SODA native-lib debugging | Reference only; learnings inform `~/neural/app/src/main/cpp/soda/soda_jni.cc` |
+| `$COSMO_DEV_ROOT/cosmo-soda-interop/` | SODA interop tooling | Cross-project interop experiments | Reference only |
+| `$COSMO_DEV_ROOT/emu-provision/` | Emulator provisioning for `emu.devkeys.net` | Remote emulator service (separate from local dev loop) | Used by `~/neural/scripts/emu-ci-run.sh` for CI runs against the remote service |
 
 ---
 
@@ -119,15 +119,15 @@ Total size: ~500 KB, tracked in git as text. See `reference/README.md`.
 truth, next milestone, ordered work, parked non-goals, and verification facts.
 Older plan/design material came from:
 
-- `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md` (320 lines)
-- `~/cosmo-dev/repo/docs/marching-orders.md` (360 lines)
-- `~/cosmo-dev/repo/docs/parallel-offload-plan.md` (157 lines)
-- `~/cosmo-dev/repo/docs/implementation-status.md` (36 lines)
-- `~/cosmo-dev/repo/docs/blockers-and-mitigations.md` (92 lines)
-- `~/cosmo-dev/repo/docs/llm-model-delivery-architecture-review.md` (59 lines)
-- `~/cosmo-dev/repo/docs/security-threat-model.md` (25 lines)
-- `~/cosmo-dev/WS4/docs/ws4-demo.md` (67 lines)
-- `~/cosmo-dev/WS4/docs/ws4-known-gaps.md` (42 lines — superseded by `docs/fallback-paths.md`)
+- `$COSMO_DEV_ROOT/repo/docs/cosmo_apk_consolidated_plan.md` (320 lines)
+- `$COSMO_DEV_ROOT/repo/docs/marching-orders.md` (360 lines)
+- `$COSMO_DEV_ROOT/repo/docs/parallel-offload-plan.md` (157 lines)
+- `$COSMO_DEV_ROOT/repo/docs/implementation-status.md` (36 lines)
+- `$COSMO_DEV_ROOT/repo/docs/blockers-and-mitigations.md` (92 lines)
+- `$COSMO_DEV_ROOT/repo/docs/llm-model-delivery-architecture-review.md` (59 lines)
+- `$COSMO_DEV_ROOT/repo/docs/security-threat-model.md` (25 lines)
+- `$COSMO_DEV_ROOT/WS4/docs/ws4-demo.md` (67 lines)
+- `$COSMO_DEV_ROOT/WS4/docs/ws4-known-gaps.md` (42 lines — superseded by `docs/fallback-paths.md`)
 
 The detailed historical material is kept in git history and the reference
 docs. It is no longer copied into `PLAN.md`, because the active plan must be
@@ -137,11 +137,11 @@ small enough to execute.
 
 `docs/architecture.md`, `README.md`, `architecture-delta.md`, and
 `fallback-paths.md` now cite `reference/*.md` (mirrored) and `PLAN.md`
-(operating plan) rather than `~/cosmo-dev/*`.
+(operating plan) rather than `$COSMO_DEV_ROOT/*`.
 
 **FM is now self-contained for all doc purposes.** A reader cloning the
 repo and reading from the root has everything they need without crossing
-into `~/cosmo-dev/`.
+into `$COSMO_DEV_ROOT/`.
 
 ### Out of scope — large binaries stay out
 

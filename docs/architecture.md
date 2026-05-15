@@ -6,7 +6,7 @@ descend into the more specific docs as needed:
 
 - **Marching orders & contract rules (C1–C9, PR0–PR6):** [`architecture-delta.md`](architecture-delta.md)
 - **Active blockers:** [`blocker-register.md`](blocker-register.md)
-- **Recovery maps (cosmo bytecode-level reference):** `~/cosmo-dev/repo/docs/{audio,text,image,llm,ui_surface,dagger_graph,settings_and_config,telemetry}_stack_map.md`
+- **Recovery maps (cosmo bytecode-level reference):** `$COSMO_DEV_ROOT/repo/docs/{audio,text,image,llm,ui_surface,dagger_graph,settings_and_config,telemetry}_stack_map.md`
 - **Inherent (joint audio→intent model project):** `~/inherent/contracts/runtime_contract.md`
 - **CaMeL reference (Google Research):** [github.com/google-research/camel-prompt-injection](https://github.com/google-research/camel-prompt-injection), [arxiv 2503.18813](https://arxiv.org/abs/2503.18813)
 
@@ -945,7 +945,7 @@ transport indefinitely; add Oak only when confidentiality > convenience.
 ### 15.5a What `liboak_session_config_builder_jni.so` actually does
 
 For the eventual port, here's what the recovered binary exposes (per the
-upstream `~/cosmo-dev/repo/docs/audio_stack_map.md` and adjacent recovery
+upstream `$COSMO_DEV_ROOT/repo/docs/audio_stack_map.md` and adjacent recovery
 notes, cross-referenced against the public Oak repo):
 
 1. **`OakSessionConfigBuilder`** — fluent builder that produces an
@@ -1217,15 +1217,15 @@ the slots visible so that:
 | Per-AST-node CaMeL port reference (for the implementing workstream) | `docs/camel-port-notes.md` |
 | 3-tier fallback paths per deferred subsystem (cosmo-recovered → commercial/OSS → build it) | `docs/fallback-paths.md` |
 | Active blockers / not-yet-resolved issues | `docs/blocker-register.md` |
-| Cosmo recovery stack maps (mirrored from `~/cosmo-dev/repo/docs/`) | `reference/cosmo-*.md`, `reference/contracts/` |
+| Cosmo recovery stack maps (mirrored from `$COSMO_DEV_ROOT/repo/docs/`) | `reference/cosmo-*.md`, `reference/contracts/` |
 | Inherent runtime tensor contract + audio corpus collection | `reference/inherent-*.md` |
 | AICore public-API surface limits | `docs/aicore-api-gap.md` |
 | Audio training corpus plan | `docs/audio-corpus-plan.md` |
 | Release signing policy | `docs/release-signing-policy.md` |
 | Remote inference HTTP contract | `docs/remote-inference-contract.md` |
 | Architecture-update enforcement hook | `docs/architecture-update-hook.md` |
-| Recovery-level cosmo internals (smali / proto fields / asset bytes) | `~/cosmo-dev/repo/docs/*_stack_map.md`, `~/cosmo-dev/repo/docs/architecture.md` |
-| Workspace-level decisions, deferred items, scope cuts | `~/cosmo-dev/WS4/docs/ws4-known-gaps.md`, `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md` |
+| Recovery-level cosmo internals (smali / proto fields / asset bytes) | `$COSMO_DEV_ROOT/repo/docs/*_stack_map.md`, `$COSMO_DEV_ROOT/repo/docs/architecture.md` |
+| Workspace-level decisions, deferred items, scope cuts | `$COSMO_DEV_ROOT/WS4/docs/ws4-known-gaps.md`, `$COSMO_DEV_ROOT/repo/docs/cosmo_apk_consolidated_plan.md` |
 | Inherent joint-model runtime contract | `~/inherent/contracts/runtime_contract.md` |
 
 ---

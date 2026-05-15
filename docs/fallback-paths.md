@@ -144,7 +144,7 @@ that Tensor G4/G5 Pixels have today.
 
 | Tier | Option | Notes |
 |---|---|---|
-| 🟢 1 | **Cosmo's drafted AOT compile pipeline** | Documented in `~/cosmo-dev/repo/docs/bert_gatekeeper_litert_jni_replacement.md`. Uses `mtk_target.SocModel.MT6989` from the MediaTek Neuron compiler. Working scripts exist under `~/cosmo-dev/litert_aot_bert_work/`. **Just needs to be run on a machine with the Neuron toolchain** |
+| 🟢 1 | **Cosmo's drafted AOT compile pipeline** | Documented in `$COSMO_DEV_ROOT/repo/docs/bert_gatekeeper_litert_jni_replacement.md`. Uses `mtk_target.SocModel.MT6989` from the MediaTek Neuron compiler. Working scripts exist under `$COSMO_DEV_ROOT/litert_aot_bert_work/`. **Just needs to be run on a machine with the Neuron toolchain** |
 | 🟡 2a | **TFLite default (no NPU acceleration)** | Fall back to `bert_v0_cpu.tflite` for MediaTek devices. Slower but works. The selector already does this when no SoC-specific variant is present |
 | 🟡 2b | **Run on the MediaTek device's GPU via TFLite GPU delegate** | Middle ground. Worse latency than NPU but better than CPU. Requires a separate `bert_v0_mtk_gpu.tflite` |
 | 🔴 3  | **Hand-author quantized BERT for mt6989** | Weeks of work; only justified if the AOT toolchain breaks fundamentally |

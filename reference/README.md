@@ -1,7 +1,7 @@
 # Reference Mirror
 
 Read-only snapshots of cosmo-recovery + inherent docs that `~/neural` cites.
-Sourced from `~/cosmo-dev/repo/docs/` and `~/inherent/` via
+Sourced from `$COSMO_DEV_ROOT/repo/docs/` and `~/inherent/` via
 `scripts/sync-reference-docs.sh`.
 
 **Do not edit files here directly** — they're mirrors. Edit at source and
@@ -55,14 +55,14 @@ scripts/sync-reference-docs.sh --diff  # show what would change without copying
 
 ## What's intentionally NOT mirrored
 
-- `~/cosmo-dev/repo/docs/marching-orders.md` — superseded by [`docs/architecture-delta.md`](../docs/architecture-delta.md) PR0–PR6
-- `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md` — superseded by [`PLAN.md`](../PLAN.md)
-- `~/cosmo-dev/repo/docs/parallel-offload-plan.md` — historical work tracker; current state is in [`PLAN.md`](../PLAN.md)
-- `~/cosmo-dev/repo/docs/implementation-status.md` — historical snapshot; current status is [`docs/architecture.md §19`](../docs/architecture.md)
-- `~/cosmo-dev/repo/docs/blockers-and-mitigations.md` — superseded by [`docs/blocker-register.md`](../docs/blocker-register.md) and the current blockers in [`PLAN.md`](../PLAN.md)
-- `~/cosmo-dev/repo/docs/security-threat-model.md` — superseded by the relevant security sections in [`docs/architecture.md`](../docs/architecture.md)
-- `~/cosmo-dev/repo/docs/llm-model-delivery-architecture-review.md` — superseded by [`docs/architecture.md §9`](../docs/architecture.md)
-- `~/cosmo-dev/WS4/docs/ws4-known-gaps.md` — superseded by [`docs/fallback-paths.md`](../docs/fallback-paths.md)
-- `~/cosmo-dev/WS4/docs/ws4-demo.md` — superseded by the next milestone in [`PLAN.md`](../PLAN.md)
+- `$COSMO_DEV_ROOT/repo/docs/marching-orders.md` — superseded by [`docs/architecture-delta.md`](../docs/architecture-delta.md) PR0–PR6
+- `$COSMO_DEV_ROOT/repo/docs/cosmo_apk_consolidated_plan.md` — superseded by [`PLAN.md`](../PLAN.md)
+- `$COSMO_DEV_ROOT/repo/docs/parallel-offload-plan.md` — historical work tracker; current state is in [`PLAN.md`](../PLAN.md)
+- `$COSMO_DEV_ROOT/repo/docs/implementation-status.md` — historical snapshot; current status is [`docs/architecture.md §19`](../docs/architecture.md)
+- `$COSMO_DEV_ROOT/repo/docs/blockers-and-mitigations.md` — superseded by [`docs/blocker-register.md`](../docs/blocker-register.md) and the current blockers in [`PLAN.md`](../PLAN.md)
+- `$COSMO_DEV_ROOT/repo/docs/security-threat-model.md` — superseded by the relevant security sections in [`docs/architecture.md`](../docs/architecture.md)
+- `$COSMO_DEV_ROOT/repo/docs/llm-model-delivery-architecture-review.md` — superseded by [`docs/architecture.md §9`](../docs/architecture.md)
+- `$COSMO_DEV_ROOT/WS4/docs/ws4-known-gaps.md` — superseded by [`docs/fallback-paths.md`](../docs/fallback-paths.md)
+- `$COSMO_DEV_ROOT/WS4/docs/ws4-demo.md` — superseded by the next milestone in [`PLAN.md`](../PLAN.md)
 
 The "superseded" set is plan/design content that's been consolidated into FM-owned canonical docs. The "mirrored" set is genuinely cosmo-recovery reference material that FM cites but doesn't rewrite.

@@ -171,7 +171,7 @@ MediaTek NeuroPilot / NPU trial status:
 
 ```text
 Legacy MediaTek converter scratch path:
-/Users/mac/cosmo-dev/mtk_npu_work
+$COSMO_DEV_ROOT/mtk_npu_work
 
 Legacy inputs:
 /Users/mac/Downloads/mtk_converter-8.13.0_packages.zip
@@ -185,12 +185,12 @@ The old MediaTek package contains Linux x86_64 Python wheels for `mtk_converter`
 ncc-tflite model.tflite -o model.dla --arch mdla5.5 --l1-size-kb 6144 --num-mdla 4
 ```
 
-Local searches under `/Users/mac/Downloads` and `/Users/mac/cosmo-dev` did not find `ncc-tflite` or `neuron_sdk`.
+Local searches under `/Users/mac/Downloads` and `$COSMO_DEV_ROOT` did not find `ncc-tflite` or `neuron_sdk`.
 
 The current public LiteRT path supersedes that older flow. The fresh scratch path is:
 
 ```text
-/Users/mac/cosmo-dev/litert_aot_bert_work
+$COSMO_DEV_ROOT/litert_aot_bert_work
 ```
 
 Installed current packages in Linux containers:

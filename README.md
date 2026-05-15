@@ -166,7 +166,7 @@ relocation safety).
 
 External:
 
-- Recovery-level cosmo internals (smali / proto fields / asset bytes): `~/cosmo-dev/repo/docs/*_stack_map.md`
+- Recovery-level cosmo internals (smali / proto fields / asset bytes): `$COSMO_DEV_ROOT/repo/docs/*_stack_map.md`
 - Inherent (joint audio→intent training pipeline): `~/inherent/contracts/runtime_contract.md`
 - CaMeL paper: [arxiv 2503.18813](https://arxiv.org/abs/2503.18813) — reference impl: [google-research/camel-prompt-injection](https://github.com/google-research/camel-prompt-injection)
 

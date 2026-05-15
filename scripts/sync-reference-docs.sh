@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# scripts/sync-reference-docs.sh — refresh ~/neural/reference/ from canonical
-# cosmo-dev + inherent doc locations.
+# scripts/sync-reference-docs.sh — refresh reference/ from canonical recovery
+# and inherent doc locations.
 #
 # Usage:
 #   scripts/sync-reference-docs.sh           # overwrite local copies
@@ -13,6 +13,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 REF_DIR="${REPO_ROOT}/reference"
+COSMO_DEV_ROOT="${COSMO_DEV_ROOT:-${HOME}/cosmo-dev}"
+INHERENT_ROOT="${INHERENT_ROOT:-${HOME}/inherent}"
 
 DIFF_MODE=false
 [[ "${1:-}" == "--diff" ]] && DIFF_MODE=true
@@ -21,24 +23,24 @@ mkdir -p "$REF_DIR/contracts"
 
 # (source_path|destination_basename) pairs.
 declare -a SOURCES=(
-  "/Users/mac/cosmo-dev/repo/docs/architecture.md|cosmo-architecture.md"
-  "/Users/mac/cosmo-dev/repo/docs/audio_stack_map.md|cosmo-audio-stack-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/text_stack_map.md|cosmo-text-stack-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/image_stack_map.md|cosmo-image-stack-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/llm_stack_map.md|cosmo-llm-stack-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/ui_surface_map.md|cosmo-ui-surface-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/dagger_graph_map.md|cosmo-dagger-graph-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/settings_and_config_map.md|cosmo-settings-and-config-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/telemetry_map.md|cosmo-telemetry-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/reachability-matrix.md|cosmo-reachability-matrix.md"
-  "/Users/mac/cosmo-dev/repo/docs/runtime_topology_map.md|cosmo-runtime-topology-map.md"
-  "/Users/mac/cosmo-dev/repo/docs/bert_gatekeeper_litert_jni_replacement.md|cosmo-bert-mt6989-aot-pipeline.md"
-  "/Users/mac/cosmo-dev/repo/docs/contracts/00_README.md|contracts/00_README.md"
-  "/Users/mac/cosmo-dev/repo/docs/contracts/01_context_store_api.md|contracts/01_context_store_api.md"
-  "/Users/mac/cosmo-dev/repo/docs/contracts/02_fulfillment_api.md|contracts/02_fulfillment_api.md"
-  "/Users/mac/cosmo-dev/repo/docs/contracts/03_skill_registry_api.md|contracts/03_skill_registry_api.md"
-  "/Users/mac/inherent/contracts/runtime_contract.md|inherent-runtime-contract.md"
-  "/Users/mac/inherent/AUDIO_COLLECTION.md|inherent-audio-collection.md"
+  "${COSMO_DEV_ROOT}/repo/docs/architecture.md|cosmo-architecture.md"
+  "${COSMO_DEV_ROOT}/repo/docs/audio_stack_map.md|cosmo-audio-stack-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/text_stack_map.md|cosmo-text-stack-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/image_stack_map.md|cosmo-image-stack-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/llm_stack_map.md|cosmo-llm-stack-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/ui_surface_map.md|cosmo-ui-surface-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/dagger_graph_map.md|cosmo-dagger-graph-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/settings_and_config_map.md|cosmo-settings-and-config-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/telemetry_map.md|cosmo-telemetry-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/reachability-matrix.md|cosmo-reachability-matrix.md"
+  "${COSMO_DEV_ROOT}/repo/docs/runtime_topology_map.md|cosmo-runtime-topology-map.md"
+  "${COSMO_DEV_ROOT}/repo/docs/bert_gatekeeper_litert_jni_replacement.md|cosmo-bert-mt6989-aot-pipeline.md"
+  "${COSMO_DEV_ROOT}/repo/docs/contracts/00_README.md|contracts/00_README.md"
+  "${COSMO_DEV_ROOT}/repo/docs/contracts/01_context_store_api.md|contracts/01_context_store_api.md"
+  "${COSMO_DEV_ROOT}/repo/docs/contracts/02_fulfillment_api.md|contracts/02_fulfillment_api.md"
+  "${COSMO_DEV_ROOT}/repo/docs/contracts/03_skill_registry_api.md|contracts/03_skill_registry_api.md"
+  "${INHERENT_ROOT}/contracts/runtime_contract.md|inherent-runtime-contract.md"
+  "${INHERENT_ROOT}/AUDIO_COLLECTION.md|inherent-audio-collection.md"
 )
 
 CHANGED=0
@@ -77,6 +79,6 @@ if [[ "$MISSING" -gt 0 ]]; then
   echo
   echo "Missing sources mean either:"
   echo "  - The upstream doc has moved or been deleted"
-  echo "  - You're running this on a machine without ~/cosmo-dev or ~/inherent"
+  echo "  - COSMO_DEV_ROOT or INHERENT_ROOT points at a missing checkout"
   exit 1
 fi
