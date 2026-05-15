@@ -11,9 +11,11 @@ import javax.inject.Singleton
 import org.json.JSONObject
 
 private fun inherentMetadataTextLoader(context: Context): () -> String? = {
-    runCatching {
-        context.assets.open("models/inherent.metadata.json").bufferedReader().use { it.readText() }
-    }.getOrNull()
+    GatekeeperModelIds.filenameFor(GatekeeperModelIds.INHERENT_V0_METADATA)?.let { filename ->
+        runCatching {
+            context.assets.open("models/$filename").bufferedReader().use { it.readText() }
+        }.getOrNull()
+    }
 }
 
 @Singleton

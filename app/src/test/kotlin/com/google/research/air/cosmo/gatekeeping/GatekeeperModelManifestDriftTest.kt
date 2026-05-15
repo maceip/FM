@@ -56,7 +56,9 @@ class GatekeeperModelManifestDriftTest {
             GatekeeperModelIds.BERT_EDGETPU_P25,
             GatekeeperModelIds.BERT_NPU_MT6989,
             GatekeeperModelIds.AUDIO_FRONTEND,
-            GatekeeperModelIds.AUDIO_GATEKEEPER
+            GatekeeperModelIds.AUDIO_GATEKEEPER,
+            GatekeeperModelIds.INHERENT_V0,
+            GatekeeperModelIds.INHERENT_V0_METADATA
         ).associateWith { id ->
             requireNotNull(GatekeeperModelIds.filenameFor(id)) {
                 "GatekeeperModelIds.filenameFor($id) returned null — update FILENAMES"
