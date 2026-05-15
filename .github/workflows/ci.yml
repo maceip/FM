@@ -6,7 +6,7 @@ name: fm-ci
 # distributed to the runner today — see LAYOUT.md "Anti-goals" and
 # scripts/provision-from-recovery.sh.
 #
-# The emu validation gate (Tier 0.3 of PLAN.md §3) runs against
+# The emu validation gate described in PLAN.md runs against
 # emu.devkeys.net via workflow_dispatch (manual trigger) below until
 # CI binary distribution is in place. Local emu validation works today
 # via scripts/emu-ci-run.sh.

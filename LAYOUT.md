@@ -113,10 +113,11 @@ stack maps + interface contracts + inherent contracts that FM cites:
 Re-sync via `scripts/sync-reference-docs.sh` (supports `--diff` dry run).
 Total size: ~500 KB, tracked in git as text. See `reference/README.md`.
 
-### Phase 2 — consolidate plan/design content into a master `PLAN.md` ✅ DONE
+### Phase 2 — simplify planning into one operating `PLAN.md` ✅ DONE
 
-`~/neural/PLAN.md` at repo root consolidates plan/design content that was
-previously scattered across:
+`~/neural/PLAN.md` at repo root is now the short operating plan: current
+truth, next milestone, ordered work, parked non-goals, and verification facts.
+Older plan/design material came from:
 
 - `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md` (320 lines)
 - `~/cosmo-dev/repo/docs/marching-orders.md` (360 lines)
@@ -128,15 +129,15 @@ previously scattered across:
 - `~/cosmo-dev/WS4/docs/ws4-demo.md` (67 lines)
 - `~/cosmo-dev/WS4/docs/ws4-known-gaps.md` (42 lines — superseded by `docs/fallback-paths.md`)
 
-Synthesized rather than concatenated — duplications dropped, status lines
-refreshed against current FM reality, cross-references updated to point at
-FM-owned canonical docs.
+The detailed historical material is kept in git history and the reference
+docs. It is no longer copied into `PLAN.md`, because the active plan must be
+small enough to execute.
 
 ### Phase 3 — point cross-references at the consolidated copies ✅ DONE
 
 `docs/architecture.md`, `README.md`, `architecture-delta.md`, and
 `fallback-paths.md` now cite `reference/*.md` (mirrored) and `PLAN.md`
-(consolidated) rather than `~/cosmo-dev/*`.
+(operating plan) rather than `~/cosmo-dev/*`.
 
 **FM is now self-contained for all doc purposes.** A reader cloning the
 repo and reading from the root has everything they need without crossing

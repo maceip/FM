@@ -152,8 +152,7 @@ relocation safety).
 
 ## Docs
 
-- [`SHIP.md`](SHIP.md) — short operating plan. Read this first for what to work on next.
-- [`PLAN.md`](PLAN.md) — long audit trail and reference backlog. Use it for evidence and details after `SHIP.md`.
+- [`PLAN.md`](PLAN.md) — short operating plan. Read this first for what to work on next.
 - [`LAYOUT.md`](LAYOUT.md) — where everything lives (canonical inside `~/neural`, what's outside and why, consolidation status)
 - [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including Presence UX layer (§13), AppFunctions surface (§14), server-side workstreams (§15), CaMeL trust-layer placement (§12), and recovered-but-unwired surface inventory (§17)
 - [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders

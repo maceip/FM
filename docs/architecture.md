@@ -1211,7 +1211,7 @@ the slots visible so that:
 | If you need... | Read |
 |---|---|
 | The current system architecture (this doc) | `docs/architecture.md` |
-| Master engineering plan (goal, milestones, workstreams, gates, threat model, demo script) | `PLAN.md` |
+| Current operating plan (next milestone, work order, parked non-goals, gate facts) | `PLAN.md` |
 | Repository layout — where everything lives | `LAYOUT.md` |
 | The C1–C9 contract rules + PR0–PR6 marching orders | `docs/architecture-delta.md` |
 | Per-AST-node CaMeL port reference (for the implementing workstream) | `docs/camel-port-notes.md` |
