@@ -117,7 +117,7 @@ downgrades to Local on network loss and logs it.
 
 **Current state:** On-device ASR + Gatekeeper + AICore live ✅. LiteRT-LM
 provisioning ⚠️ (needs Gemma 4 bundle). Remote inference structural ⚠️
-(no live endpoint — see §6.3). Local-only mode works for emulator + cloud
+(no live endpoint — see §7.2). Local-only mode works for emulator + cloud
 LLM via remote.
 
 ### M4 — Parity Demo + Hardening 🔵
@@ -140,7 +140,226 @@ Privacy test suite green.
 
 ---
 
-## 3. Workstream structure
+## 3. Ship Checklist — force-ranked
+
+This is the operational answer to "what must work before we can ask someone to
+use FM?" It consolidates the per-tier work items from M1–M4 (§2), in-flight
+state (§6), the cosmo-recovery work surface (`docs/architecture.md`), and the
+fallback paths (`docs/fallback-paths.md`).
+
+Tiers are blocking: **Tier N cannot start its acceptance gate until Tier N-1
+items are green.** Lower-tier items have implementation slack within a tier
+but the gate is collective.
+
+### 3.0 Validation convention (read first)
+
+**Every item below is "done" only when it passes the emu gate.**
+
+The emu gate today: `scripts/emu-ci-run.sh <APK> <ACTIVITY> <RUN_SECONDS>`
+against the shared `emu.devkeys.net` service. The script:
+
+1. Posts the APK to the emu service.
+2. Installs + launches the named activity inside the remote emulator.
+3. Captures logcat + screen recording for the requested run window.
+4. **Fails if logcat matches `FATAL|ANR|CRASH|Exception|test.*fail|AssertionError`** within the window.
+5. Downloads the recording + logs to `artifacts/emu-<jobid>/` for review.
+
+If the emu run passes → task counts as done. If the recording doesn't
+show the expected behavior — even if no crash fired — the task is **not
+done**. Visual review of the screen.mp4 is part of the gate.
+
+**Soon (Pixel arrives) — same gate against real device.** When a Pixel
+device is on the test bench, every gate runs both against emu AND against
+the device. The convention does not change; only the substrate doubles.
+
+**For tests deeper than "doesn't crash"** (e.g., privacy enforcement,
+permission denial path), wrap them as instrumented tests; emu-ci-run.sh
+exercises them inside the activity it launches. A failed instrumented
+test is a failed emu run.
+
+For each Tier N item below, the **Emu gate** column names what the emu
+run must do to count as proof.
+
+---
+
+### 3.1 Tier 0 — Foundation (everything else assumes these)
+
+| # | Item | Status | Emu gate |
+|---|---|---|---|
+| 0.1 | `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug` green on every PR | ⚠️ (pre-existing `Color.kt` detekt MatchingDeclarationName issue blocks `detekt`; build + lint + unit tests green) | CI runs the four commands; both Kotlin + Java sources clean |
+| 0.2 | `scripts/dev-loop.sh` launches FM on a connected device, streams logs, exits cleanly when interrupted | ✅ smoke-tested via `--help`; not exercised end-to-end on hardware | Run `dev-loop.sh --no-logs --no-launch --apk-only` against emu — APK produced, size sane |
+| 0.3 | `scripts/emu-ci-run.sh` integrated into PR CI; fails on any FATAL/ANR within a 60s run window | ⚠️ script exists; CI not yet calling it on every PR | A PR opens with a deliberate crash injection → emu-ci-run reports FATAL → PR fails |
+| 0.4 | `MainActivity` launches and renders the Home destination of Nav3 without exception | ✅ build succeeds; live behavior unverified on emu | emu-ci-run launches MainActivity for 30s; no `FATAL` in logcat; screen.mp4 shows non-blank Home screen |
+| 0.5 | Fresh clone → `scripts/provision-from-recovery.sh` → `./gradlew assembleDebug` → APK launches | ⚠️ provision script smoke-tested; full new-machine flow not yet validated | New CI job: clone FM, run provision, build, push to emu, launch — full chain green |
+| 0.6 | All gitignored recovered binaries SHA-256-verified against `model-manifest.json` and `verify-soda-assets.sh` | ✅ scripts/download-models.sh --verify-only passes locally | emu-ci-run does NOT re-verify (binaries are in the APK), but the PR-side `scripts/verify-phase6-release-gates.sh` does |
+
+**Tier 0 acceptance:** every PR that lands main runs through 0.1–0.4 in CI
+and the result is green.
+
+---
+
+### 3.2 Tier 1 — One end-to-end user flow (the "is this even alive" gate)
+
+The minimum a user must experience without an engineer in the room: ask FM
+to set a timer, see confirmation, see the timer get set.
+
+| # | Item | Status | Emu gate |
+|---|---|---|---|
+| 1.1 | First-launch permission rationale flow: app starts, asks for mic + notifications + accessibility with clear rationale text, handles deny + don't-ask-again | ⚠️ helper exists; full flow validation pending | emu-ci-run launches; instrumented test grants permissions programmatically; screen.mp4 shows rationale dialog before any permission ask |
+| 1.2 | Text input on Home: user types "set a timer for 10 minutes" → `FulfillmentOrchestrator.handleUserQuery` runs | ⚠️ Fulfillment wired (architecture.md §6); end-to-end from Home not verified on emu | emu run + instrumented test simulates text input → logcat shows `Gatekeeper:` BERT classification → `Fulfillment:` action parsed → confirmation surface rendered |
+| 1.3 | Side-effect confirmation: timer skill returns `SideEffectPending` → user taps Confirm → Android Clock provider receives `ACTION_SET_TIMER` → audit trail records the apply | ⚠️ skill registry wired; confirmation UI may not surface from a real `FulfillmentResult` | emu run + instrumented test confirms the action → adb shell query Clock provider shows new timer; `ActionsRepository` history grows by one entry |
+| 1.4 | Voice input on Home: user speaks (instrumented `MediaRecorder` fixture audio) → SODA transcribes → Gatekeeper classifies → same flow as 1.2 | ⚠️ SODA wired on-device but not validated end-to-end via emu (emu lacks mic; need fixture-audio inject) | emu run plays a WAV fixture through `GatekeeperDebugReceiver` `ACTION_INJECT_AUDIO` → SODA produces transcript → same end of 1.2/1.3 |
+| 1.5 | State persists across `am force-stop`: timer history, settings, permission grants survive | ⚠️ DataStore + SQLCipher wired; round-trip-across-kill not regression-tested | emu run: do flow 1.1–1.3, `am force-stop` the app, relaunch, query `ActionsRepository.history()` via debug receiver → previous timer entry present |
+| 1.6 | App handles airplane mode without crash (local-LLM-only path stays alive) | ⚠️ NetworkAwareLLM degradation path exists; not validated via emu | emu run: simulate airplane mode (`adb shell svc data disable`); do flow 1.2 with a query that AICore can answer locally; no `LlmUnavailableException` for both lanes |
+
+**Tier 1 acceptance:** an unscripted user installs the APK, grants permissions
+through the rationale flow, sets a timer by voice, sees it confirmed and
+applied. The emu run captures the whole sequence as a single video.
+
+---
+
+### 3.3 Tier 2 — The parity demo (all 9 skills + recall + privacy)
+
+This is M2 + M3 of the original milestone plan. The user can demo the full
+"ambient agent" pitch.
+
+| # | Item | Status | Emu gate |
+|---|---|---|---|
+| 2.1 | 9 parity skills end-to-end: list (add to grocery list), timer, calendar draft, doc draft, web search, jargon definitions, insight, recall, conversation summary | ⚠️ skill registry wired; each subtype's executor is single-handler stub today (architecture.md §6.1) — needs per-subtype split | emu run: instrumented test invokes each of 9 skills in turn → each emits `SideEffectApplied` or `Result` event in `ActionsRepository` |
+| 2.2 | Ambient mic capture via SODA: speech detected, Magic Mic directedness gate fires, transcript flows into `@AmbientAudioEphemeralBuffer` | ✅ on-device wired; emu validation needed (mic-fixture inject) | emu run: inject directed speech fixture → buffer count increases by 1; inject undirected speech → buffer count unchanged (gate suppressed) |
+| 2.3 | Notification capture: `NotificationListenerService` receives a posted notification → flows into `@NotificationEphemeralBuffer` | ✅ wired; emu validation needed | emu run: `adb shell cmd notification post` a notification → `@NotificationEphemeralBuffer` count increases |
+| 2.4 | Screen text capture: AccessibilityService observes screen text → flows into `@ScreenEphemeralBuffer` | ✅ wired; emu validation needed | emu run: launch a known activity with known text → buffer contains that text |
+| 2.5 | Recall: user asks "what was that thing about <topic>?" → `ContextStore.queryByText` returns relevant events with timestamps + source attribution | ⚠️ `queryByText` works; semantic `queryByEmbedding` is no-op until Gecko (deferred per fallback-paths.md) | emu run: pre-seed buffer + ContextStore with known events → ask recall query → response includes the seeded text + timestamp |
+| 2.6 | Disabled-source privacy enforcement: with source X off, generate N events → assert 0 reach store AND 0 reach any prompt | 🔵 the 4 must-pass privacy tests (PLAN.md §12) are listed but instrumented forms not all written | emu run runs `DisabledSourcePrivacyTest` (new); it must be green |
+| 2.7 | Retention sweep: events older than `getEphemeralBufferDurationMin()` are removed on next sweep | ⚠️ eviction policy in `InMemoryEphemeralBuffer`; ContextStore retention sweep status unknown | emu run + time-control fixture (override `Clock` injection) inserts old + recent events → trigger sweep → only recent remain |
+| 2.8 | Fulfillment routing modes: Local-only, Cloud-only, Hybrid each work; mode toggle persists; routing logs the choice | ⚠️ NetworkAwareLLM exists; the 3-mode toggle in Settings may or may not be wired | emu run: toggle each mode, do a query → `LLMStatsRepository` shows the correct route taken |
+| 2.9 | "Forget last 10 minutes" action removes matching events from store + in-flight buffers | 🔵 not built | emu run: insert recent events → invoke forget-window → buffer + ContextStore both clean |
+
+**Tier 2 acceptance:** the emu can replay the 6-flow demo script (PLAN.md §11)
+end-to-end without engineer intervention. The screen recording matches the
+expected per-flow behavior.
+
+---
+
+### 3.4 Tier 3 — Presence surface (the user-visible UX)
+
+The orb / tab / card stack is what the user looks at during ambient use.
+Without it FM is a settings screen, not an assistant.
+
+| # | Item | Status | Emu gate |
+|---|---|---|---|
+| 3.1 | Orb surface renders parked at screen edge with idle/listening/dismissed visuals (`presence/surfaces/OrbSurface.kt`) | ✅ Compose surface exists; emu render unverified | emu run launches a debug activity that renders `OrbSurface(state=Parked)` → screen.mp4 shows the orb in expected position with the design's aerospace palette |
+| 3.2 | Tab surface expands from orb on tap; cards render for `DeepResearch`, `SendResults`, `CalendarTimer` payloads | ✅ surfaces exist; tap-expand behavior unverified | emu run: simulate tap on orb → screen.mp4 shows tab expanded with 3 stub cards |
+| 3.3 | Presence state driver: a producer observes `Gatekeeper.results` + `IntentBuffer` + `FulfillmentEvent` and emits `PresenceState` transitions; surfaces collect from a single `StateFlow<PresenceState>` | ⚠️ surfaces render against `PresenceState`; the producer/orchestrator is the missing piece (`architecture.md §13.2`) | emu run + instrumented harness: post a `GatekeepingResult` to a fake gatekeeper → assert `PresenceState` flow emits `Working(taskId, STARTED)` |
+| 3.4 | Dismiss + snooze + reopen: user can dismiss a card for N minutes; reopen on demand | ⚠️ `Dismissed(until)` state exists; dismiss control wiring unverified | emu run: dismiss a Ready card → state transitions to Dismissed → after time-control advance, returns to Parked |
+| 3.5 | Card payload library covers all 9 parity skills (today: 3 payloads exist — `DeepResearch`, `SendResults`, `CalendarTimer`) | ⚠️ payload-per-skill mapping incomplete | emu run renders each of 9 skill-result payloads → screen.mp4 shows each cleanly |
+| 3.6 | Glass / projected XR rendering wired (`GlassPanel` exists; `CosmoProjectedGlassCaptureService` binds; producer from `PresenceState` not driven today) | 🟡 stays deferred for v1; slot reserved | (deferred; no v1 gate) |
+
+**Tier 3 acceptance:** the emu can run a 30-second loop where the orb parks
+→ listens → shows a Working pill → reveals a Ready card → user dismisses →
+orb returns to parked. Recorded as a single video for the demo.
+
+---
+
+### 3.5 Tier 4 — LLM lane completeness (so hybrid mode actually works)
+
+Three independent LLM lanes, each with a clean failover and a typed
+`LlmUnavailableException` on missing capability.
+
+| # | Item | Status | Emu gate |
+|---|---|---|---|
+| 4.1 | AICore (Gemini Nano) generates on a Pixel target; emu falls back to remote | ✅ wrapper exists; Pixel validation pending hardware | emu run: no AICore available → `LlmUnavailableException(AICORE_NOT_INSTALLED)` → routing falls to next lane |
+| 4.2 | LiteRT-LM bundle: `scripts/provision-gemma4-litertlm.sh` downloads the official `litert-community/gemma-4-E4B-it-litert-lm` bundle; `LiteRtLmLLM` loads it on emu | ⚠️ bundle not provisioned by default; storage-id derivation works | emu run: pre-provision the bundle → `LiteRtLmLLM.isAvailable` true → a query routes through it → response has `route=LiteRtLm` in `LLMStatsRepository` |
+| 4.3 | Remote inference: smallest server stand-up = `/v1/private-token/issue` (PrivateToken issuer, ~150 LOC FastAPI) + `/v1/inference` (verifies signature + token, runs LLM, returns SSE) | 🔵 client wired; no server | emu run with a local test server (loopback `BuildConfig.REMOTE_INFERENCE_BASE_URL` = `http://10.0.2.2:8080`) → request signed correctly → response parsed |
+| 4.4 | Network-aware router: airplane mode → Local; network restored → Hybrid; mode change logs route + reason | ⚠️ logic exists; emu validation needed | emu run: airplane on → Local route; airplane off → Hybrid route picked; `LLMStatsRepository` shows both routes taken with reasons |
+| 4.5 | All 3 lanes fail clean: `LlmUnavailableException` with a specific `LlmFailureCause` for each kind of unavailability (not installed, no model, network, auth, timeout, bad cert, configuration) | ✅ exception classes exist; coverage of all paths in tests pending | emu run: instrumented tests force each `LlmFailureCause` → assert correct exception caught + correct next-lane attempt |
+
+**Tier 4 acceptance:** the emu can demonstrate hybrid mode under three
+network conditions (full network, metered network, airplane mode) and the
+right lane is chosen each time, logged with the reason.
+
+---
+
+### 3.6 Tier 5 — Production hardening (before "ask someone to use this")
+
+| # | Item | Status | Emu gate |
+|---|---|---|---|
+| 5.1 | All 4 must-pass privacy tests green (PLAN.md §12): disabled-source, retention, local-only-no-egress, forget-window | 🔵 listed; not all instrumented | emu run runs the privacy test suite as instrumented tests → all green |
+| 5.2 | Battery drain test: 24h ambient run on real device < 3% battery loss per day | 🔵 `scripts/run-perfetto-battery.sh` exists; baseline measurement not captured | (real-device gate; emu can't measure) |
+| 5.3 | Memory pressure trim: `Application.onTrimMemory(TRIM_MEMORY_RUNNING_LOW/CRITICAL)` clears byte buffers; `_BACKGROUND` clears writable ephemeral buffers | ✅ `MemoryPressureTrimmer` wired | emu run: `adb shell am send-trim-memory <pkg> RUNNING_CRITICAL` → `lib/performance/MemoryPressureTrimmer:` log line confirms clear |
+| 5.4 | ANR watchdog (debug only): 5s main-thread stall triggers stack dump | ✅ `DebugDiagnostics` wired | emu run: inject a deliberate 6s stall → screen.mp4 shows no ANR popup (watchdog dumps before system ANR triggers); log has watchdog stack |
+| 5.5 | StrictMode (debug only): 0 violations in a 30-min monkey test | ✅ wired; monkey test not regression-run | emu run: `adb shell monkey -p <pkg> 1000` → logcat has 0 `StrictMode` violations |
+| 5.6 | R8 release build green; APK ≤ 45 MB after minification; no missing-class warnings | ✅ `:app:assembleRelease` working; APK size healthy | emu run installs `releaseInternal` APK (release minification, debug signing); launches; no missing-class crashes |
+| 5.7 | Cert pinning + cleartext disabled (`AndroidManifest.xml usesCleartextTraffic="false"`) + non-launcher activities not exported | ✅ wired | emu run: instrumented test attempts cleartext HTTP — fails as expected |
+| 5.8 | Permission posture passes a Play Store policy self-check: every dangerous permission has rationale, accessibility service shows justification, foreground service has correct type bitmask | ⚠️ posture mostly correct; self-check not formalized | (no emu gate; CI script `scripts/verify-phase6-release-gates.sh` covers the static checks) |
+| 5.9 | Encrypted ContextStore (Room + SQLCipher) round-trips data; backup-extraction yields ciphertext only | ✅ wired | emu run: instrumented test inserts → adb pull the `.db` → `file` reports SQLCipher header / data not readable as plain SQLite |
+| 5.10 | All 29 manifest permissions requested with rationale; none silently held without UI | ⚠️ `PermissionRationaleHelper` exists; full coverage audit pending | emu run + audit script: every `<uses-permission>` matches a UI rationale entry |
+
+**Tier 5 acceptance:** the emu can run the full demo (Tier 1+2+3) for 30+
+minutes with monkey load and no FATAL/ANR/StrictMode/cleartext-egress
+violations.
+
+---
+
+### 3.7 Tier 6 — Pre-v1 nice-to-haves (in priority order)
+
+These improve the experience but **don't block "ask someone to use it."**
+Ordered by leverage per `docs/fallback-paths.md` triage table.
+
+| # | Item | Effort | Status | Emu gate |
+|---|---|---|---|---|
+| 6.1 | Voice Match enrollment UI (cosmo assets + JNI already ported — only UI missing) | ~1 day | 🔵 | emu run: launch enrollment flow → speak 3 sample utterances → `SodaEnrollmentManagerImpl.nativeGetSpeakerInfo` returns non-empty bytes; `TranscriptionData.speakerLabel` populated on subsequent ambient transcript |
+| 6.2 | CaMeL trust layer — Plan DSL variant (foundational types: `Capabilities`, `Value<T>`, `SecurityPolicyEngine`, `QuarantinedLlmService`, `PrivilegedLlmService`, then interpreter) | ~2 engineer-weeks | 🔵 | emu run: a tainted-source query (notification text) attempts a state-changing tool call → `SecurityPolicyDeniedError` surfaces in the CaMeLAgent loop; the action does NOT execute |
+| 6.3 | mt6989 BERT variant: run the drafted AOT pipeline on a machine with the MediaTek Neuron toolchain | ~1 day on toolchain machine | 🔵 | (compile-time; emu validates by loading the new variant when SOC reports `MT6989`) |
+| 6.4 | Conformer EdgeTPU activation on Pixel (flip `isAvailable=false` → real probe) | ~1 day after Pixel arrives | 🔵 (gated on hardware) | (real-device gate only; emu lacks Tensor Darwinn) |
+| 6.5 | AOC nanoapp transport (platform-signed compile or bytecode-gen for `ContextHubClientCallback` subclass) | ~1 day after platform-signing access | 🔵 (gated on signing) | (platform-signed gate; emu may not expose Context Hub) |
+| 6.6 | Inherent joint model delivery (`~/inherent` ships `inherent.tflite` + `inherent.metadata.json`) | 5–6 weeks per inherent project plan | ⚠️ in progress | emu run: provision new assets → `InherentBackend.isAvailable=true` → routing picks it on appropriate query |
+| 6.7 | Per-subtype action handler split (`FulfillmentActionHandlerImpl` → 22 dedicated handlers) | ~1 week | ⚠️ central handler today | emu run: each of 22 action types invokes its dedicated handler → none falls through to a generic catch |
+| 6.8 | Mariner browsing-agent backend (tier-2 Browser-Use behind §15.4 transport) | ~1 week | 🔵 | emu run: invoke a `BrowsingAgent` action → TaskMonitor surface shows incremental `MarinerState` updates → final answer returned |
+| 6.9 | Real Pixel hardware integration full sweep (every Tier 0–5 item validated on real device, not just emu) | ~1 day after Pixel arrives | 🔵 | (real-device gate; emu cannot validate; this is when the "soon to also be a real device" half of §3.0 activates) |
+
+---
+
+### 3.8 Out of scope for v1 (do NOT work on these)
+
+These have explicit scope cuts in `docs/architecture.md §13 / §15.3` and
+`docs/fallback-paths.md`. Pulling them in delays "ask someone to use this."
+
+| Surface | Why out of scope |
+|---|---|
+| **Voice generation / TTS** (VoiceLM, Vogo, SoundStream, LocalTTS, AudioRenderer) | Deferred per `docs/architecture.md §16`. If a v1 user-facing TTS need lands, tier-2 fallback is `android.speech.tts.TextToSpeech` (~2 days). VoiceLM tier-1 requires re-recovering the truncated `temporal_decoder` asset |
+| **Workspace grounding** (server fetch of Gmail/Calendar/Drive) | Replaced with on-device Android content providers; user owns the read path |
+| **PI (Personal Intelligence) service** | Replaced with on-device `ContextStore` |
+| **Server-side prompt-injection classifier** | Replaced with on-device CaMeL (Tier 6.2) |
+| **Gecko semantic search over ContextStore** | Architectural hook exists (`queryByEmbedding`); model + impl deferred. `queryByText` works for v1 |
+| **DBW server pipeline** (opt-in upload of accessibility-tree captures for distillation training) | Long-tail planned item per `docs/architecture.md §15.2`; client-side `AccessibilityForestCaptor` slot reserved |
+| **Federated learning aggregation** | Not on parity capability set |
+| **Multi-device fan-out** (assistant state mirrored across devices) | Not on parity; future workstream |
+| **AgentQ-style ask-back service** | Google-internal name; generic LLM via `lib/llm/` replaces |
+
+---
+
+### 3.9 The single decision tree
+
+For anyone picking up work, the order is:
+
+```
+Is Tier 0 green in CI?            → If no, fix Tier 0 first. Nothing else matters.
+Is Tier 1 green on emu?           → If no, work on Tier 1. The minimum bar.
+Is Tier 2 green on emu?           → If no, work on Tier 2. The parity demo.
+Is Tier 3 green on emu?           → If no, work on Tier 3. The user-visible UX.
+Is Tier 4 green on emu?           → If no, work on Tier 4. Routing across LLM lanes.
+Is Tier 5 green on emu?           → If no, work on Tier 5. Production hardening.
+Otherwise → pick from Tier 6 by leverage. Voice Match enrollment is the
+            highest-leverage 1-day win; CaMeL is the highest-value 2-week
+            investment.
+```
+
+**Don't skip tiers.** If Tier 1 is failing on emu, do not start CaMeL.
+
+---
+
+## 4. Workstream structure
 
 Four workstreams. One engineer each. A rotating **Release Captain** (1 week,
 round-robin) owns the green build, demo APK, and bug triage that week. This
@@ -164,7 +383,7 @@ prevents WS4 from silently absorbing all QA.
 
 ---
 
-## 4. Interface contracts
+## 5. Interface contracts
 
 These are the seams that make four parallel streams viable. Each is owned by
 the producing WS and reviewed by all consumers. Specs live at
@@ -184,7 +403,7 @@ ahead of any feature code.
 
 ---
 
-## 5. Current snapshot (2026-05-15)
+## 6. Current snapshot (2026-05-15)
 
 For per-component status, see [`docs/architecture.md`](docs/architecture.md)
 **§19 Snapshot summary** — it's regenerated more often than this doc.
@@ -210,7 +429,7 @@ For per-component status, see [`docs/architecture.md`](docs/architecture.md)
 
 ---
 
-## 6. Active blockers
+## 7. Active blockers
 
 External blockers cannot be solved in code. Mitigations keep us moving.
 
@@ -287,7 +506,7 @@ APK analyzer output.
 
 ---
 
-## 7. Security threat model
+## 8. Security threat model
 
 STRIDE over components that hold private context, cross process boundaries,
 or execute side effects. High and medium risks are listed with concrete
@@ -317,7 +536,7 @@ any new captor, model path, exported component, or side-effect action lands.
 
 ---
 
-## 8. LLM / model delivery architecture
+## 9. LLM / model delivery architecture
 
 Three independent LLM lanes behind the same `LLM` contract:
 
@@ -356,7 +575,7 @@ Two tiers per the architecture-delta:
 
 ---
 
-## 9. Build / test / ship gates
+## 10. Build / test / ship gates
 
 ### Per-PR gates
 
@@ -408,7 +627,7 @@ Runs:
 
 ---
 
-## 10. Demo script
+## 11. Demo script
 
 Pre-flight:
 
@@ -465,7 +684,7 @@ Expect green.
 
 ---
 
-## 11. Privacy enforcement (must-pass tests)
+## 12. Privacy enforcement (must-pass tests)
 
 Privacy claims that aren't tested are marketing. The following tests **must
 be green** by M4:
@@ -485,7 +704,7 @@ WS2 owns sources 1, 2, 4. WS3 owns source 3. WS1 owns the UI surface for all fou
 
 ---
 
-## 12. Reference-only material (what NOT to use the APK recovery for)
+## 13. Reference-only material (what NOT to use the APK recovery for)
 
 Use the prior APK work only to inform product requirements:
 
@@ -516,7 +735,7 @@ outside the repo). They land in the APK via
 
 ---
 
-## 13. Out of scope
+## 14. Out of scope
 
 | Surface | Why out of scope |
 |---|---|
@@ -530,7 +749,7 @@ outside the repo). They land in the APK via
 
 ---
 
-## 14. Cross-reference index
+## 15. Cross-reference index
 
 If you need... | Read
 --- | ---
@@ -553,7 +772,7 @@ Audio training corpus plan | `docs/audio-corpus-plan.md`
 
 ---
 
-## 15. Update protocol
+## 16. Update protocol
 
 This doc is the canonical engineering plan. Updates land here when:
 
@@ -568,3 +787,6 @@ This doc is the canonical engineering plan. Updates land here when:
 Per-component status snapshots live in `docs/architecture.md §19` and are
 refreshed more frequently. Per-PR engineering progress lives in commit
 messages and the `architecture-delta.md` PR0–PR6 status lines.
+
+The **Ship Checklist (§3) is the source of truth for "what to work on next."**
+Update tier statuses there as items go green on the emu gate.

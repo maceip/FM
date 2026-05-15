@@ -152,7 +152,7 @@ relocation safety).
 
 ## Docs
 
-- [`PLAN.md`](PLAN.md) — master engineering plan: goal, milestones, workstreams, interface contracts, current snapshot, active blockers, security threat model, LLM/model-delivery review, build/test/ship gates, demo script, privacy enforcement, out-of-scope. **Read this first if you're new to the project.**
+- [`PLAN.md`](PLAN.md) — master engineering plan. **Read this first if you're new to the project**, and start with **[§3 Ship Checklist](PLAN.md#3-ship-checklist--force-ranked)** — force-ranked tiered list of "what must work before we ask someone to use FM," gated through the emu validation service (and soon real device)
 - [`LAYOUT.md`](LAYOUT.md) — where everything lives (canonical inside `~/neural`, what's outside and why, consolidation status)
 - [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including Presence UX layer (§13), AppFunctions surface (§14), server-side workstreams (§15), CaMeL trust-layer placement (§12), and recovered-but-unwired surface inventory (§17)
 - [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders
