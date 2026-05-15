@@ -1007,7 +1007,8 @@ ahead of any feature code.
 ## 6. Current snapshot (2026-05-15)
 
 For per-component status, see [`docs/architecture.md`](docs/architecture.md)
-**§19 Snapshot summary** — it's regenerated more often than this doc.
+**§19 Snapshot summary** for subsystem orientation. The audited ship/gate
+status in §3 supersedes that snapshot when they disagree.
 
 **Headline:**
 
@@ -1044,7 +1045,7 @@ For per-component status, see [`docs/architecture.md`](docs/architecture.md)
 
 External blockers cannot be solved in code. Mitigations keep us moving.
 
-### 6.1 Pixel hardware (Conformer EdgeTPU activation, AOC nanoapp transport)
+### 7.1 Pixel hardware (Conformer EdgeTPU activation, AOC nanoapp transport)
 
 **Blocker:** the Conformer audio-gatekeeper backend
 (`audio_gatekeeper_edgetpu.tflite` + `libdarwinndelegatejni.so`) requires
@@ -1066,7 +1067,7 @@ Pixel target.
 from `return false` to `Build.SOC_MANUFACTURER == "google" && darwinnDelegateLoadsCleanly()`.
 ~1 day of validation work.
 
-### 6.2 Real Private Aratea inference endpoint + token issuer
+### 7.2 Real Private Aratea inference endpoint + token issuer
 
 **Blocker:** no live `/v1/inference` or `/v1/private-token/issue` server.
 Cannot do end-to-end remote inference validation.
@@ -1091,7 +1092,7 @@ Cannot do end-to-end remote inference validation.
   [architecture.md §15.6](docs/architecture.md) describes the issuer
   service as ~150 LOC of FastAPI.
 
-### 6.3 MediaTek mt6989 BERT AOT toolchain
+### 7.3 MediaTek mt6989 BERT AOT toolchain
 
 **Blocker:** the BERT classifier compiles for Tensor G4/G5 (Pixel 9/10) but
 not for the MediaTek Dimensity 9300 used in Xiaomi 15T Pro and others.
@@ -1107,7 +1108,7 @@ not for the MediaTek Dimensity 9300 used in Xiaomi 15T Pro and others.
 into `app/src/main/assets/models/`, update the manifest hash + size; the
 backend selector picks it automatically.
 
-### 6.4 Release APK build + posture
+### 7.4 Release APK build + posture
 
 **Blocker:** release build is not currently green. A fresh
 `./gradlew :app:assembleReleaseInternal` on 2026-05-15 failed in
@@ -1394,15 +1395,17 @@ This doc is the canonical engineering plan. Updates land here when:
 
 - A milestone gate is met (update §2)
 - A workstream owner changes or a Release Captain rotates (update §3)
-- A new blocker arises or an old one is resolved (update §6)
-- A new security risk is identified or mitigation lands (update §7)
-- An LLM lane is added/removed (update §8)
-- A new must-pass privacy test is identified (update §11)
+- A new blocker arises or an old one is resolved (update §7)
+- A new security risk is identified or mitigation lands (update §8)
+- An LLM lane is added/removed (update §9)
+- A new must-pass privacy test is identified (update §12)
 - The out-of-scope list changes (update §13)
 
 Per-component status snapshots live in `docs/architecture.md §19` and are
-refreshed more frequently. Per-PR engineering progress lives in commit
-messages and the `architecture-delta.md` PR0–PR6 status lines.
+useful for subsystem orientation, but §3 is the audited gate status. If §19
+and §3 disagree, trust §3 and regenerate §19 in a separate documentation PR.
+Per-PR engineering progress lives in commit messages and the
+`architecture-delta.md` PR0–PR6 status lines.
 
 The **Ship Checklist (§3) is the source of truth for "what to work on next."**
 Update tier statuses there as items go green on the emu gate.
