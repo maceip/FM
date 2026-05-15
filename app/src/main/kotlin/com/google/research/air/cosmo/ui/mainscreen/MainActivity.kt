@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CameraAlt
@@ -27,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -54,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
@@ -598,8 +602,16 @@ private fun ActionsScreen(
     onNavigate: (CosmoRoute) -> Unit
 ) {
     val actions by actionsRepository.userFacingActions.collectAsState()
+    val executedActions by actionsRepository.executedActions.collectAsState()
     val scope = rememberCoroutineScope()
     var pendingConfirmation by remember { mutableStateOf<FulfillmentAction?>(null) }
+    var askQuery by rememberSaveable { mutableStateOf("") }
+    fun submitAsk() {
+        val submitted = askQuery.trim()
+        if (submitted.isEmpty()) return
+        askQuery = ""
+        scope.launch { orchestrator.handleUserQuery(submitted, "") }
+    }
     pendingConfirmation?.let { pending ->
         AlertDialog(
             onDismissRequest = { pendingConfirmation = null },
@@ -639,13 +651,43 @@ private fun ActionsScreen(
                 rotationDegrees = 5f
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { scope.launch { orchestrator.handleUserQuery("summarize what I should do next", "") } }) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = askQuery,
+                onValueChange = { askQuery = it },
+                modifier = Modifier.weight(1f),
+                label = { Text("Ask Cosmo") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { submitAsk() })
+            )
+            Button(
+                onClick = ::submitAsk,
+                enabled = askQuery.isNotBlank()
+            ) {
                 Text("Ask")
             }
             Button(onClick = { scope.launch { orchestrator.handleBatchRun() } }) {
                 Text("Batch")
             }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CosmoSignalTag(
+                text = "PENDING ${actions.size}",
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                rotationDegrees = -3f
+            )
+            CosmoSignalTag(
+                text = "EXECUTED ${executedActions.size}",
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                rotationDegrees = 3f
+            )
         }
         LazyColumn(
             modifier = Modifier.verticalFadingEdges(bottom = 28.dp),

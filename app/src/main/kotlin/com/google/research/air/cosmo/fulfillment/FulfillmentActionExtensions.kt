@@ -74,3 +74,32 @@ internal fun FulfillmentAction.actionTypeName(): String =
         is FulfillmentAction.Unsupported -> "unsupported"
         is FulfillmentAction.WebSearch -> "web_search"
     }
+
+@Suppress("CyclomaticComplexMethod")
+internal fun FulfillmentAction.withStatus(status: FulfillmentAction.Status): FulfillmentAction =
+    when (this) {
+        is FulfillmentAction.ActiveDataPlan -> copy(status = status)
+        is FulfillmentAction.AddTask -> copy(status = status)
+        is FulfillmentAction.AddTimer -> copy(status = status)
+        is FulfillmentAction.AddToList -> copy(status = status)
+        is FulfillmentAction.AddToMemory -> copy(status = status)
+        is FulfillmentAction.BrowsingAgent -> copy(status = status)
+        is FulfillmentAction.CallAgent -> copy(status = status)
+        is FulfillmentAction.CreateCalendarEvent -> copy(status = status)
+        is FulfillmentAction.CreateDoc -> copy(status = status)
+        is FulfillmentAction.DeepResearch -> copy(status = status)
+        is FulfillmentAction.DefineTerm -> copy(status = status)
+        is FulfillmentAction.DraftEmail -> copy(status = status)
+        is FulfillmentAction.DraftSms -> copy(status = status)
+        is FulfillmentAction.InvokeAgentQ -> copy(status = status)
+        is FulfillmentAction.Navigation -> copy(status = status)
+        is FulfillmentAction.PlayMusic -> copy(status = status)
+        is FulfillmentAction.ProvideEventContext -> copy(status = status)
+        is FulfillmentAction.ProvideInsight -> copy(status = status)
+        is FulfillmentAction.ProvidePersonContext -> copy(status = status)
+        is FulfillmentAction.ProvideRecall -> copy(status = status)
+        is FulfillmentAction.QueryPhotos -> copy(status = status)
+        is FulfillmentAction.RemovedAction -> copy(status = status)
+        is FulfillmentAction.Unsupported -> copy(status = status)
+        is FulfillmentAction.WebSearch -> copy(status = status)
+    }

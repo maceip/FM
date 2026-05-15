@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.google.research.air.cosmo.BuildConfig
 import com.google.research.air.cosmo.di.ApplicationScope
 import dagger.Module
 import dagger.Provides
@@ -518,6 +519,7 @@ object LLMModule {
 
     @Provides @Singleton
     fun provideDefault(
-        @HybridLLM llm: LLM
-    ): LLM = llm
+        @HybridLLM hybrid: LLM,
+        @SimulatedLLM simulated: LLM
+    ): LLM = if (BuildConfig.DEBUG) simulated else hybrid
 }

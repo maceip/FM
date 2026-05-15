@@ -29,7 +29,8 @@ class SimulationLLM @Inject constructor() : LlmBackendAdapter(
     }
 
     private fun generateSimulatedResponse(prompt: String): String {
-        val lower = prompt.lowercase()
+        val query = prompt.userQueryOrFullPrompt()
+        val lower = query.lowercase()
 
         return when {
             "play music" in lower || "song" in lower -> """
@@ -38,11 +39,15 @@ class SimulationLLM @Inject constructor() : LlmBackendAdapter(
                 ]
             """.trimIndent()
 
-            "timer" in lower || "remind me in" in lower -> """
+            "timer" in lower || "remind me in" in lower -> {
+                val durationSeconds = timerDurationSeconds(lower)
+                val title = timerTitle(durationSeconds)
+                """
                 [
-                  {"action_type": "add_timer", "id": "sim-002", "title": "Timer", "duration_seconds": 300}
+                  {"action_type": "add_timer", "id": "sim-timer", "title": "$title", "duration_seconds": $durationSeconds}
                 ]
-            """.trimIndent()
+                """.trimIndent()
+            }
 
             "calendar" in lower || "meeting" in lower -> """
                 [
@@ -74,5 +79,34 @@ class SimulationLLM @Inject constructor() : LlmBackendAdapter(
                 ]
             """.trimIndent()
         }
+    }
+
+    private fun String.userQueryOrFullPrompt(): String =
+        lineSequence()
+            .lastOrNull { it.startsWith("User query:", ignoreCase = true) }
+            ?.substringAfter(":")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: this
+
+    private fun timerDurationSeconds(query: String): Int {
+        val minutes = TIMER_MINUTES.find(query)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        if (minutes != null) return minutes * SECONDS_PER_MINUTE
+        val seconds = TIMER_SECONDS.find(query)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        return seconds ?: DEFAULT_TIMER_SECONDS
+    }
+
+    private fun timerTitle(durationSeconds: Int): String =
+        if (durationSeconds % SECONDS_PER_MINUTE == 0) {
+            "Set ${durationSeconds / SECONDS_PER_MINUTE} minute timer"
+        } else {
+            "Set $durationSeconds second timer"
+        }
+
+    private companion object {
+        const val DEFAULT_TIMER_SECONDS = 300
+        const val SECONDS_PER_MINUTE = 60
+        val TIMER_MINUTES = Regex("""\b(\d+)\s*(?:minutes?|mins?)\b""")
+        val TIMER_SECONDS = Regex("""\b(\d+)\s*(?:seconds?|secs?)\b""")
     }
 }

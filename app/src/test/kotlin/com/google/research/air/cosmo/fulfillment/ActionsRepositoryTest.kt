@@ -49,7 +49,7 @@ class ActionsRepositoryTest {
         r.maybeUpdateActionsList(listOf(a), "f2")
         r.markActionAsExecuted("e1")
         r.executedActions.test {
-            assertTrue(awaitItem().any { it.id == "e1" })
+            assertTrue(awaitItem().any { it.id == "e1" && it.status == FulfillmentAction.Status.EXECUTED })
             cancelAndIgnoreRemainingEvents()
         }
         r.currentActions.test {
@@ -65,7 +65,7 @@ class ActionsRepositoryTest {
         r.maybeUpdateActionsList(listOf(a), "f3")
         r.markActionAsDismissed("d1")
         r.userDismissedActions.test {
-            assertTrue(awaitItem().any { it.id == "d1" })
+            assertTrue(awaitItem().any { it.id == "d1" && it.status == FulfillmentAction.Status.DISMISSED })
             cancelAndIgnoreRemainingEvents()
         }
     }

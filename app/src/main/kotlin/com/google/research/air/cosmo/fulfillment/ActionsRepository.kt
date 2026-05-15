@@ -107,9 +107,10 @@ constructor() : ActionsRepositoryContract {
         status: FulfillmentAction.Status
     ) {
         val match = _currentActions.value.firstOrNull { it.id == id } ?: return
+        val retired = match.withStatus(status)
         _currentActions.value = _currentActions.value.filterNot { it.id == id }
         _userFacingActions.value = _userFacingActions.value.filterNot { it.id == id }
-        if (status == FulfillmentAction.Status.EXECUTED) _executedActions.value = _executedActions.value + match
-        if (status == FulfillmentAction.Status.DISMISSED) _userDismissedActions.value = _userDismissedActions.value + match
+        if (status == FulfillmentAction.Status.EXECUTED) _executedActions.value = _executedActions.value + retired
+        if (status == FulfillmentAction.Status.DISMISSED) _userDismissedActions.value = _userDismissedActions.value + retired
     }
 }

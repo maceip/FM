@@ -52,6 +52,21 @@ class FulfillmentRunnerTest {
     }
 
     @Test
+    fun `user timer query produces ten minute add timer action`() = runTest {
+        val actions =
+            runner().fulfill(
+                prompt = "Reactive fulfillment. Conversation:",
+                trigger = FulfillmentTriggerType.USER_QUERY,
+                userQuery = "set a timer for 10 minutes"
+            )
+
+        val timer = actions.single() as FulfillmentAction.AddTimer
+        assertEquals("sim-timer", timer.id)
+        assertEquals(600, timer.durationSeconds)
+        assertEquals("Set 10 minute timer", timer.title)
+    }
+
+    @Test
     fun `parseResponse supports every schema action subtype plus removed`() {
         val actions =
             runner().parseResponse(
