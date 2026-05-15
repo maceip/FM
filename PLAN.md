@@ -245,6 +245,435 @@ exercise of the full stack.
 
 ---
 
+### 3.0a Split by bucket — validation vs missing code
+
+Every item in §3.1–§3.7 falls into one of two buckets. The split decides
+who picks it up:
+
+- **Bucket V — Validate feature is working.** Code is wired; work is
+  exercising it on emu (eventually real device), watching logs + screen,
+  confirming documented behavior occurs. Owned by the validation engineer.
+- **Bucket M — Missing / new code.** Code does not exist or is partial.
+  Work is writing or completing it. Owned by the feature engineer.
+
+Items move M → V once written; not the other way (a validation-failure
+means the feature regressed, not that the bucket flipped).
+
+Each item below is **self-contained**: file paths, current state, the gap,
+the contract to write, and what "done" looks like. An engineer should be
+able to start either bucket without re-reading the rest of PLAN.md.
+
+#### Bucket V — Validate working (per item)
+
+For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (what to look for).
+
+**V0.1 PR gate green**
+- Where: `.github/workflows/ci.yml`
+- Trigger: open any PR
+- Confirm: `compile-lint-test` job green; `emu-validate` skipped (manual)
+
+**V0.2 dev-loop.sh on hardware**
+- Where: `scripts/dev-loop.sh`
+- Trigger: `scripts/dev-loop.sh --reinstall` with a USB-attached Android
+- Confirm: APK installs, MainActivity launches, logcat streams; Ctrl+C cleanly stops logcat
+
+**V0.3 emu-ci-run.sh manual trigger**
+- Where: `.github/workflows/ci.yml` workflow_dispatch + `scripts/emu-ci-run.sh`
+- Trigger: GH Actions → fm-ci → "Run workflow" with `run_emu=true`, `emu_run_seconds=90`
+- Confirm: `emu-validate` job green; artifact `emu-<run>` contains `logcat.txt` + `screen.mp4`
+
+**V0.4 MainActivity Home render 30s**
+- Where: `app/src/main/kotlin/.../ui/mainscreen/MainActivity.kt:128`
+- Trigger: `scripts/emu-ci-run.sh app-debug.apk com.google.research.air.cosmo/.ui.mainscreen.MainActivity 30`
+- Confirm: 0 lines matching `FATAL|ANR|Exception` in logcat; screen.mp4 shows non-blank Home
+
+**V0.5 Fresh clone → APK**
+- Where: `scripts/provision-from-recovery.sh`, `scripts/download-models.sh`
+- Trigger: `git clone`; `scripts/provision-from-recovery.sh`; `./gradlew assembleDebug`; `adb install`
+- Confirm: assembleDebug exits 0; app launches on device
+
+**V0.6 SHA-256 binary verification**
+- Where: `app/src/main/assets/model-manifest.json` + `scripts/download-models.sh --verify-only`
+- Trigger: PR CI compile-lint-test step "Model manifest"
+- Confirm: 0 checksum mismatches (--allow-missing-binaries used; missing-not-mismatched still passes)
+
+**V1.1 First-launch permission rationale flow**
+- Where: `app/src/main/kotlin/.../lib/permission/PermissionRationaleHelper.kt:120-188` + `RuntimePermissionDescriptor` enum at `:51-107`
+- Trigger: fresh-install + MainActivity launch with no granted permissions
+- Confirm: rationale dialog appears BEFORE each permission ask; deny → still functions; deny+don't-ask-again → settings deep link offered
+
+**V1.2 Text → FulfillmentOrchestrator E2E**
+- Where: `app/src/main/kotlin/.../fulfillment/FulfillmentOrchestrator.kt:12-23` `handleUserQuery(query, conversationHistory)`
+- Trigger: Home text field → type "set a timer for 10 minutes" → submit
+- Confirm: logcat shows `FulfillmentOrchestrator.handleUserQuery` → `Gatekeeper:` BERT classification → action parsed; a `CardPayload` renders on screen
+
+**V1.4 Voice → SODA → Gatekeeper**
+- Where: SODA JNI + `GatekeeperDebugReceiver`
+- Trigger: `adb shell am broadcast -a com.google.research.air.cosmo.DEBUG_INJECT_AUDIO --es file <fixture>.wav` (or real-device mic)
+- Confirm: SODA transcript log emitted → Gatekeeper classifies → same end of V1.2
+
+**V1.5 Persistence across force-stop**
+- Where: DataStore + `app/src/main/kotlin/.../context/ContextStore.kt:280-371` (RoomContextStore)
+- Trigger: do V1.2 → `adb shell am force-stop com.google.research.air.cosmo` → relaunch → query ActionsRepository
+- Confirm: prior timer entry present in history
+
+**V1.6 Airplane mode no crash**
+- Where: `app/src/main/kotlin/.../lib/llm/LLM.kt:151-270` NetworkAwareLLM
+- Trigger: `adb shell svc data disable && svc wifi disable`; then V1.2 with a locally-answerable query
+- Confirm: no LlmUnavailableException for both lanes; local path completes; LLMStatsRepository shows `route=Local`
+
+**V2.2 SODA + Magic Mic directedness**
+- Where: SodaCapability + Magic Mic directedness gate
+- Trigger: inject directed and undirected speech fixtures via debug receiver
+- Confirm: `AmbientAudioEphemeralBuffer` count increases only for directed
+
+**V2.3 NotificationListenerService → buffer**
+- Where: NotificationCaptureController + `@NotificationEphemeralBuffer`
+- Trigger: `adb shell cmd notification post -t TEST -i android.R.drawable.sym_def_app_icon test test`
+- Confirm: NotificationEphemeralBuffer count increments
+
+**V2.4 Accessibility → buffer**
+- Where: AccessibilityEventSource + `@ScreenEphemeralBuffer`
+- Trigger: launch a known-text activity (debug `am start` with known text overlay)
+- Confirm: buffer entries contain the expected text
+
+**V2.5 Recall queryByText**
+- Where: `ContextStore.kt:72-107` (interface), `queryByText` impl in RoomContextStore
+- Trigger: seed events via debug receiver; ask "what did I see about X?"
+- Confirm: response includes seeded text + timestamps + source; `queryByEmbedding` returns empty as documented
+
+**V2.6 Disabled-source privacy (4 tests)**
+- Where: each Captor's `if (settings.isXEnabled())` guard + `ContextStore.insert` filter; M5.8's self-check verifies the static map
+- Trigger: instrumented `DisabledSourcePrivacyTest` (must-pass set: disabled-source, retention, local-only-no-egress, forget-window)
+- Confirm: 0 events from disabled source reach ContextStore; 0 reach any LLM prompt context
+
+**V3.1 Orb parked render**
+- Where: `app/src/main/kotlin/.../presence/surfaces/OrbSurface.kt:50-118` consuming `OrbActivity.IDLE/LISTENING/RECENTLY_DISMISSED`
+- Trigger: debug activity instantiating `OrbSurface(activity=IDLE)`
+- Confirm: screen.mp4 shows orb in expected position with aerospace palette
+
+**V3.2 Tab surface expand**
+- Where: `app/src/main/kotlin/.../presence/surfaces/TabSurface.kt:60-314` + `CardStackSurface.kt:43-124`
+- Trigger: tap orb in debug activity that wires TabSurface
+- Confirm: TabSurface expands; CardStackSurface renders layered cards
+
+**V3.4 Dismiss / snooze / reopen**
+- Where: `presence/PresenceState.kt:7-14` (`Dismissed(until)`)
+- Trigger: dismiss a Ready card in debug harness; advance a time-control fixture past `until`
+- Confirm: state transitions `Dismissed → Parked` at the `until` timestamp
+
+**V4.1 AICore on Pixel**
+- Where: `app/src/main/kotlin/.../lib/llm/LLM.kt:104-116` `AICoreLLM` wrapping `AICoreClientWrapper`
+- Trigger: real Pixel device with AICore installed
+- Confirm: `LLMStatsRepository` shows `route=AICore` for a query that lands locally
+
+**V4.4 Network router**
+- Where: `LLM.kt:151-270` NetworkAwareLLM
+- Trigger: toggle `adb shell svc wifi enable/disable`
+- Confirm: route switches LOCAL ↔ CLOUD; reason logged in LLMStatsRepository
+
+**V4.5 Lanes fail clean**
+- Where: `LLM.kt:85-102` `LlmUnavailableException` + `LlmFailureCause` enum (AICORE_NOT_INSTALLED, MODEL_NOT_READY, QUOTA, NETWORK, AUTH, TIMEOUT, BAD_CERTIFICATE, CONFIGURATION, LOCAL_MODEL_UNAVAILABLE, INTERNAL — 10 cases)
+- Trigger: force each of 10 failure causes (instrumented fixtures that inject the condition)
+- Confirm: correct exception thrown; correct next-lane fallback taken
+
+**V5.3 onTrimMemory**
+- Where: `app/src/main/kotlin/.../lib/performance/MemoryPressureTrimmer.kt:8-31`
+- Trigger: `adb shell am send-trim-memory com.google.research.air.cosmo RUNNING_CRITICAL`
+- Confirm: log line `MemoryPressureTrimmer:`; `EphemeralBufferRegistry` byte + object buffers cleared
+
+**V5.4 ANR watchdog**
+- Where: `app/src/main/kotlin/.../lib/performance/DebugDiagnostics.kt:62-108` `MainThreadAnrWatchdog` (5s)
+- Trigger: inject a 6s main-thread stall via debug receiver
+- Confirm: stack dump logged BEFORE system ANR popup
+
+**V5.5 StrictMode 0 violations in monkey** (gated on M-StrictMode landing)
+- Where: StrictMode config in `CosmoApp.onCreate`
+- Trigger: `adb shell monkey -p com.google.research.air.cosmo 1000`
+- Confirm: 0 `StrictMode` lines in logcat
+
+**V5.6 R8 release build + APK ≤ 45 MB**
+- Where: `app/build.gradle.kts` releaseInternal config
+- Trigger: `./gradlew assembleReleaseInternal`
+- Confirm: build green; APK size sane; install + launch → no missing-class crashes
+
+**V5.7 Cert pinning + cleartext disabled**
+- Where: `AndroidManifest.xml` `usesCleartextTraffic="false"` + `RemoteInferenceClient.kt:251-256` `CertificatePinner`
+- Trigger: instrumented attempt at plain HTTP request to any host
+- Confirm: refused; instrumented attempt with wrong cert → `BAD_CERTIFICATE` fail-fast
+
+**V5.9 Encrypted ContextStore round-trip**
+- Where: `ContextStore.kt` with `SupportOpenHelperFactory(passphraseProvider.passphrase())` at line 394
+- Trigger: insert events → `adb pull` of `/data/data/<pkg>/databases/cosmo_context.db` → `file` + `xxd`
+- Confirm: SQLCipher header; plaintext data NOT readable; `sqlite3` open without passphrase fails
+
+**V6.9 Real Pixel sweep** (gated on Pixel arrival)
+- Where: every V0–V5 item above
+- Trigger: re-run each on the Pixel
+- Confirm: same green state as emu, plus the V4.1 / V6.4 / V6.5 items emu cannot exercise
+
+#### Bucket M — Missing / new code (per item, priority order)
+
+For each: **Where** (current file/line + the gap), **Present** (what's wired today), **Gap** (what's missing), **Contract** (what to write), **Done** (acceptance), **Refs**.
+
+**M1.3 SkillResult.SideEffectPending → confirmation card surfacing**
+- Where:
+  - `app/src/main/kotlin/.../skills/Skills.kt:62-86` — `SkillResult` sealed; `SideEffectPending(confirmationToken: String, summary: String)` at :73; `SideEffectApplied(auditId, summary)` at :78
+  - `app/src/main/kotlin/.../skills/Skills.kt:88-107` — `SkillRegistry` already exposes `suspend fun confirm(token: String): SkillResult` (:104) and `suspend fun cancel(token: String)` (:106)
+  - `app/src/main/kotlin/.../presence/PresenceState.kt:43-103` — `CardPayload.PermissionConfirmation(prompt: String, actionLabel: String, undoable: Boolean)` at :99-103
+  - `app/src/main/kotlin/.../presence/surfaces/CardStackSurface.kt:42-107` — `CardStackSurface(cards, onAction: (cardId, actionId) -> Unit)`; renders `ActionButtonGrid(card.id, card.actions, onAction)` at :100
+  - `app/src/main/kotlin/.../presence/surfaces/cards/PermissionConfirmationCard.kt:28-53` — content composable; its inner "CONFIRM / UNDO" boxes are decorative (no click handlers)
+- Present: SkillResult emits SideEffectPending; SkillRegistry has confirm/cancel; CardStackSurface has onAction callback hook + per-card `actions: List<CardAction>` plumbing; PermissionConfirmation payload exists
+- Gap: no producer constructs a `PresenceCard(id = token, payload = PermissionConfirmation, actions = [Confirm, Cancel])` from a SideEffectPending emission; no host wires `onAction` → `SkillRegistry.confirm/cancel`. The card's inner buttons being decorative is fine — the real surface is the action grid added below the card by `CardStackSurface`.
+- Contract (sub-task of M3.3 producer):
+  - In M3.3's reducer: when a `SkillResult.SideEffectPending(token, summary)` arrives, emit `PresenceState.Ready(taskId = invocationTaskId, cards = listOf(PresenceCard(id = token, payload = CardPayload.PermissionConfirmation(prompt = summary, actionLabel = "Confirm", undoable = true), actions = listOf(CardAction("confirm", "Confirm", type = CardActionType.PRIMARY), CardAction("cancel", "Cancel", type = CardActionType.DESTRUCTIVE)))))`
+  - In the screen that hosts `CardStackSurface`: wire `onAction = { cardId, actionId -> scope.launch { when (actionId) { "confirm" -> skillRegistry.confirm(cardId); "cancel" -> skillRegistry.cancel(cardId) } } }`. cardId == confirmationToken by construction above.
+- Done: instrumented: `FulfillmentOrchestrator.handleUserQuery("set a timer for 10 minutes")` → screen shows Permission card with the summary + Confirm/Cancel buttons rendered by ActionButtonGrid. Tap Confirm → `SkillRegistry.confirm(token)` returns `SideEffectApplied(auditId, summary)`; `ActionsRepository.history()` grows by 1. Tap Cancel → SkillRegistry.cancel(token); no apply; card dismisses.
+- Refs: architecture.md §6 (fulfillment) + §13.2 (presence). Tightly coupled with M3.3.
+
+**M-StrictMode disk-read-on-main-thread (Tier 5 critical fix)**
+- Where: `app/src/main/kotlin/.../context/ContextStore.kt:381-396` `ContextStoreModule.provideDatabase`; chain pulled in via `contentcapture/ScreenCapture.kt:32-39` (PeriodicScreenCaptorImpl injects ContextStore) → `controller/CosmoController.kt:35` (private val periodicScreenCaptor) → MainActivity.kt:103 @Inject
+- Present: `System.loadLibrary("sqlcipher")` at ContextStore.kt:391 runs synchronously during Hilt `provideDatabase` during `injectMainActivity` → ~154ms DiskRead on main thread; 165 frames skipped per baseline emu log
+- Gap: loadLibrary on main thread + eager DI of ContextStore-dependent components into MainActivity
+- Contract: (a) move `System.loadLibrary("sqlcipher")` to `CosmoApp.onCreate` on a dedicated single-thread coroutine + a `CompletableDeferred<Unit>` consumed before any DB op; (b) remove loadLibrary from `provideDatabase`; (c) change `CosmoController.periodicScreenCaptor` to `dagger.Lazy<PeriodicScreenCaptor>` and call `.get()` only in `reconcileCaptureJobs()` — same for any other ContextStore-touching consumer in MainActivity's transitive graph (audit all CosmoController fields)
+- Done: emu-ci-run → 0 `StrictMode` DiskRead lines from ContextStoreModule on cold start; Choreographer skipped-frame count < 30 (baseline: 165)
+- Refs: baseline emu run `artifacts/emu-run/job-3f7ce1f2247a433ead14d1f5889fb698/logcat.txt`
+
+**M3.3 PresenceState driver/producer**
+- Where: `app/src/main/kotlin/.../presence/PresenceState.kt` (file is 145 lines). Sealed variants at :7-14: `Hidden`, `Parked(mode: PresenceMode, activity: OrbActivity)`, `Working(taskId: String, phase: WorkPhase, pillText: String? = null)`, `NeedsInput(taskId, prompt)`, `Ready(taskId: String, cards: List<PresenceCard>, primaryAction: CardAction? = null)`, `Dismissed(until: Instant)`. `PresenceCard` at :24-28 wraps `(id, payload, actions)`. Supporting enums at :16-18 (`PresenceMode { ORB, TAB }`, `OrbActivity { IDLE, LISTENING, RECENTLY_DISMISSED }`, `WorkPhase { STARTED, SYNCING, PROCESSING, FINALIZING }`). Surfaces (OrbSurface, TabSurface, CardStackSurface) already consume `PresenceState`. No producer file today.
+- Present: state shapes + surfaces wired; no orchestrator emits the state
+- Gap: no `StateFlow<PresenceState>` producer that watches Gatekeeper output + SkillResult emissions + dismiss events
+- Contract: new `presence/PresenceStateProducer.kt`:
+  ```kotlin
+  @Singleton
+  class PresenceStateProducer @Inject constructor(
+      gatekeeperOutput: GatekeeperOutputSource,           // emits GatekeepingResult flow
+      orchestrator: FulfillmentOrchestrator,              // (or its SkillResult emission source)
+      // dismissal channel from the host UI
+  ) {
+      private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+      val state: StateFlow<PresenceState> = … // see reduce()
+      private fun reduce(...): PresenceState
+  }
+  ```
+  Reducer mapping:
+  - Idle (no recent input + no pending result) → `Parked(mode = ORB, activity = IDLE)`
+  - Gatekeeper detects directed audio → `Parked(mode = ORB, activity = LISTENING)`; then on triggeredFulfillment → `Working(taskId, phase = STARTED)`; phase advances as runner emits progress
+  - `SkillResult.SideEffectPending(token, summary)` → `Ready(taskId, cards = [PresenceCard(id = token, payload = PermissionConfirmation(prompt = summary, actionLabel = "Confirm"), actions = [Confirm, Cancel])])` (see M1.3 for exact CardAction shape)
+  - `SkillResult.Answer(text)` / `Draft(...)` / `SideEffectApplied(...)` → `Ready(taskId, cards = [...payload-specific...])` per skill-card mapping (M3.5)
+  - `SkillResult.Failed(reason)` → `Ready(taskId, cards = [error-card])` OR back to `Parked` with a transient toast (designer's call; document the choice)
+  - Dismiss action from UI → `Dismissed(until = now + 10.minutes)`; auto-return to `Parked` when `Instant.now() >= until`
+- Done: instrumented harness: post fake GatekeepingResult with triggeredFulfillment=true → `state.value` is `Working`. Emit SideEffectPending → `state.value` is `Ready(cards=[PermissionConfirmation])`. Fire dismiss → `Dismissed`. Advance time-control past `until` → `Parked`.
+- Refs: architecture.md §13.2.
+
+**M2.1 Per-subtype skill executor split (9 parity skills)**
+- Where: `app/src/main/kotlin/.../skills/Skills.kt:88-107` SkillRegistry (uses 4-bucket `SkillCategory` PRODUCTIVITY/CAPTURE/KNOWLEDGE/UTILITY); `app/src/main/kotlin/.../fulfillment/FulfillmentActionHandler.kt:29-138` central `when (action)` at :41
+- Present: SkillRegistry interface; SkillsRepositoryImpl with category-only descriptors; central FulfillmentActionHandlerImpl dispatching to inline blocks
+- Gap: no per-skill executor classes; 9 parity skills not formally enumerated as distinct types
+- Contract: 
+  ```kotlin
+  sealed interface SkillExecutor {
+      val id: SkillId
+      suspend fun execute(query: ParsedQuery, ctx: List<ContextEvent>): SkillResult
+  }
+  ```
+  One impl per parity skill in `skills/executors/`: TimerSkill, ListSkill, CalendarSkill, DocSkill, WebSearchSkill, JargonSkill, InsightSkill, RecallSkill, SummarySkill. Bind via `@IntoMap @SkillIdKey` Dagger multibinding; replace central `when` with `executors[query.skillId]?.execute(query, ctx)`.
+- Done: 9 executor files exist; central `when` block deleted or only delegates; instrumented test routes each skill to its dedicated class.
+- Refs: precursor to M6.7 (22-handler split for FulfillmentAction). Architecture.md §6.1.
+
+**M2.7 ContextStore retention sweep**
+- Where:
+  - `app/src/main/kotlin/.../context/ContextStore.kt:72-107` — `ContextStore` interface. Existing delete APIs:
+    - `suspend fun delete(id: String)` (:95)
+    - `suspend fun deleteRange(range: LongRange, sources: Set<Source>? = null): Int` (:97-100) — **time-range + optional source filter; NO retention-class filter**
+    - `suspend fun purgeSource(source: Source): Int` (:102)
+  - `app/src/main/kotlin/.../context/ContextStore.kt:50` — `enum class RetentionClass { EPHEMERAL, SHORT, LONG }` — present as a column on `ContextEventEntity` (:44), exposed in `stats().countsByRetention`, but NOT a filter param on `deleteRange`.
+  - `app/src/main/kotlin/.../ephemeralbuffer/EphemeralBuffer.kt:141-144` — `EvictionPolicy(maxEntries, maxEntryAgeMillis)` for in-memory buffers
+- Present: time-range deletion + per-source purge; retentionClass is a column but not a filter for delete; no sweep scheduler
+- Gap: (a) `deleteRange` cannot filter by `RetentionClass`, so a per-class sweep needs a Dao-level addition or a query-then-delete approach; (b) no `WorkManager` job that runs the sweep
+- Contract:
+  - Extend the interface: add `suspend fun deleteRange(range: LongRange, retentionClasses: Set<RetentionClass>): Int` (overload). Implement in `RoomContextStore` via a new `@Query("DELETE FROM context_events WHERE timestampMs BETWEEN :startMs AND :endMs AND retentionClass IN (:classes)")` Dao method.
+  - New `context/ContextRetentionSweeper.kt` — `WorkManager` `PeriodicWorkRequest` every 1h. Reads a `RetentionPolicy(map: Map<RetentionClass, Duration>)` from CosmoSettingStore (default: EPHEMERAL=24h, SHORT=7d, LONG=90d). For each class with a finite duration, call `contextStore.deleteRange(range = 0L..(now-duration).toEpochMilli(), retentionClasses = setOf(rc))`.
+  - Schedule from `CosmoApp.onCreate` (after the sqlcipher-load completes per M-StrictMode).
+- Done: instrumented: insert ephemeral events older than 24h, short older than 7d, recent of each → trigger one-shot sweep work → only events newer than per-class retention remain.
+
+**M2.8 Routing-mode settings UI**
+- Where: `app/src/main/kotlin/.../setting/Settings.kt:91-241` CosmoSettingStore; `app/src/main/kotlin/.../lib/llm/LLM.kt:151-270` NetworkAwareLLM (2-mode: LOCAL/CLOUD; "hybrid" is an execution strategy, not a 3rd mode)
+- Present: NetworkAwareLLM picks lane by network availability; no user-controlled mode
+- Gap: `RoutingMode` user setting + Compose preference UI + NetworkAwareLLM honor of user-forced mode
+- Contract: (a) add `enum class RoutingMode { LOCAL_ONLY, CLOUD_ONLY, HYBRID }` to settings proto + CosmoSettingStore getter/setter (default = HYBRID); (b) add segmented control to Settings screen under "Privacy & Routing"; (c) in `NetworkAwareLLM.execute()` short-circuit: LOCAL_ONLY → local only (`LlmFailureCause.CONFIGURATION` if local unavail); CLOUD_ONLY → cloud only; HYBRID → current behavior
+- Done: setting persists across force-stop; `LLMStatsRepository` shows the correct lane per mode.
+
+**M2.9 "Forget last N minutes" action**
+- Where: no orchestrator file yet
+- Present:
+  - `ContextStore.deleteRange(range: LongRange, sources: Set<Source>? = null): Int` (see M2.7 for full signature) — usable directly for a time-window wipe across all sources or a filtered subset
+  - `EphemeralBufferRegistry` — likely needs a `clearRange(start, end)` method added to its buffer interface (verify; current `EphemeralBuffer.kt:141-144` defines `EvictionPolicy` but not an explicit range-clear API)
+- Gap: (a) user-facing action; (b) orchestrator that purges in-memory buffers AND ContextStore for the same window; (c) buffer-side `clearRange` if absent
+- Contract:
+  - Add `ForgetWindowAction(endMs: Long, durationMs: Long)` to fulfillment models
+  - Add Gatekeeper intent label `FORGET_WINDOW`; either retrain BERT classifier with the new label OR add a regex pre-classifier that catches phrases "forget the last N (minutes|hours)" before BERT
+  - New handler `ForgetWindowHandler.handle(action)`:
+    - `val range = (action.endMs - action.durationMs)..action.endMs`
+    - For each buffer in `EphemeralBufferRegistry.allBuffers()`: `buffer.clearRange(start = range.first, end = range.last)` (add the method to `EphemeralBuffer` interface if absent)
+    - `contextStore.deleteRange(range, sources = null)` — purges all sources in the window
+  - UI: Settings → "Forget last…" preset buttons (1m / 5m / 10m / 30m / 1h) calling the handler with `endMs = now()`
+- Done: voice phrase OR settings button → 0 events remain in any buffer between [end-duration, end]; 0 rows in ContextStore for the same window; events outside window survive.
+
+**M3.5 Card payload coverage per parity skill**
+- Where: `app/src/main/kotlin/.../presence/PresenceState.kt:43-104` (CardPayload sealed — 10 variants: Browser, Calling, Messaging, Document, ListTasks, CalendarTime, PeopleContext, MediaImage, SourceCitation, PermissionConfirmation)
+- Present: 10 payloads + card composables in `presence/surfaces/cards/` (correction: PLAN.md previously claimed 3 — wrong)
+- Gap: the mapping `SkillResult → CardPayload variant` per parity skill is not documented or wired uniformly. Some skills emit payloads; some may emit only `Done` with no card.
+- Contract: new `skills/SkillCardMapping.kt` — exhaustive `fun SkillResult.toCardPayload(): CardPayload?` for each of 9 parity skills. Wire into M3.3's reducer.
+- Done: each of 9 skills executed in instrumented harness → card renders with correct payload variant + correct content.
+
+**M4.2 LiteRT-LM bundle provisioning default**
+- Where: `scripts/provision-gemma4-litertlm.sh` exists; `app/src/main/kotlin/.../lib/llm/LiteRtLmLLM.kt:32-266` loads from `models/${storageSlug()}/bundled.litertlm` (line 225)
+- Present: script + loader present
+- Gap: bundle not provisioned on fresh clone; `LiteRtLmLLM.isAvailable` returns false until someone runs the script manually
+- Contract: add a bundle entry to `app/src/main/assets/model-manifest.json` (id `gemma4-e4b-litertlm`, delivery=`remote`, url=official HuggingFace LiteRT-LM URL, sha256/sizeBytes, mediaType `application/x-litertlm-bundle`, required=true) so `scripts/download-models.sh` provisions it. OR: invoke `provision-gemma4-litertlm.sh` from `scripts/provision-from-recovery.sh` for fresh clones.
+- Done: fresh clone + provision + assembleDebug + launch → `LiteRtLmLLM.isAvailable=true`; query routes through it with `route=LiteRtLm` in LLMStatsRepository.
+
+**M4.3 Remote inference server**
+- Where: no `server/` yet. Client side in `app/src/main/kotlin/.../lib/llm/RemoteInferenceClient.kt`:
+  - `interface RemoteInferenceClient.infer(parts, onToken)` at :34-39
+  - `data class RemoteInferenceConfig(baseUrl, certificatePin, audience)` at :41-75; `fromBuildConfig()` reads `CosmoBuildConfig.remoteInference*` Gradle properties
+  - `data class AnonymousRateLimitedCredential(authorizationHeader, expiresAtEpochMillis)` at :77-88 with required `"PrivateToken "` bearer scheme prefix
+  - `OkHttpClient.Builder` at :245-259 with `CertificatePinner` at :251-256, `RequestSigningInterceptor` added at :257
+  - `OkHttpRemoteInferenceClient` class at :268
+- Present: full client incl. signed-request scheme + cert pinning + PrivateToken bearer credential type
+- Gap: minimum server stub matching the client's existing contract
+- Contract: new `server/inference/` Python (FastAPI), ~150 LOC:
+  - `POST /v1/private-token/issue` returns an authorization header value satisfying `"PrivateToken " + token` (per AnonymousRateLimitedCredential at :77-88), valid until `expiresAtEpochMillis`
+  - `POST /v1/inference` verifies the request-signing interceptor's header (ECDSA over canonical request bytes — read the exact algorithm in `RequestSigner` / `RequestSigningInterceptor` before implementing the verifier), verifies `Authorization: PrivateToken …`, runs LLM, returns SSE deltas
+  - LLM backend: configurable; default `mock-llm` for dev; `vllm` recipe documented for Gemma3
+  - `Dockerfile` + `pyproject.toml`; `make dev` runs locally on `:8080`
+  - For emu loopback set `cosmo.remoteInference.baseUrl=http://10.0.2.2:8080` in debug Gradle props (read by `CosmoBuildConfig.remoteInferenceBaseUrl`)
+- Done: client+server roundtrip locally; emu debug build hits `10.0.2.2:8080`, gets SSE response; `LLMStatsRepository` shows the route + token issuance recorded.
+- Refs: architecture.md §15.4–§15.6.
+
+**M5.8 Permission posture self-check**
+- Where: `app/src/main/AndroidManifest.xml` (23 `<uses-permission>` entries — verified by `grep -c "<uses-permission " AndroidManifest.xml`); `app/src/main/kotlin/.../lib/permission/PermissionRationaleHelper.kt:51-107` (RuntimePermissionDescriptor enum)
+- Present: enum has descriptors for some permissions
+- Gap: no scripted self-check
+- Contract: new `scripts/verify-permission-posture.sh` (Python): parse AndroidManifest.xml uses-permission entries; for each dangerous permission, assert an entry exists in `RuntimePermissionDescriptor`; assert foreground-service types declared in `<service>` match `<uses-permission android:name="android.permission.FOREGROUND_SERVICE_*">` set; exit non-zero on any mismatch. Add to CI compile-lint-test as a non-blocking step initially, then hard gate after M5.10.
+- Done: script runs in CI; reports clean.
+
+**M5.10 Rationale UI coverage for all dangerous permissions**
+- Where: `RuntimePermissionDescriptor` enum at `PermissionRationaleHelper.kt:48-107`. Current entries (10): Microphone, Camera, Notifications, FineLocation, ApproximateLocation, CalendarRead, CalendarWrite, PhoneCall, NearbyDevices, LocalNetwork. `PermissionRationaleHelper` class at :120-... with `states()` returning per-permission `RuntimePermissionState(descriptor, grantState)`.
+- Present: enum covers all 10 *dangerous-runtime* permissions in the manifest. The other 13 manifest entries are NORMAL permissions (INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE_*, SCHEDULE_EXACT_ALARM, WAKE_LOCK, etc.) or signature-protected (ACCESS_CONTEXT_HUB) — no runtime rationale required.
+- Gap: **probably already done** at coverage level. The real risk is that future-added dangerous permissions get added to manifest without an enum entry — M5.8's self-check catches that. Spot-check: every current dangerous `<uses-permission>` does map to an enum entry.
+- Contract: keep this item open as a guard-rail. M5.8's script enforces the invariant going forward. No new code today unless a permission is genuinely missing — verify by running M5.8's script once written.
+- Done: M5.8 self-check passes; instrumented launch with each dangerous permission ungranted → rationale dialog renders before the ask.
+
+**M6.1 Voice Match enrollment UI**
+- Where: `app/src/main/kotlin/com/google/android/libraries/assistant/speakerid/SodaEnrollmentManagerImpl.kt` (26 lines, full file). JNI surface (all `external fun`):
+  - `nativeConstruct(): Long` (:10) — returns a native handle
+  - `nativeDelete(handle: Long)` (:12)
+  - `nativeProcessRequest(handle: Long, payload: ByteArray)` (:14) — feed audio frames / commands during enrollment
+  - `nativeGetSpeakerInfo(handle: Long): ByteArray` (:19) — readable speaker model bytes
+  - `nativeGetVoiceMatchModels(handle: Long): ByteArray` (:21)
+  - `nativeGetEnrollmentAudio(handle: Long): ByteArray` (:23)
+  - `nativeGetEnrollmentAudioInfo(handle: Long): ByteArray` (:25)
+  - `init { SodaJniLibraryLoader.ensureLoaded() }` (:6-8)
+- Present: JNI bridge + recovered SODA enrollment binaries (provisioned via `scripts/provision-from-recovery.sh`). No UI; no Kotlin-side session wrapper that manages the handle lifecycle.
+- Gap: 3-utterance enrollment Compose flow + handle lifecycle wrapper + speakerInfo persistence + speakerLabel population
+- Contract:
+  - New `speakerid/SodaEnrollmentSession.kt` — Kotlin wrapper managing the native handle:
+    ```kotlin
+    class SodaEnrollmentSession : AutoCloseable {
+        private val impl = SodaEnrollmentManagerImpl()
+        private val handle: Long = impl.nativeConstruct()
+        fun processUtterance(pcm: ByteArray) = impl.nativeProcessRequest(handle, pcm)
+        fun speakerInfo(): ByteArray = impl.nativeGetSpeakerInfo(handle)
+        override fun close() { impl.nativeDelete(handle) }
+    }
+    ```
+  - New `presence/screens/VoiceMatchEnrollmentScreen.kt` — Compose 3-step flow (Welcome → Record 1/2/3 → Done). Each record step opens a `MediaRecorder` (PCM 16kHz mono) and pipes captured frames into `session.processUtterance(pcm)`.
+  - On completion: `session.speakerInfo()` → persist `ByteArray` to encrypted CosmoSettingStore; expose `getSpeakerInfo(): ByteArray?`.
+  - Wire into transcription path: when SODA emits TranscriptionData and `getSpeakerInfo()` non-null, populate `TranscriptionData.speakerLabel` (verify there is a Kotlin-side compare API or whether speakerLabel is already populated by the underlying SODA library when a saved speakerInfo is restored before transcription).
+- Done: emu run launches enrollment → 3 fixture utterances → `getSpeakerInfo()` returns non-empty bytes; ambient transcript afterward has populated `speakerLabel`.
+
+**M6.2 CaMeL trust layer (Plan DSL variant)**
+- Where: no code; architecture at `docs/architecture.md §12`; per-AST-node port reference at `docs/camel-port-notes.md`
+- Present: architecture only
+- Gap: everything (~2 engineer-weeks)
+- Contract (Kotlin), new package `lib/camel/`:
+  - `data class Capabilities(val sourcesSet: Set<Source>, val readersSet: Set<Reader>)` with `union`, `intersection`, `isReadableBy` helpers
+  - `data class Value<T>(val value: T, val capabilities: Capabilities)`
+  - `interface SecurityPolicy { fun check(call: FunctionCall, args: Map<String, Value<*>>, deps: Set<Value<*>>): SecurityResult }`
+  - `class SecurityPolicyEngine(val policies: List<SecurityPolicy>) { fun check(...): SecurityResult }`
+  - `interface QuarantinedLlmService { suspend fun query(prompt: Value<String>): Value<String> }` — output inherits prompt capabilities; backed by an LLM with a strict "answer only" system prompt
+  - `interface PrivilegedLlmService { suspend fun generate(prompt: String): String }` — no Value wrapping; for the code-gen path
+  - Interpreter: Python-subset AST → Kotlin executor; nodes for `assign`, `call`, `if`, `for`, `while`, `binop`, `attr`, `index`; each call passes through SecurityPolicyEngine.check
+  - `class LoopAgent(val pllm: PrivilegedLlmService, val interpreter: PlanInterpreter)` — PLLM emits code as string, Interpreter executes, loop on error
+- Done: emu run: a tainted-source query (NotificationEphemeralBuffer entry passed as `Value<String>(value, Capabilities(sourcesSet=setOf(NOTIFICATION)))`) attempts a state-changing tool → SecurityPolicyDeniedError surfaces in agent loop; the action does NOT execute.
+- Refs: arxiv 2503.18813; reference impl `~/Downloads/pixel-backups/backup_git/git/home/adk-samples/python/agents/camel/`.
+
+**M6.3 mt6989 BERT variant AOT pipeline**
+- Where: no in-repo file; reference source in `~/Downloads/cosmo_recovered_*` for the original AOT pipeline
+- Present: arm64 cpu/dsp BERT variants in `app/src/main/assets/models/`; mt6989 variant absent
+- Gap: AOT pipeline (runs on a MediaTek Neuron toolchain machine, not the dev's normal machine)
+- Contract: 
+  - On the toolchain machine: port cosmo AOT script (or reverse-engineer from recovered)
+  - Output: `bert_mt6989_dsp.tflite`; entry in `app/src/main/assets/model-manifest.json` with sha256/size/url
+  - `SocVariantResolver` picks `bert_mt6989_dsp.tflite` when `Build.SOC_MODEL == "MT6989"`
+- Done: debug-override SocVariantResolver to report MT6989 → resolver picks the new variant → BERT load succeeds.
+
+**M6.4 Conformer EdgeTPU activation on Pixel**
+- Where: `lib/conformer/` or `lib/llm/conformer/` — engineer to grep `Conformer.*isAvailable` for the stub
+- Present: `isAvailable=false` hardcoded
+- Gap: real Tensor DarwinNN delegate probe
+- Contract: real `isAvailable` checks `Build.DEVICE in pixelModelsWithDarwinNN` AND probes EdgeTPU delegate construction without throw; returns false on emu / non-Pixel (preserving current behavior).
+- Done: real Pixel device → Conformer route logged in LLMStatsRepository for transcription queries.
+
+**M6.5 AOC nanoapp transport**
+- Where: `app/src/main/kotlin/.../contexthub/NanoAppClient.kt` — currently degrades with log `ContextHubClientCallback is a class; cannot subclass without bytecode gen` (per baseline emu log)
+- Present: degraded probe path
+- Gap: real subclass of `ContextHubClientCallback`
+- Contract: prefer build-time bytecode gen (ByteBuddy or `kotlinx.metadata.jvm`-based gen) producing a concrete `ContextHubClientCallback` subclass that forwards to `Channel<NanoAppMessage>`. Alternative: platform-signed APK + manifest signing (requires platform signing access).
+- Done: emu (with mock ContextHub fixture) or platform-signed Pixel build → no "cannot subclass" log → nanoapp events flow through the channel.
+
+**M6.7 Per-subtype action handler split (22 handlers)**
+- Where: `app/src/main/kotlin/.../fulfillment/FulfillmentActionHandler.kt:29-138`; `when (action)` at :41; 22 action subtypes in `FulfillmentModels.kt`
+- Present: monolithic handler
+- Gap: 22 dedicated handler classes
+- Contract: 
+  ```kotlin
+  sealed interface ActionHandler<A : FulfillmentAction> { suspend fun handle(action: A, ctx: HandlerContext): HandlerResult }
+  ```
+  One file per subtype in `fulfillment/handlers/` (AddTaskHandler, AddTimerHandler, AddToListHandler, …, 22 total); `@IntoMap @ActionTypeKey` Dagger multibinding; replace `when (action)` with `handlers[action::class].handle(...)`.
+- Done: 22 handler files; central `when` deleted.
+- Refs: extends M2.1.
+
+**M6.8 Mariner browsing-agent backend**
+- Where: `app/src/main/kotlin/.../fulfillment/actions/mariner/TaskMonitorNavigationBridge.kt:1-98` (activity-bridge — NOT gRPC as PLAN.md previously implied)
+- Present: activity-bridge stub
+- Gap: real browsing-agent backend + streamed state to TaskMonitor surface
+- Contract: tier-2 (default) Browser-Use server in `server/browse/` (similar shape to M4.3): `POST /v1/browse/execute` returns SSE of `BrowserState(currentUrl, screenshotUrl, actionHistory, status)`. New Kotlin client `fulfillment/actions/browser/BrowsingAgentClient.kt` (HTTP/SSE). Wire BrowsingAgent action → client.execute(query) → flows into TaskMonitor surface as incremental progress.
+- Done: emu run: "find me a flight SFO to LAX" → TaskMonitor shows incremental BrowserState → final answer.
+
+**M6.6 Inherent joint model delivery** — external project deliverable; not in-repo work. Track for integration; no contract written here.
+
+#### Will Bucket V + Bucket M = demo-ready / user-ready?
+
+**Demo-ready: yes.** With V+M complete, every Tier 0–3 flow has a screen-recordable emu run; Tier 4 routing demonstrates all lanes; Tier 5 hardening passes the monkey + StrictMode + cleartext checks. The 6-flow demo script (PLAN.md §11) plays end-to-end from a single APK.
+
+**User-ready (= ask a real person to install + use it day-to-day): no.** V+M leaves at least these gaps before users:
+
+1. **Crash reporting** — Firebase Analytics is disabled (no `google-services.json` in debug build per baseline emu log). With no crash reporter, the first user-side crash is invisible. Need: Firebase Crashlytics integration OR a self-hosted alternative (Sentry self-host, Bugsnag-style endpoint to the M4.3 server) tied to the privacy posture.
+2. **Production release signing + distribution** — `releaseInternal` works (V5.6) but it's debug-signed. No production keystore is set up (`config/signing/*release*.keystore` is gitignored, no committed production cert). No distribution channel chosen (Play Store internal track? Firebase App Distribution? signed sideload?). Without this, "ask someone to install" means "give them an unsigned/dev-signed APK", which most Android devices will refuse outside developer mode.
+3. **User feedback loop** — no in-app feedback form, no telemetry endpoint for "this didn't work" reports. The 4 must-pass privacy tests assume the user has no need to phone home; some opt-in feedback path is necessary or you only hear about bugs through word-of-mouth.
+4. **Real-device battery proof** — V5.2 is gated on Pixel arrival; until proven, sustained-use battery is unknown. 3%/day target may not hold; without it, users will uninstall after a day.
+5. **Full data-wipe** — M2.9 covers "forget last N minutes" per source. There's no "delete everything" / GDPR-style flow that wipes ContextStore + buffers + speakerInfo + settings + cached LLM responses in one action. Required for trust.
+6. **Onboarding flow** — V1.1 covers permission rationales but there's no first-launch product walkthrough (what is FM, what does it do, what does it not do, voice match enrollment if available). Without it, install-to-first-meaningful-use cliff is steep.
+7. **i18n / accessibility** — strings are English-only; no TalkBack audit, no font-scaling audit. Required for any non-English user; required for Play Store accessibility compliance.
+8. **Self-hosted server SLO story (M4.3)** — if remote inference is offered, uptime + logging + rate-limiting + abuse handling is operational work outside the client. The server stub doesn't address run-it-in-production.
+
+**Net:** V+M is sufficient to **show** FM working to a stakeholder via emu screen recordings or a one-on-one Pixel demo with engineer present. It is **not** sufficient to put on a stranger's phone and walk away. The "ready for users" layer is a Tier 5.5 / 5.6 of operational/release concerns that are not yet in PLAN.md. Adding them after Bucket V+M are complete is ~1–2 additional engineer-weeks (excluding self-host server ops, which can be deferred by choosing the on-device-only routing default).
+
+---
+
 ### 3.1 Tier 0 — Foundation (everything else assumes these)
 
 | # | Item | Status | Emu gate |
