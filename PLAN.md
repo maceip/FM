@@ -115,10 +115,13 @@ WS4: List, calendar draft, document draft, jargon, insight skills. Audit
 **Gate:** airplane mode → ask → Local path answers. Hybrid path correctly
 downgrades to Local on network loss and logs it.
 
-**Current state:** On-device ASR + Gatekeeper + AICore live ✅. LiteRT-LM
-provisioning ⚠️ (needs Gemma 4 bundle). Remote inference structural ⚠️
-(no live endpoint — see §7.2). Local-only mode works for emulator + cloud
-LLM via remote.
+**Current state:** On-device ASR + Gatekeeper code exists. AICore is a live
+client only on devices where the AICore feature is installed. LiteRT-LM
+provisioning ⚠️ needs the Gemma 4 bundle. Remote inference is structural ⚠️
+with no live endpoint (see §7.2). On emulator, the default `LLM` binding is
+still `@HybridLLM`; without AICore/LiteRT-LM/remote config, fulfillment fails
+closed with no actions. `SimulationLLM` exists for tests but is not the
+default app path.
 
 ### M4 — Parity Demo + Hardening 🔵
 
@@ -1069,9 +1072,10 @@ from `return false` to `Build.SOC_MANUFACTURER == "google" && darwinnDelegateLoa
 Cannot do end-to-end remote inference validation.
 
 **Mitigation:**
-- `SimulationLLM` returns realistic canned JSON for the 9 parity skills.
-  Bypasses the entire remote path; the full fulfillment loop is testable
-  on emulator + CI without a server.
+- `SimulationLLM` returns realistic canned JSON for common actions, but it is
+  qualifier-isolated (`@SimulatedLLM`) and is not the default `LLM` binding.
+  To use it as a no-server emulator/demo path, add an explicit debug/test
+  binding or a fixture seam that routes `FulfillmentRunner` through it.
 - `RemoteInferenceLLM` throws clear `LlmUnavailableException` with
   `LlmFailureCause.CONFIGURATION` or `AUTH` so downstream code degrades
   cleanly to the next routing lane.
