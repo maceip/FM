@@ -144,6 +144,75 @@ Start only after Step 2 is green.
 - Keep ActionDeck as the source of truth for side-effect confirmation until
   Presence proves equivalent behavior.
 
+## Active Contracts
+
+These are the only contracts that matter right now. Keep them small and update
+them only when an implementation PR proves the contract wrong.
+
+### Build Contract
+
+Owned by the build captain.
+
+- Inputs: existing Gradle project, GitHub Actions workflow, model/recovery
+  verification scripts.
+- Allowed changes: CI gating, lint/detekt fixes, test drift fixes, R8 keep or
+  dependency fixes, relocation-safe doc/script paths.
+- Must not change: product behavior, action schemas, capture semantics.
+- Done means the commands in Step 1 pass locally and in CI, with no `|| true`
+  masking for detekt, lint, or unit tests.
+
+### Timer Flow Contract
+
+Owned by the app-flow owner.
+
+- Input UI: Home accepts arbitrary user text and submits it once per explicit
+  send action.
+- LLM seam: debug/test builds have a deterministic path that maps "set a timer
+  for 10 minutes" to an `add_timer` JSON response.
+- Fulfillment seam: `FulfillmentOrchestrator.handleUserQuery(query, history)`
+  receives the exact submitted text; `FulfillmentRunner` parses it into
+  `FulfillmentAction.AddTimer`.
+- UI seam: `ActionsRepository.userFacingActions` drives the existing ActionDeck
+  card; confirmation calls `FulfillmentActionHandler.execute`.
+- Done means the emulator recording shows typed input, action card, confirm,
+  and executed state.
+
+### Parity Fixture Contract
+
+Owned by the validation owner.
+
+- Use the existing `FulfillmentAction` model.
+- Each fixture declares: query, expected action subtype, required fields, and
+  expected UI/history state.
+- Fixtures must cover timer, list, calendar draft, document draft, web search,
+  define term, insight, recall, and summary.
+- Must not require a per-skill executor split.
+- Done means all nine fixtures pass against the same path as the timer flow.
+
+### Privacy Contract
+
+Owned by the validation owner with WS2/WS3.
+
+- Disabled source: when a source is off, generated events from that source do
+  not reach `ContextStore` and are not included in model prompt context.
+- Retention: old rows and old in-memory entries are deleted according to the
+  configured retention window.
+- Local-only: a scripted local-only query has no network egress.
+- Forget-window: the requested time range is removed from both persistent
+  context and in-flight buffers.
+- Done means these are automated tests, not manual inspection.
+
+### Presence Contract
+
+Owned by the presence owner after Step 2 is green.
+
+- Source of truth: `ActionsRepository` for fulfillment results and
+  Gatekeeper output for listening/working state.
+- Mapping: `FulfillmentAction -> PresenceCard`; no new action schema.
+- Confirmation: Presence may mirror ActionDeck confirmation, but ActionDeck
+  remains authoritative until parity is proven by the same timer-flow test.
+- Done means Presence can be disabled and the timer flow still ships.
+
 ## Do Not Work On Yet
 
 These are parked until Steps 1 and 2 are green:
