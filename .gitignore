@@ -59,7 +59,10 @@ hs_err_pid*.log
 app/src/main/assets/models/*.tflite
 app/src/main/assets/soda/*.zip
 app/src/main/jniLibs/arm64-v8a/*.so
+# recovered-soda.jar is a Kotlin compile-time dep (small, 3.4 MB) — must be tracked.
+# Other *.jar still ignored to keep accidental .aar/.jar drops out.
 app/libs/*.jar
+!app/libs/recovered-soda.jar
 
 # Misplaced design artifacts at repo root
 /stitch_*.zip
