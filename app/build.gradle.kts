@@ -28,6 +28,15 @@ private fun Project.resolveCosmoReleaseSigning(): CosmoReleaseSigning? {
 
 private val cosmoReleaseSigning: CosmoReleaseSigning? = project.resolveCosmoReleaseSigning()
 
+private fun String?.isTruthyFlag(): Boolean =
+    this?.let { value ->
+        value == "1" || value.equals("true", ignoreCase = true) || value.equals("yes", ignoreCase = true)
+    } == true
+
+private fun Project.allowMissingRecoveredBinaries(): Boolean =
+    providers.environmentVariable("COSMO_ALLOW_MISSING_BINARIES").orNull.isTruthyFlag() ||
+        (findProperty("cosmo.allowMissingBinaries") as String?).isTruthyFlag()
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.androidx.baselineprofile)
@@ -190,14 +199,22 @@ tasks.register<Exec>("verifyCosmoReleaseModelManifest") {
     description =
         "Release-only gate: non-empty model manifest and required bundled assets must match checksum/size (scripts/download-models.sh --verify-only)."
     workingDir = rootProject.layout.projectDirectory.asFile
-    commandLine("bash", "-c", "scripts/download-models.sh --verify-only")
+    val args = mutableListOf("scripts/download-models.sh", "--verify-only")
+    if (allowMissingRecoveredBinaries()) {
+        args += "--allow-missing-binaries"
+    }
+    commandLine("bash", *args.toTypedArray())
 }
 
 tasks.register<Exec>("verifySodaAssets") {
     group = "verification"
     description = "Verifies bundled recovered SODA language-pack assets by checksum and size."
     workingDir = rootProject.layout.projectDirectory.asFile
-    commandLine("bash", "scripts/verify-soda-assets.sh")
+    val args = mutableListOf("scripts/verify-soda-assets.sh")
+    if (allowMissingRecoveredBinaries()) {
+        args += "--allow-missing-binaries"
+    }
+    commandLine("bash", *args.toTypedArray())
 }
 
 afterEvaluate {
