@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# verify-architecture-delta.sh — confirms the architecture-delta doc + the
+# files it references exist on disk, and that the required Phase headers
+# are present.
+#
+# Originally also enforced specific CI-workflow steps; those checks were
+# dropped in 2026-05-15 when CI was overhauled to a lean compile+lint+test
+# gate with emu validation gated on workflow_dispatch (the CI runner does
+# not have the recovered binaries needed for the strict gates).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -64,23 +72,3 @@ for path in "${required_paths[@]}"; do
     exit 66
   fi
 done
-
-if ! grep -Fq "scripts/verify-architecture-delta.sh" ".github/workflows/ci.yml"; then
-  echo "CI workflow does not run scripts/verify-architecture-delta.sh" >&2
-  exit 66
-fi
-
-if grep -Fq "scripts/download-models.sh --verify-only --allow-empty" ".github/workflows/ci.yml"; then
-  echo "CI workflow still allows an empty model manifest" >&2
-  exit 66
-fi
-
-if ! grep -Fq "scripts/download-models.sh --verify-only" ".github/workflows/ci.yml"; then
-  echo "CI workflow does not verify the strict model manifest" >&2
-  exit 66
-fi
-
-if ! grep -Fq "scripts/verify-phase6-release-gates.sh" ".github/workflows/ci.yml"; then
-  echo "CI workflow does not run scripts/verify-phase6-release-gates.sh" >&2
-  exit 66
-fi
