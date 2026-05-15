@@ -95,53 +95,52 @@ namespace stays cosmo for parity.
 
 ---
 
-## Consolidation roadmap (concern surfaced 2026-05-15)
+## Consolidation status (as of 2026-05-15)
 
 The on-disk dispersal is intentional for the large recovery binaries (they
 can't live in git) but **excessive for the docs and design references**.
-Plan to consolidate:
+Three-phase consolidation:
 
-### Phase 1 — bring docs into `~/neural/reference/` (low risk)
+### Phase 1 — mirror cosmo-recovery docs into `~/neural/reference/` ✅ DONE
 
-Create `~/neural/reference/` containing read-only mirrors of cosmo-recovery
-docs that FM cites. Files involved:
+`~/neural/reference/` now contains read-only mirrors of all the cosmo-recovery
+stack maps + interface contracts + inherent contracts that FM cites:
 
-- `~/cosmo-dev/repo/docs/architecture.md` → `~/neural/reference/cosmo-architecture.md`
-- `~/cosmo-dev/repo/docs/audio_stack_map.md` → `~/neural/reference/cosmo-audio-stack-map.md`
-- `~/cosmo-dev/repo/docs/text_stack_map.md` → `~/neural/reference/cosmo-text-stack-map.md`
-- `~/cosmo-dev/repo/docs/llm_stack_map.md` → `~/neural/reference/cosmo-llm-stack-map.md`
-- `~/cosmo-dev/repo/docs/image_stack_map.md` → `~/neural/reference/cosmo-image-stack-map.md`
-- `~/cosmo-dev/repo/docs/dagger_graph_map.md` → `~/neural/reference/cosmo-dagger-graph-map.md`
-- `~/cosmo-dev/repo/docs/settings_and_config_map.md` → `~/neural/reference/cosmo-settings-and-config-map.md`
-- `~/cosmo-dev/repo/docs/telemetry_map.md` → `~/neural/reference/cosmo-telemetry-map.md`
-- `~/cosmo-dev/repo/docs/bert_gatekeeper_litert_jni_replacement.md` → `~/neural/reference/cosmo-bert-aot-pipeline.md`
-- `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md` → `~/neural/reference/cosmo-apk-consolidated-plan.md`
-- `~/cosmo-dev/WS4/docs/ws4-known-gaps.md` → `~/neural/reference/ws4-known-gaps.md`
+- 12 cosmo stack-map docs (`cosmo-*.md`)
+- 4 workstream interface contracts (`contracts/00–03_*.md`)
+- 2 inherent docs (runtime contract + audio collection)
 
-Add `scripts/sync-reference-docs.sh` to re-pull these from cosmo-dev when
-they change. Total size: ~500 KB; tracked in git as text.
+Re-sync via `scripts/sync-reference-docs.sh` (supports `--diff` dry run).
+Total size: ~500 KB, tracked in git as text. See `reference/README.md`.
 
-**Status:** not yet executed.
+### Phase 2 — consolidate plan/design content into a master `PLAN.md` ✅ DONE
 
-### Phase 2 — bring `~/inherent` runtime contract under `~/neural`
+`~/neural/PLAN.md` at repo root consolidates plan/design content that was
+previously scattered across:
 
-Copy `~/inherent/contracts/runtime_contract.md` →
-`~/neural/reference/inherent-runtime-contract.md` and keep it in sync.
+- `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md` (320 lines)
+- `~/cosmo-dev/repo/docs/marching-orders.md` (360 lines)
+- `~/cosmo-dev/repo/docs/parallel-offload-plan.md` (157 lines)
+- `~/cosmo-dev/repo/docs/implementation-status.md` (36 lines)
+- `~/cosmo-dev/repo/docs/blockers-and-mitigations.md` (92 lines)
+- `~/cosmo-dev/repo/docs/llm-model-delivery-architecture-review.md` (59 lines)
+- `~/cosmo-dev/repo/docs/security-threat-model.md` (25 lines)
+- `~/cosmo-dev/WS4/docs/ws4-demo.md` (67 lines)
+- `~/cosmo-dev/WS4/docs/ws4-known-gaps.md` (42 lines — superseded by `docs/fallback-paths.md`)
 
-The training pipeline source (`~/inherent/src/`) stays separate — it's a
-distinct project with its own dependencies. The **contract** is what FM
-needs to read.
+Synthesized rather than concatenated — duplications dropped, status lines
+refreshed against current FM reality, cross-references updated to point at
+FM-owned canonical docs.
 
-**Status:** not yet executed.
+### Phase 3 — point cross-references at the consolidated copies ✅ DONE
 
-### Phase 3 — point everything at the consolidated copies
+`docs/architecture.md`, `README.md`, `architecture-delta.md`, and
+`fallback-paths.md` now cite `reference/*.md` (mirrored) and `PLAN.md`
+(consolidated) rather than `~/cosmo-dev/*`.
 
-Update internal doc cross-references in `architecture.md`,
-`architecture-delta.md`, etc. to point to `reference/*` instead of
-`~/cosmo-dev/repo/docs/*`. Once Phase 1+2 land, FM is **self-contained for
-all doc purposes**.
-
-**Status:** depends on Phase 1+2.
+**FM is now self-contained for all doc purposes.** A reader cloning the
+repo and reading from the root has everything they need without crossing
+into `~/cosmo-dev/`.
 
 ### Out of scope — large binaries stay out
 

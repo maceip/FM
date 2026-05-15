@@ -152,11 +152,13 @@ relocation safety).
 
 ## Docs
 
-- [`LAYOUT.md`](LAYOUT.md) — where everything lives (canonical inside `~/neural`, what's outside and why, consolidation roadmap)
+- [`PLAN.md`](PLAN.md) — master engineering plan: goal, milestones, workstreams, interface contracts, current snapshot, active blockers, security threat model, LLM/model-delivery review, build/test/ship gates, demo script, privacy enforcement, out-of-scope. **Read this first if you're new to the project.**
+- [`LAYOUT.md`](LAYOUT.md) — where everything lives (canonical inside `~/neural`, what's outside and why, consolidation status)
 - [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including Presence UX layer (§13), AppFunctions surface (§14), server-side workstreams (§15), CaMeL trust-layer placement (§12), and recovered-but-unwired surface inventory (§17)
 - [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders
 - [`docs/camel-port-notes.md`](docs/camel-port-notes.md) — per-AST-node CaMeL port-fidelity reference (read when the implementing workstream picks up §12)
 - [`docs/fallback-paths.md`](docs/fallback-paths.md) — 3-tier fallback for each deferred subsystem (cosmo-recovered → commercial/OSS → build-it), with effort estimates + triage
+- [`reference/`](reference/) — read-only mirrors of cosmo-recovery stack maps + workstream interface contracts + inherent contracts
 - [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers (oldest first)
 - [`docs/aicore-api-gap.md`](docs/aicore-api-gap.md) — public AICore feature-selection limits
 - [`docs/remote-inference-contract.md`](docs/remote-inference-contract.md) — issuer + inference HTTP contract
