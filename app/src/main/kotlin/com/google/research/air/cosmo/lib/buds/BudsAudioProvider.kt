@@ -5,7 +5,6 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.research.air.cosmo.di.ApplicationScope
@@ -146,8 +145,7 @@ constructor(
     }
 
     private fun hasBluetoothConnectPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
     private fun closeSocket(socket: BluetoothSocket?) {
         runCatching { socket?.close() }

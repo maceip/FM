@@ -1,5 +1,6 @@
 package com.google.research.air.cosmo.lib.util
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.util.Log
 import com.google.common.util.concurrent.ListeningExecutorService
@@ -125,14 +126,17 @@ internal constructor(
         }
 
         @JvmStatic
+        @SuppressLint("PrivateApi")
         internal fun contextHubInfoClass(): Class<*> =
             Class.forName("android.hardware.location.ContextHubInfo")
 
         @JvmStatic
+        @SuppressLint("PrivateApi")
         internal fun contextHubClientCallbackClass(): Class<*> =
             Class.forName("android.hardware.location.ContextHubClientCallback")
 
         @JvmStatic
+        @SuppressLint("PrivateApi")
         internal fun nanoAppMessageClass(): Class<*> =
             Class.forName("android.hardware.location.NanoAppMessage")
 

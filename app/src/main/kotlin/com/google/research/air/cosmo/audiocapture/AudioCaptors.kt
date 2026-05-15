@@ -1,5 +1,6 @@
 package com.google.research.air.cosmo.audiocapture
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -9,7 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.research.air.cosmo.context.ContextEvent
 import com.google.research.air.cosmo.context.ContextStore
@@ -218,6 +218,7 @@ constructor(
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun getPixelBudsDevice(): BluetoothDevice? {
         if (!hasBluetoothConnectPermission()) return null
         return runCatching {
@@ -227,6 +228,7 @@ constructor(
         }.getOrNull()
     }
 
+    @SuppressLint("MissingPermission")
     private fun isPixelBudsDevice(device: BluetoothDevice): Boolean {
         if (!hasBluetoothConnectPermission()) return false
         return runCatching {
@@ -293,16 +295,10 @@ constructor(
     }
 
     private fun hasBluetoothConnectPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
-    @Suppress("DEPRECATION")
     private fun Intent.bluetoothDeviceExtra(): BluetoothDevice? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-        } else {
-            getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-        }
+        getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
 }
 
 class SODADeviceAudioCaptor

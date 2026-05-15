@@ -1,7 +1,5 @@
 package com.google.research.air.cosmo.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -40,13 +38,6 @@ fun CosmoHazeHost(content: @Composable () -> Unit) {
 fun Modifier.cosmoHazeSource(state: HazeState): Modifier = this.hazeSource(state)
 
 /**
- * `true` when the runtime can render real backdrop blur. Haze requires API 31+ for GPU blur and
- * falls back to a solid tint on older devices; we keep the same fallback shape ourselves so callers
- * can choose to skip `hazeEffect` entirely (and avoid the per-frame cost).
- */
-val supportsRealBlur: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-/**
  * Default frosted style used by Cosmo chrome. Tinted toward the active surface so the bar still
  * reads against any wallpaper.
  */
@@ -62,17 +53,11 @@ fun cosmoFrostedStyle(
 )
 
 /**
- * Convenience: applies real blur on API 31+ or a tinted scrim on older devices. Use on chrome
- * surfaces (top bar, bottom bar, sticky overlays).
+ * Convenience wrapper for chrome surfaces (top bar, bottom bar, sticky overlays). The app's min
+ * SDK is 33, so Haze's real blur path is always available.
  */
 @Composable
 fun Modifier.cosmoFrosted(
     state: HazeState = LocalHazeState.current,
     style: HazeStyle = cosmoFrostedStyle()
-): Modifier =
-    if (supportsRealBlur) {
-        this.hazeEffect(state = state, style = style)
-    } else {
-        val tint = style.tints.firstOrNull()?.color ?: MaterialTheme.colorScheme.surface
-        this.background(tint)
-    }
+): Modifier = this.hazeEffect(state = state, style = style)

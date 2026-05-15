@@ -1,7 +1,6 @@
 package com.google.research.air.cosmo.ui.theme
 
 import android.app.WallpaperManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Composable
@@ -19,8 +18,8 @@ import androidx.compose.ui.platform.LocalContext
  * called with `wallpaperDriven = true` (or when a screen explicitly wraps itself in
  * [rememberWallpaperPalette]).
  *
- * Today exposes only the 3 wallpaper colors Android surfaces via [WallpaperManager.getWallpaperColors]
- * (SDK 27+). For full Material-You tonal palettes wire `material-color-utilities` and expand
+ * Today exposes only the 3 wallpaper colors Android surfaces via [WallpaperManager.getWallpaperColors].
+ * For full Material-You tonal palettes wire `material-color-utilities` and expand
  * [WallpaperPalette] to hold per-role tone arrays.
  */
 val LocalWallpaperPalette = staticCompositionLocalOf { WallpaperPalette.Empty }
@@ -45,8 +44,7 @@ data class WallpaperPalette(
 
 /**
  * Reads the system wallpaper colors and re-emits them when the wallpaper changes. Returns
- * [WallpaperPalette.Empty] below API 27 (where [WallpaperManager.OnColorsChangedListener] doesn't
- * exist) or when no wallpaper is set.
+ * [WallpaperPalette.Empty] when no wallpaper colors are available.
  */
 @Composable
 fun rememberWallpaperPalette(): WallpaperPalette {
@@ -57,21 +55,16 @@ fun rememberWallpaperPalette(): WallpaperPalette {
         val manager = WallpaperManager.getInstance(context)
         palette = manager.snapshotPalette()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            val listener = WallpaperManager.OnColorsChangedListener { _, _ ->
-                palette = manager.snapshotPalette()
-            }
-            manager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
-            onDispose { manager.removeOnColorsChangedListener(listener) }
-        } else {
-            onDispose { }
+        val listener = WallpaperManager.OnColorsChangedListener { _, _ ->
+            palette = manager.snapshotPalette()
         }
+        manager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
+        onDispose { manager.removeOnColorsChangedListener(listener) }
     }
     return palette
 }
 
 private fun WallpaperManager.snapshotPalette(): WallpaperPalette {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return WallpaperPalette.Empty
     val colors = getWallpaperColors(WallpaperManager.FLAG_SYSTEM) ?: return WallpaperPalette.Empty
     return WallpaperPalette(
         primary = Color(colors.primaryColor.toArgb()),
