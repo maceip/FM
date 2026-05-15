@@ -309,6 +309,8 @@ dependencies {
     implementation(libs.sqlcipher.android)
 
     testImplementation(libs.androidx.test.core)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.hilt.testing)
     testImplementation(libs.json)

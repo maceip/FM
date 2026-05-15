@@ -655,7 +655,182 @@ boundary uniformly via the security policy engine.
 
 ---
 
-## 13. Voice output (🟡 DEFERRED)
+## 13. Presence layer (⚠️ first pass — surfaces landed, orchestration partial)
+
+The user-facing "ambient agent" surface — distinct from the main Nav3 app
+shell (§10). Where Nav3 is the settings/debug/actions explorer, **Presence is
+what the user actually sees during ambient use**: an orb that parks at the
+screen edge, expands into a tab + card stack when there's something to surface,
+and can be projected to the glass capture target. Design-led aerospace/HUD
+visual language, separate token palette from the main Compose theme.
+
+> Per the user: "almost as important as the models themselves" — the
+> on-device assistant succeeds or fails on this surface, not on the
+> settings screen.
+
+### 13.1 Components
+
+| Component | File | Status | Notes |
+|---|---|---|---|
+| Sealed state | `presence/PresenceState.kt` | ✅ | `Hidden`, `Parked(mode, activity)`, `Working(taskId, phase, pillText?)`, `NeedsInput(taskId, prompt)`, `Ready(taskId, cards, primaryAction?)`, `Dismissed(until)` |
+| Modes / phases | same | ✅ | `PresenceMode { ORB, TAB }`; `OrbActivity { IDLE, LISTENING, RECENTLY_DISMISSED }`; `WorkPhase { STARTED, SYNCING, PROCESSING, FINALIZING }` |
+| Card payload types | same | ✅ | `DeepResearch(query, sources, activeTab)`, `SendResults(draftReply, recipients)`, `CalendarTimer(focusMinutes, focusSeconds, reminders)` |
+| Action types | same | ✅ | `CardAction { id, label, sublabel?, type }`; `CardActionType { DEFAULT, PRIMARY, DESTRUCTIVE, COLLAPSE }` |
+| Aerospace/HUD palette | `presence/PresenceTokens.kt` | ✅ | Separate from `CosmoTokens`; glass surfaces (low/medium/high), cyan glow edges, dim/bright borders |
+| Orb surface | `presence/surfaces/OrbSurface.kt` | ✅ | Parked orb with idle/listening/recently-dismissed visuals + Compose animations |
+| Tab surface | `presence/surfaces/TabSurface.kt` | ✅ | Expanded form |
+| Card stack | `presence/surfaces/CardStackSurface.kt` | ✅ | Vertical glass-panel stack dispatched on `CardPayload` |
+| Glass panel primitive | `presence/surfaces/GlassPanel.kt` | ✅ | Shared base for all surfaces |
+| State driver | (not yet a dedicated file) | ⚠️ | Surfaces render against `PresenceState`; the **producer** that maps `GatekeeperOutput` / `FulfillmentResult` / `IntentRecord` transitions into `PresenceState` emissions is the missing piece |
+| Projected-XR rendering | binds via `glasses/CosmoProjectedGlassCaptureService` | ⚠️ | `GlassPanel` exists; the service binds; the wiring from `PresenceState` flow → projected surface is not driven today |
+| Card payload library expansion | `presence/PresenceState.kt::CardPayload` | ⚠️ | 3 payloads supported; mapping all 22 fulfillment action subtypes (§6) to payloads is incomplete |
+
+### 13.2 The state-machine contract
+
+The presence state-machine is the **observable surface** of the assistant
+to the user. Transitions are driven by upstream events:
+
+- `GatekeepingResult` (directed transcript classified) → `Working(taskId,
+  phase=STARTED)` if it triggers fulfillment
+- `IntentRecord` (from §5 IntentExtractor) → `Working(... phase=PROCESSING,
+  pillText=intent.intent)` to surface in-flight intent
+- `FulfillmentEvent.NeedsConfirmation(action)` → `NeedsInput(taskId,
+  prompt)`
+- `FulfillmentEvent.Executed(result)` → `Ready(taskId, cards,
+  primaryAction)`
+- User-side `dismiss(taskId, until)` → `Dismissed(until)` → eventually
+  back to `Hidden` or `Parked`
+
+The driver lives architecturally between `FulfillmentOrchestrator` (§6) and
+the surfaces. **It is not yet implemented.** When it lands, it's a single
+class (`PresenceStateMachine` or similar) that observes
+`gatekeeper.results`, `intentBuffer`, and `fulfillment.events`, and exposes
+`state: StateFlow<PresenceState>` that the surfaces collect.
+
+### 13.3 Trust-layer interlock
+
+When CaMeL (§12) lands, the `Ready` state's `primaryAction` and the
+`NeedsInput` prompt become tool-call boundaries the interpreter consults
+through `SecurityPolicyEngine`. The presence layer is where the user
+gives capability grants (the "allow / deny / always allow" UI), so
+trust-layer dynamic capability negotiation flows through Presence.
+
+---
+
+## 14. AppFunctions surface (Android 17 / API 36 — ⚠️ first pass)
+
+Exposes FM's capabilities as **Android AppFunctions** so other apps and the
+system Assistant runtime can invoke them. AppFunctions is the Android 17
+public API for cross-app function-calling: a typed RPC contract that the
+platform AI agents discover and call, replacing the older Slices /
+intent-actions / app-action surface.
+
+### 14.1 Functions exposed today
+
+`appfunctions/AmbientAppFunctions.kt` declares these methods:
+
+| Function | Status | Routes to |
+|---|---|---|
+| `getAmbientStatus(): AmbientStatus` (state, ambientAudioOn, budsAudioOn, watchAudioOn, glassOn, lanDiscoveryOn) | ✅ | `CosmoController` + `CosmoStateManager` |
+| `startAmbientSession()` | ✅ | `CosmoStateManager.enableCosmo()` |
+| `stopAmbientSession()` | ✅ | `CosmoStateManager.disableCosmo()` |
+| `snoozeAmbientSession(duration: Duration)` | ✅ | `CosmoStateManager.setSnoozeUntil(...)` |
+| `queryRecentContext(query: String, limit: Int = 10): List<String>` | ✅ | `ContextStore.queryByText` |
+| `summarizeRecentContext(query: String): String` | ✅ | `queryRecentContext` → bullet-joined |
+| `openTaskMonitor(title, prompt, agentResponse): Boolean` | ✅ | `TaskMonitorNavigationBridge.openTaskMonitor(...)` |
+| `runUserConfirmedQuery(query, conversationHistory)` | ✅ | `FulfillmentOrchestrator.handleUserQuery(...)` |
+
+### 14.2 Platform binding (incomplete)
+
+| Slot | Status | Notes |
+|---|---|---|
+| `@AppFunctionSerializable` on data types (`AmbientStatus`) | ❌ | Required for the platform's type registry; not applied |
+| `@AppFunctionSchema` or `@AppFunction` on methods | ❌ | Required for discovery by the platform Assistant agent; not applied |
+| `AppFunctionService` subclass + manifest registration | ❌ | Required service entry-point; not present |
+| Per-function permission gating | ❌ | First-pass methods are permissive. Session control (`startAmbientSession`, `stopAmbientSession`, `snoozeAmbientSession`) MUST require a system confirmation surface (e.g., `RequestPermission` flow) before being callable by a 3P app |
+| Trust-layer interlock | 🔵 | When CaMeL (§12) lands, each AppFunction registers as a `CamelFunction` with its own `Capabilities`; permission checks route through `SecurityPolicyEngine` |
+
+When platform binding is added: each method gets `@AppFunctionSchema`,
+data types get `@AppFunctionSerializable`, `AppFunctionService` is added
+to `AndroidManifest.xml`. The current pure-Kotlin class shape is the
+**logic**; the annotations + service binding are the **discovery + invocation**
+layer the platform demands.
+
+---
+
+## 15. Server-side workstreams
+
+Genesis is on-device-first. Several cosmo functions had server-side
+counterparts; this section lists those at the system-design level and
+flags whether genesis builds an equivalent, replaces it, or skips it.
+
+> Privacy model: anything that flows off-device is opt-in, audited, and
+> (when CaMeL lands) routes through the trust layer (§12) via capability
+> checks at the tool-call boundary.
+
+### 15.1 Mapping cosmo server-side to genesis
+
+| Cosmo server-side function | Genesis approach | Status |
+|---|---|---|
+| **LLM inference** (BARD / LaMDA backend) | On-device first: AICore (Gemini Nano), LiteRT-LM (on-device Gemma 4 bundle). Remote inference (Oak) as fallback | ✅ on-device live; ⚠️ remote needs endpoint + cert pin config |
+| **Private inference transport (Oak session)** | `RemoteInferenceClient` + Oak session config via `liboak_session_config_builder_jni.so` + `libpi_client_session_config_jni.so` (recovered, not yet bundled) | ⚠️ transport ready; live endpoint not provisioned; Oak libs need bundling |
+| **DBW data pipeline** (server-side training-data ingestion of accessibility-tree captures for screen-understanding model distillation) | See §15.2 below — client side partly built; server pipeline is a future workstream | 🔵 planned (system-level only) |
+| **BARD Workspace grounding service** (server fetch of Gmail/Calendar/Drive content) | Replaced — genesis uses on-device Android content providers (`ContextStore` + per-source ephemeral buffers). User owns the read path | 🟡 explicitly skipped |
+| **Prompt-injection classifier service** (BARD's `PromptInjectionWorkspaceMetadata`-driven scanner) | Replaced by on-device CaMeL trust layer (§12) — control/data flow separation by design, not classifier-by-classifier | 🔵 planned (CaMeL — different mechanism, same threat) |
+| **Browsing-agent backend** (the agent that drives Mariner / TaskMonitor) | TaskMonitor UI ships; the agent loop runs server-side in cosmo. Genesis interim path: route through remote inference. Long-term: on-device tool-using agent when LLM context windows + tool-calling fidelity allow | ⚠️ UI live; agent backend not built |
+| **Personal Intelligence (PI) service** (Google's personal-data aggregation backend) | Replaced — on-device `ContextStore` is the equivalent. No remote aggregation | 🟡 explicitly skipped |
+| **Telemetry aggregation** (sink for 309 typed Firebase events) | Firebase Analytics handles ingestion; no custom backend | ✅ |
+| **Model delivery / refresh** (LiteRT-LM bundle, audio gatekeeper assets, SODA packs, future Inherent model) | Two-tier: bundled-in-APK for stable assets (BERT, SODA packs); HTTPS download for variable-size bundles (LiteRT-LM, Inherent) | ⚠️ provisioning works locally; production CDN not configured |
+
+### 15.2 DBW (Distill-By-Watching) — what cosmo had vs what genesis builds
+
+**Cosmo recovered surface** (`~/Downloads/cosmo_baksmali/classes17/com/google/intelligence/dbw/`
++ `classes43/intelligence/dbw/proto/`): a **structured accessibility-tree
+capture library**, not a training pipeline. The "Distill-By-Watching" name
+refers to what the *server-side* did with these uploaded captures.
+
+On-device library shape:
+- `ImmutableAndroidAccessibilityForest` — collection of trees (one per window)
+- `ImmutableAndroidAccessibilityTree` — a single window's hierarchy
+- `ImmutableAndroidAccessibilityNode` — node with parent/child edges, clickable-span info, available actions
+- `ImmutableAndroidAccessibilityWindow` — window metadata (type, bounds)
+- `AccessibilityEventListener` / `AccessibilityServiceConnectionListener` / `AccessibilityTreeCache` / `ConnectedAccessibilityServiceProvider`
+- Proto layer: `AndroidAccessibilityForest`, `AndroidAccessibilityTree`,
+  `AndroidAccessibilityNodeInfo`, `AndroidAccessibilityWindowInfo`,
+  `AndroidAccessibilityAction` + geometry types (`Point`, `PointF`,
+  `Rect`, `Line`)
+
+**Genesis state**:
+
+| Layer | Status | Notes |
+|---|---|---|
+| Flat event-based screen capture | ✅ | `interactioncapture/ScreenInteractionCaptor` emits `ScreenInteraction(timestamp, type, packageName, windowId, text)` events; `contentcapture/PeriodicScreenCaptor` polls for screen text. Narrower than cosmo's full tree forest |
+| Structured accessibility-tree capture | 🔵 | Not built. Architectural slot: `contentcapture/AccessibilityForestCaptor.kt` (new). Same `ConnectedAccessibilityServiceProvider` pattern; emits the full forest per window-change event |
+| Tree-shaped proto schema (`AndroidAccessibilityForest`, etc.) | 🔵 | Not built. Either port cosmo's protobufs (recovery already extracted them) or define genesis-narrower equivalents under `contentcapture/proto/` |
+| Server-side ingestion endpoint | 🔵 | Not built — out of this doc's scope at the implementation level. Contract surface: "opt-in uploads of forests, returns refined models." Capability-gated through CaMeL when present |
+| Server-side distillation training | 🔵 | Not built. System-design only: ingest forests → de-identify (redact text, hash IDs) → screen-understanding model training run → output goes to model-manifest CDN for next bundle |
+| Returned-model delivery | (uses §15.1 model delivery) | ⚠️ | Same path as LiteRT-LM bundle refresh |
+
+The server piece is described **at the architecture level only**. Specific
+pipeline implementation (data store choice, training framework, K8s job
+orchestration) is left to server-team timing. Genesis treats the server side
+as a contract surface: "given opt-in captures, return better
+gatekeeper/intent models," with mechanism chosen later.
+
+### 15.3 What genesis explicitly chooses NOT to mirror
+
+| Cosmo surface | Why genesis skips it |
+|---|---|
+| **PI service** (Personal Intelligence) | On-device `ContextStore` is the privacy-preserving equivalent; no remote aggregation of personal data |
+| **Workspace grounding** (server fetch of Gmail/Calendar/Drive) | Android content providers + user permissions own the read path on-device; no server fetch |
+| **Server-side prompt-injection classifier** (`PromptInjectionClassifierAbuseMetadata`, `PromptInjectionWorkspaceMetadata` protos found in `cosmo_baksmali` proto deps) | Replaced by CaMeL on-device (§12) — different defense mechanism (architectural separation vs statistical classifier), same threat (prompt injection) |
+
+These are conscious privacy-driven choices, not gaps. The on-device path
+delivers equivalent functionality without an off-device data round-trip.
+
+---
+
+## 16. Voice output (🟡 DEFERRED)
 
 **Status: 🟡 deferred. Architecturally placed; no plans to build for current scope.**
 
@@ -700,7 +875,7 @@ fulfillment action handlers that produce speakable output gain a single
 
 ---
 
-## 14. Appendix: Recovered-but-unwired surfaces
+## 17. Appendix: Recovered-but-unwired surfaces
 
 A catalog of things genesis could enable without writing new infrastructure.
 None are blockers; all are inventory.
@@ -711,7 +886,7 @@ Found at `~/Downloads/cosmo_recovered_native_libs/lib/arm64-v8a/`:
 
 | Library | Subsystem | Why not bundled |
 |---|---|---|
-| `libvogo_jni.so` | VoiceLM/TTS | Voice output deferred (§13) |
+| `libvogo_jni.so` | VoiceLM/TTS | Voice output deferred (§16) |
 | `libsbcdecoder_jni.so` | Pixel Buds SBC | Genesis uses `ReflectiveSbcAudioDecoder` (MediaCodec-based) — `.so` not needed |
 | `liboak_session_config_builder_jni.so` | Oak private-compute sessions | Genesis remote inference uses plain TLS over OkHttp, not Oak sessions |
 | `libpi_client_session_config_jni.so` | Personal Intelligence service binding | Genesis doesn't bind to PI |
@@ -728,7 +903,7 @@ Found at `~/Downloads/cosmo_recovered_large_assets/`:
 
 | Asset | Subsystem | Status |
 |---|---|---|
-| `voicelm/encoder_int4-graph-custom_op.tflite` (137M) | VoiceLM | Deferred (§13) |
+| `voicelm/encoder_int4-graph-custom_op.tflite` (137M) | VoiceLM | Deferred (§16) |
 | `voicelm/merged_depth_decoder_int4-graph-custom_op.tflite` (48M) | VoiceLM | Deferred |
 | `voicelm/temporal_decoder_int4-graph-custom_op.tflite` (truncated, 64MB missing) | VoiceLM | Deferred + needs re-recovery |
 | `voicelm/soundstream_{encoder,decoder,quantizer}.tflite` | VoiceLM neural codec | Deferred |
@@ -765,13 +940,15 @@ the slots visible so that:
 
 ---
 
-## 15. Appendix: Document map
+## 18. Appendix: Document map
 
 | If you need... | Read |
 |---|---|
 | The current system architecture (this doc) | `docs/architecture.md` |
+| Repository layout — where everything lives | `LAYOUT.md` |
 | The C1–C9 contract rules + PR0–PR6 marching orders | `docs/architecture-delta.md` |
 | Per-AST-node CaMeL port reference (for the implementing workstream) | `docs/camel-port-notes.md` |
+| 3-tier fallback paths per deferred subsystem (cosmo-recovered → commercial/OSS → build it) | `docs/fallback-paths.md` |
 | Active blockers / not-yet-resolved issues | `docs/blocker-register.md` |
 | AICore public-API surface limits | `docs/aicore-api-gap.md` |
 | Audio training corpus plan | `docs/audio-corpus-plan.md` |
@@ -784,7 +961,7 @@ the slots visible so that:
 
 ---
 
-## 16. Snapshot summary (2026-05-13)
+## 19. Snapshot summary (2026-05-15)
 
 **Live and exercised today (✅):** capture (ambient + buds + device + watch
 + screen + interactions + notifications + location), SODA stack (per-source
@@ -796,7 +973,11 @@ Combined BERT+regex fusion), C9 selector routing, intent extraction (LLM-backed
 and context gather), fulfillment (22 action types, confirmation policy, audit
 trail), LLM clients (public AICore, simulation), persistent context store
 (Room + SQLCipher), state probe (`CosmoStateSource` cosmo-aligned), settings
-DataStore, Nav3 UI with 24 debug panels, telemetry catalog with provenance.
+DataStore, Nav3 UI with 24 debug panels, telemetry catalog with provenance,
+**Presence surfaces (orb / tab / card stack / glass-panel primitive,
+aerospace-HUD palette)**, **AppFunctions logic surface (`AmbientAppFunctions`
+methods route through `CosmoController`, `CosmoStateManager`, `ContextStore`,
+`FulfillmentOrchestrator`, `TaskMonitorNavigationBridge`)**.
 
 **Partial (⚠️):** EdgeTPU Conformer backend (`isAvailable=false` until Pixel
 returns), Inherent backend (placeholder asset until `~/inherent` ships),
@@ -804,7 +985,11 @@ AOC nanoapp transport (reflection-bridged; needs platform-signed callback or
 bytecode-gen), Voice Match (JNI stub + config plumbing; no UI / no enrollment),
 HotwordEvent routing (logged-only), LiteRT-LM (provisioning needed),
 remote inference (live config needed), glass + camera capture (services
-bind; consumers not wired), action handler split.
+bind; consumers not wired), action handler split, **Presence state driver
+(surfaces render, but the `GatekeeperOutput → PresenceState` producer isn't
+written)**, **AppFunctions platform binding (`@AppFunctionSchema` /
+`@AppFunctionSerializable` annotations + `AppFunctionService` registration
+not applied — methods aren't discoverable by the platform agent yet)**.
 
 **Deferred (🟡):** Voice output stack (VoiceLM + Vogo + LocalTTS + AudioRenderer),
 Gecko semantic search, Pumpkin semantic grammar, Diarization,
@@ -813,7 +998,11 @@ native libraries.
 
 **Planned (🔵):** CaMeL trust layer (provenance + capability tokens + PLLM/QLLM
 split + interpreter at tool-call boundary), mt6989 BERT variant (AOT pipeline
-drafted, model not produced yet).
+drafted, model not produced yet), **structured accessibility-tree capture
+(DBW-style `AccessibilityForestCaptor`)**, **server-side workstreams (DBW
+data pipeline + opt-in upload + distillation training; browsing-agent
+backend; production CDN for model delivery — system-design only, no
+implementation)**.
 
 The architecture is **substrate-complete for the parity demo**: every cosmo
 capture and classification path that genesis intends to ship has working code.

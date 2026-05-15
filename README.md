@@ -117,10 +117,32 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 ## Build
 
+**Fast local dev loop** (recommended for everyday work):
+
+```bash
+scripts/dev-loop.sh                  # build → install → launch → stream logcat
+scripts/dev-loop.sh --reinstall      # preserve app data on reinstall
+scripts/dev-loop.sh --clean-install  # uninstall first
+scripts/dev-loop.sh --mirror         # also launch scrcpy
+scripts/dev-loop.sh --help           # all flags
+```
+
+Requires an attached device or running emulator (`adb devices` should list
+one). Reads `ANDROID_SERIAL` for targeting if multiple are connected.
+
+**First-time setup on a new machine** — provision the gitignored recovered
+binaries (TFLites, SODA packs, JNI .so) from `~/Downloads/cosmo_recovered_*`:
+
+```bash
+scripts/provision-from-recovery.sh   # copies binaries into the assets/jniLibs tree
+```
+
+**Standalone Gradle commands:**
+
 ```bash
 ./gradlew :app:assembleDebug
 ./gradlew :app:testDebugUnitTest
-./gradlew :app:installDebug   # on a connected device
+./gradlew :app:installDebug
 ```
 
 CI gates: `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`.
@@ -130,9 +152,11 @@ relocation safety).
 
 ## Docs
 
-- [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including CaMeL trust-layer placement (§12) and recovered-but-unwired surface inventory (§14)
+- [`LAYOUT.md`](LAYOUT.md) — where everything lives (canonical inside `~/neural`, what's outside and why, consolidation roadmap)
+- [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including Presence UX layer (§13), AppFunctions surface (§14), server-side workstreams (§15), CaMeL trust-layer placement (§12), and recovered-but-unwired surface inventory (§17)
 - [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders
 - [`docs/camel-port-notes.md`](docs/camel-port-notes.md) — per-AST-node CaMeL port-fidelity reference (read when the implementing workstream picks up §12)
+- [`docs/fallback-paths.md`](docs/fallback-paths.md) — 3-tier fallback for each deferred subsystem (cosmo-recovered → commercial/OSS → build-it), with effort estimates + triage
 - [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers (oldest first)
 - [`docs/aicore-api-gap.md`](docs/aicore-api-gap.md) — public AICore feature-selection limits
 - [`docs/remote-inference-contract.md`](docs/remote-inference-contract.md) — issuer + inference HTTP contract
