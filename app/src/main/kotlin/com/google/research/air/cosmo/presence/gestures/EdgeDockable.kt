@@ -6,12 +6,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.google.research.air.cosmo.presence.PresenceTokens
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -32,65 +32,109 @@ fun Modifier.edgeDockable(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
-    val tapMaxPx = with(density) { Dp(PresenceTokens.Motion.tapMaxDisplacementDp).toPx() }
-    val longPressMaxPx = with(density) { Dp(PresenceTokens.Motion.longPressMaxDisplacementDp).toPx() }
-    val flickThresholdPx = with(density) { Dp(PresenceTokens.Motion.flickVelocityThresholdDpPerSec).toPx() }
-    val expandThresholdPx = with(density) { Dp(PresenceTokens.Motion.expandVelocityThresholdDpPerSec).toPx() }
+    val thresholds = GestureThresholds(
+        tapMaxPx = with(density) { Dp(PresenceTokens.Motion.tapMaxDisplacementDp).toPx() },
+        longPressMaxPx = with(density) { Dp(PresenceTokens.Motion.longPressMaxDisplacementDp).toPx() },
+        flickThresholdPx = with(density) { Dp(PresenceTokens.Motion.flickVelocityThresholdDpPerSec).toPx() },
+        expandThresholdPx = with(density) { Dp(PresenceTokens.Motion.expandVelocityThresholdDpPerSec).toPx() },
+    )
+    val callbacks = EdgeGestureCallbacks(onTap, onLongPress, onExpand, onDismiss)
 
     pointerInput(state) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             val downTime = System.currentTimeMillis()
-            val startPosition = state.offset.value
             var totalDisplacement = Offset.Zero
             var lastPosition = down.position
             var lastTime = downTime
-            var consumed = false
 
-            while (true) {
+            var tracking = true
+            while (tracking) {
                 val event = awaitPointerEvent()
-                val change: PointerInputChange = event.changes.firstOrNull() ?: break
+                val change = event.changes.firstOrNull()
 
-                if (!change.pressed) {
-                    val upTime = System.currentTimeMillis()
-                    val duration = upTime - downTime
-                    val displacement = totalDisplacement.getDistance()
-                    val dt = (upTime - lastTime).coerceAtLeast(1)
+                if (change == null) {
+                    tracking = false
+                } else if (!change.pressed) {
+                    val releaseTime = System.currentTimeMillis()
+                    val duration = releaseTime - downTime
+                    val dt = (releaseTime - lastTime).coerceAtLeast(1)
                     val velocity = (change.position - lastPosition) / (dt.toFloat() / 1000f)
 
-                    when {
-                        displacement < tapMaxPx && duration < PresenceTokens.Motion.tapMaxDurationMs -> {
-                            onTap()
-                        }
-                        displacement < longPressMaxPx && duration >= PresenceTokens.Motion.longPressMinDurationMs -> {
-                            onLongPress()
-                        }
-                        abs(velocity.x) > flickThresholdPx && isAwayFromCenter(state, velocity) -> {
-                            onDismiss()
-                        }
-                        abs(velocity.x) > expandThresholdPx && isTowardCenter(state, velocity) -> {
-                            onExpand()
-                        }
-                        else -> {
-                            scope.launch { state.snapToNearest() }
-                        }
+                    performReleaseGesture(
+                        gesture = classifyReleaseGesture(state, velocity, totalDisplacement.getDistance(), duration, thresholds),
+                        state = state,
+                        scope = scope,
+                        callbacks = callbacks,
+                    )
+                    tracking = false
+                } else {
+                    val delta = change.positionChange()
+                    if (delta != Offset.Zero) {
+                        totalDisplacement += delta
+                        val decay = state.velocityDecayFactor(state.offset.value)
+                        val dampedDelta = delta * decay
+                        scope.launch { state.snapTo(state.offset.value + dampedDelta) }
+                        lastPosition = change.position
+                        lastTime = System.currentTimeMillis()
+                        change.consume()
                     }
-                    break
-                }
-
-                val delta = change.positionChange()
-                if (delta != Offset.Zero) {
-                    totalDisplacement += delta
-                    val decay = state.velocityDecayFactor(state.offset.value)
-                    val dampedDelta = delta * decay
-                    scope.launch { state.snapTo(state.offset.value + dampedDelta) }
-                    lastPosition = change.position
-                    lastTime = System.currentTimeMillis()
-                    change.consume()
-                    consumed = true
                 }
             }
         }
+    }
+}
+
+private data class GestureThresholds(
+    val tapMaxPx: Float,
+    val longPressMaxPx: Float,
+    val flickThresholdPx: Float,
+    val expandThresholdPx: Float,
+)
+
+private data class EdgeGestureCallbacks(
+    val onTap: () -> Unit,
+    val onLongPress: () -> Unit,
+    val onExpand: () -> Unit,
+    val onDismiss: () -> Unit,
+)
+
+private enum class ReleaseGesture {
+    TAP,
+    LONG_PRESS,
+    DISMISS,
+    EXPAND,
+    SNAP,
+}
+
+private fun classifyReleaseGesture(
+    state: EdgeDockState,
+    velocity: Offset,
+    displacement: Float,
+    duration: Long,
+    thresholds: GestureThresholds,
+): ReleaseGesture =
+    when {
+        displacement < thresholds.tapMaxPx && duration < PresenceTokens.Motion.tapMaxDurationMs -> ReleaseGesture.TAP
+        displacement < thresholds.longPressMaxPx &&
+            duration >= PresenceTokens.Motion.longPressMinDurationMs -> ReleaseGesture.LONG_PRESS
+        abs(velocity.x) > thresholds.flickThresholdPx && isAwayFromCenter(state, velocity) -> ReleaseGesture.DISMISS
+        abs(velocity.x) > thresholds.expandThresholdPx && isTowardCenter(state, velocity) -> ReleaseGesture.EXPAND
+        else -> ReleaseGesture.SNAP
+    }
+
+private fun performReleaseGesture(
+    gesture: ReleaseGesture,
+    state: EdgeDockState,
+    scope: CoroutineScope,
+    callbacks: EdgeGestureCallbacks,
+) {
+    when (gesture) {
+        ReleaseGesture.TAP -> callbacks.onTap()
+        ReleaseGesture.LONG_PRESS -> callbacks.onLongPress()
+        ReleaseGesture.DISMISS -> callbacks.onDismiss()
+        ReleaseGesture.EXPAND -> callbacks.onExpand()
+        ReleaseGesture.SNAP -> scope.launch { state.snapToNearest() }
     }
 }
 

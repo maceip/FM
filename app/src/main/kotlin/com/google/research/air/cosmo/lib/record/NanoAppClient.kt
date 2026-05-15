@@ -132,13 +132,7 @@ constructor(
             return false
         }
         val callback = contextHubClientCallback ?: return false
-        val client =
-            contextHubClient ?: util.createContextHubClient(AMBIENT_AUDIO_NANO_APP_ID, callback)?.also {
-                contextHubClient = it
-            } ?: run {
-                Log.w(TAG, "Failed to register Context Hub client for nanoapp $AMBIENT_AUDIO_NANO_APP_ID")
-                return false
-            }
+        val client = resolveContextHubClient(util, callback) ?: return false
         val payload = intToLeBytes(message)
         val nanoAppMessage =
             ContextHubClientUtil.createNanoAppMessage(AMBIENT_AUDIO_NANO_APP_ID, message, payload)
@@ -146,7 +140,22 @@ constructor(
         val result =
             runCatching { ContextHubClientUtil.invokeSendMessageToNanoApp(client, nanoAppMessage) }
                 .onFailure { Log.w(TAG, "sendMessageToNanoApp threw: ${it.message}") }
-                .getOrElse { return false }
+                .getOrNull()
+        return isAcceptedSendResult(result)
+    }
+
+    private fun resolveContextHubClient(util: ContextHubClientUtil, callback: Any): Any? {
+        contextHubClient?.let { return it }
+        return util.createContextHubClient(AMBIENT_AUDIO_NANO_APP_ID, callback).also { client ->
+            if (client == null) {
+                Log.w(TAG, "Failed to register Context Hub client for nanoapp $AMBIENT_AUDIO_NANO_APP_ID")
+            } else {
+                contextHubClient = client
+            }
+        }
+    }
+
+    private fun isAcceptedSendResult(result: Int?): Boolean {
         if (result != IPM_SOUND_OK_STATUS) {
             Log.w(TAG, "sendMessageToNanoApp non-OK result=$result")
             return false

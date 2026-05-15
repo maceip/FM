@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.research.air.cosmo.di.ApplicationScope
 import dagger.Binds
@@ -93,11 +94,12 @@ constructor(
                         _state.value = BudsProviderState.Streaming
                         streamAudio(socket)
                     } catch (security: SecurityException) {
+                        Log.w(TAG, "Bluetooth permission denied while opening Buds socket", security)
                         _state.value = BudsProviderState.Failed("Bluetooth permission denied")
                     } catch (io: IOException) {
                         _state.value = BudsProviderState.Failed(io.message ?: "Bluetooth socket failed")
                     } finally {
-                        runCatching { socket?.close() }
+                        closeSocket(socket)
                         if (budsSocket === socket) budsSocket = null
                         if (_state.value is BudsProviderState.Streaming || _state.value is BudsProviderState.Connecting) {
                             _state.value = BudsProviderState.Idle
@@ -114,7 +116,7 @@ constructor(
     }
 
     override fun shutdown() {
-        runCatching { budsSocket?.close() }
+        closeSocket(budsSocket)
         budsSocket = null
         connectionJob?.cancel()
         connectionJob = null
@@ -124,7 +126,7 @@ constructor(
     private suspend fun stopLocked() {
         val current = connectionJob
         connectionJob = null
-        runCatching { budsSocket?.close() }
+        closeSocket(budsSocket)
         budsSocket = null
         current?.cancelAndJoin()
         _state.value = BudsProviderState.Idle
@@ -147,7 +149,13 @@ constructor(
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
+    private fun closeSocket(socket: BluetoothSocket?) {
+        runCatching { socket?.close() }
+            .onFailure { Log.w(TAG, "Failed to close Buds socket", it) }
+    }
+
     companion object {
+        private const val TAG = "BudsAudioProvider"
         private const val AUDIO_BUFFER_SIZE = 0x800
     }
 }

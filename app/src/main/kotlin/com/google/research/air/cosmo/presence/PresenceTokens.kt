@@ -65,14 +65,14 @@ object PresenceTokens {
     object Ring {
         val innerRadius: Dp = 12.dp
         val outerRadius: Dp = 18.dp
-        val dashOn: Float = 6f
-        val dashOff: Float = 6f
-        val dotOn: Float = 3f
-        val dotOff: Float = 4f
-        val strokeWidth: Float = 2f
-        val strokeWidthHeavy: Float = 4f
-        val spinDurationMs: Int = 10_000
-        val spinDurationSlowMs: Int = 12_000
+        const val dashOn: Float = 6f
+        const val dashOff: Float = 6f
+        const val dotOn: Float = 3f
+        const val dotOff: Float = 4f
+        const val strokeWidth: Float = 2f
+        const val strokeWidthHeavy: Float = 4f
+        const val spinDurationMs: Int = 10_000
+        const val spinDurationSlowMs: Int = 12_000
     }
 
     object Blur {

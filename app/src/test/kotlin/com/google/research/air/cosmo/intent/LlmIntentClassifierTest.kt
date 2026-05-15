@@ -198,11 +198,11 @@ class LlmIntentClassifierTest {
 
     private class ThrowingLlm : LLM {
         override suspend fun inference(prompt: String, onToken: (String) -> Unit): String {
-            throw IllegalStateException("llm down")
+            error("llm down")
         }
 
         override suspend fun inference(parts: List<PromptPart>, onToken: (String) -> Unit): String {
-            throw IllegalStateException("llm down")
+            error("llm down")
         }
     }
 
