@@ -298,7 +298,7 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 - Confirm: 0 checksum mismatches (--allow-missing-binaries used; missing-not-mismatched still passes)
 
 **V1.1 First-launch permission rationale flow**
-- Where: `app/src/main/kotlin/.../lib/permission/PermissionRationaleHelper.kt:120-188` + `RuntimePermissionDescriptor` enum at `:51-107`
+- Where: `app/src/main/kotlin/.../lib/permission/PermissionRationaleHelper.kt:120` `PermissionRationaleHelper` class + `RuntimePermissionDescriptor` enum at `:42-107` (declaration at :42, 10 entries from :48 to :107)
 - Trigger: fresh-install + MainActivity launch with no granted permissions
 - Confirm: rationale dialog appears BEFORE each permission ask; deny → still functions; deny+don't-ask-again → settings deep link offered
 
@@ -323,9 +323,9 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 - Confirm: no LlmUnavailableException for both lanes; local path completes; LLMStatsRepository shows `route=Local`
 
 **V2.2 SODA + Magic Mic directedness**
-- Where: SodaCapability + Magic Mic directedness gate
-- Trigger: inject directed and undirected speech fixtures via debug receiver
-- Confirm: `AmbientAudioEphemeralBuffer` count increases only for directed
+- Where: `app/src/main/kotlin/.../lib/soda/SodaController.kt:67` (`val directedness: SharedFlow<DirectednessEvent>`); `SodaConfigBuilder.kt:108` configures the IntendedSpeechConfig ("Magic Mic" in the comment); `JniSodaCapability.kt:23` is the JNI bridge
+- Trigger: inject directed and undirected speech fixtures via `GatekeeperDebugReceiver`
+- Confirm: `directedness` flow emits `DirectednessEvent` only for directed speech; `@AmbientAudioEphemeralBuffer` count increases only for directed
 
 **V2.3 NotificationListenerService → buffer**
 - Where: NotificationCaptureController + `@NotificationEphemeralBuffer`
@@ -353,7 +353,7 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 - Confirm: screen.mp4 shows orb in expected position with aerospace palette
 
 **V3.2 Tab surface expand**
-- Where: `app/src/main/kotlin/.../presence/surfaces/TabSurface.kt:60-314` + `CardStackSurface.kt:43-124`
+- Where: `app/src/main/kotlin/.../presence/surfaces/TabSurface.kt:60-85` `fun TabSurface(...)` (file is 313 lines total; rest is private composables) + `CardStackSurface.kt:42-107` `fun CardStackSurface(cards, onAction)`
 - Trigger: tap orb in debug activity that wires TabSurface
 - Confirm: TabSurface expands; CardStackSurface renders layered cards
 
@@ -388,7 +388,7 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 - Confirm: stack dump logged BEFORE system ANR popup
 
 **V5.5 StrictMode 0 violations in monkey** (gated on M-StrictMode landing)
-- Where: StrictMode config in `CosmoApp.onCreate`
+- Where: StrictMode config in `app/src/main/kotlin/.../lib/performance/DebugDiagnostics.kt:15-23` (`setThreadPolicy` + `setVmPolicy`); installed from `CosmoApp.kt:45` via `DebugDiagnostics.install(this)`
 - Trigger: `adb shell monkey -p com.google.research.air.cosmo 1000`
 - Confirm: 0 `StrictMode` lines in logcat
 
@@ -414,7 +414,34 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 
 #### Bucket M — Missing / new code (per item, priority order)
 
-For each: **Where** (current file/line + the gap), **Present** (what's wired today), **Gap** (what's missing), **Contract** (what to write), **Done** (acceptance), **Refs**.
+**Cosmo as behavioral spec.** FM is a clean-room reimplementation of cosmo. The cosmo APK's decompiled smali is at `~/Downloads/cosmo_baksmali/classes38/com/google/research/air/cosmo/`. For each Bucket-M item below, the **Source** marker tags whether the item is:
+- **PORT** — cosmo has the equivalent class/behavior; M-work is restoring it in FM
+- **REORG** — FM has reorganized cosmo's structure (e.g. FM's `presence/` package consolidates UX that cosmo split across `voiceassistant/`, `ui/mainscreen/`, etc.) — M-work is wiring FM's redesigned shape
+- **NEW** — no cosmo equivalent exists; the contract is genuinely new
+
+Per-item source markers (verified by searching `~/Downloads/cosmo_baksmali/classes38/com/google/research/air/cosmo/`):
+- **M1.3** — REORG. Cosmo has `SkillResult` proto at `gatekeeping/proto/SkillResultKt.smali`; the confirmation UI was rendered through `voiceassistant/ChatViewComposable` etc., not through FM's CardPayload abstraction.
+- **M-StrictMode** — PORT/CLEAN. The eager-DI bug is FM-side; cosmo's class structure works fine because cosmo loaded sqlcipher elsewhere. Engineer should compare FM's `ContextStoreModule` against cosmo's equivalent (`~/Downloads/cosmo_baksmali/.../context/`).
+- **M3.3** — REORG. **No cosmo `presence/` namespace exists.** Cosmo's UX state ran through individual ViewModels (`voiceassistant/BrowsingAgentViewModel.smali`, `ChatViewComposable`, `FloatyScreen$VoiceMatch.smali`). FM has consolidated into a single PresenceState producer; this is genuinely new architectural work.
+- **M3.5** — REORG. Same as M3.3; CardPayload→Skill mapping is part of FM's redesigned presence layer, not cosmo.
+- **M2.1** — NEW. Cosmo's `fulfillment/actions/` only has `mariner/` as a subdir; no per-skill executor split existed in cosmo.
+- **M2.7** — NEW. No retention-sweep class found in cosmo's `ephemeralbuffer/` or `context/`. The buffer-side eviction is cosmo-shaped (EvictionPolicy in `EphemeralBuffer.kt:141-144`) but the store-side sweep is FM-new.
+- **M2.8** — NEW. User-controlled RoutingMode is a clean-room addition. Cosmo's routing was driven by network policy automatically.
+- **M2.9** — NEW. No "forget last N" surface in cosmo (search for `forget` returned only a regex match in `gatekeeping/impl/RegexGatekeepingModelV0.smali`, not a delete action).
+- **M4.2** — PORT. Cosmo has `lib/llm/LiteRtLm*.smali` (LiteRtLmLLM exists in cosmo). The provisioning script is the FM-side gap.
+- **M4.3** — NEW (server side). The client at `RemoteInferenceClient.kt` is structurally cosmo-derived (P-256 signing, PrivateToken bearer); the server stub never lived in the client APK.
+- **M5.8** — NEW. CI self-check is FM tooling, not in cosmo.
+- **M5.10** — PORT-style. Cosmo had per-permission rationale strings; FM's `RuntimePermissionDescriptor` enum currently covers all 10 dangerous manifest permissions. The risk is regression, not a current gap.
+- **M6.1** — PORT. Cosmo has the full Voice Match UI: `voiceassistant/VoiceMatchViewComposable.smali` + `VoiceMatchEnrollingScreen` + `VoiceMatchEnrollmentEnrolledScreen`. FM has the JNI bridge at `SodaEnrollmentManagerImpl.kt`; the UI port is what's missing.
+- **M6.2** — NEW. CaMeL is from the arxiv paper (2503.18813), not cosmo.
+- **M6.3** — PORT. Cosmo's APK shipped with mt6989-targeted BERT variants; the AOT compile pipeline runs on a MediaTek toolchain machine.
+- **M6.4** — PORT. Cosmo source: `gatekeeping/models/ConformerEncoderImpl.smali` + `ConformerEncoder.smali` + `ConformerEncoderModule.smali`. FM has the stub at `gatekeeping/backend/ConformerEdgeTpuBackend.kt`.
+- **M6.5** — PORT-blocked. Cosmo source: `lib/record/NanoAppClient.smali` + `NanoAppClient$contextHubClientCallback$1.smali`. The subclass worked in cosmo because cosmo was platform-signed; FM needs bytecode-gen instead.
+- **M6.6** — External project (Inherent); track for integration only.
+- **M6.7** — NEW (24-handler split, not 22). Cosmo had centralized `when`; the split is a clean-room improvement.
+- **M6.8** — Mixed. UI source in cosmo: `voiceassistant/BrowsingAgentViewModel.smali` + `BrowsingAgentScreenKt.smali` + `fulfillment/FulfillmentAction$BrowsingAgent.smali` (UI is PORT). Server-side backend is NEW.
+
+For each item below: **Where** (current file/line + the gap), **Present** (what's wired today), **Gap** (what's missing), **Contract** (what to write), **Done** (acceptance), **Refs**.
 
 **M1.3 SkillResult.SideEffectPending → confirmation card surfacing**
 - Where:
@@ -432,7 +459,7 @@ For each: **Where** (current file/line + the gap), **Present** (what's wired tod
 - Refs: architecture.md §6 (fulfillment) + §13.2 (presence). Tightly coupled with M3.3.
 
 **M-StrictMode disk-read-on-main-thread (Tier 5 critical fix)**
-- Where: `app/src/main/kotlin/.../context/ContextStore.kt:381-396` `ContextStoreModule.provideDatabase`; chain pulled in via `contentcapture/ScreenCapture.kt:32-39` (PeriodicScreenCaptorImpl injects ContextStore) → `controller/CosmoController.kt:35` (private val periodicScreenCaptor) → MainActivity.kt:103 @Inject
+- Where: `app/src/main/kotlin/.../context/ContextStore.kt:381-396` `ContextStoreModule.provideDatabase` (object at :381; `System.loadLibrary("sqlcipher")` at :391; `.openHelperFactory(SupportOpenHelperFactory(...))` at :394); chain pulled in via `contentcapture/ScreenCapture.kt:32-64` (`PeriodicScreenCaptorImpl` class, injects `ContextStore` via the constructor at :32-39) → `controller/CosmoController.kt:35` (`private val periodicScreenCaptor: PeriodicScreenCaptor,`) → `MainActivity.kt:103` (`@Inject lateinit var cosmoController: CosmoController`)
 - Present: `System.loadLibrary("sqlcipher")` at ContextStore.kt:391 runs synchronously during Hilt `provideDatabase` during `injectMainActivity` → ~154ms DiskRead on main thread; 165 frames skipped per baseline emu log
 - Gap: loadLibrary on main thread + eager DI of ContextStore-dependent components into MainActivity
 - Contract: (a) move `System.loadLibrary("sqlcipher")` to `CosmoApp.onCreate` on a dedicated single-thread coroutine + a `CompletableDeferred<Unit>` consumed before any DB op; (b) remove loadLibrary from `provideDatabase`; (c) change `CosmoController.periodicScreenCaptor` to `dagger.Lazy<PeriodicScreenCaptor>` and call `.get()` only in `reconcileCaptureJobs()` — same for any other ContextStore-touching consumer in MainActivity's transitive graph (audit all CosmoController fields)
@@ -507,17 +534,20 @@ For each: **Where** (current file/line + the gap), **Present** (what's wired tod
 **M2.9 "Forget last N minutes" action**
 - Where: no orchestrator file yet
 - Present:
-  - `ContextStore.deleteRange(range: LongRange, sources: Set<Source>? = null): Int` (see M2.7 for full signature) — usable directly for a time-window wipe across all sources or a filtered subset
-  - `EphemeralBufferRegistry` — likely needs a `clearRange(start, end)` method added to its buffer interface (verify; current `EphemeralBuffer.kt:141-144` defines `EvictionPolicy` but not an explicit range-clear API)
-- Gap: (a) user-facing action; (b) orchestrator that purges in-memory buffers AND ContextStore for the same window; (c) buffer-side `clearRange` if absent
+  - `ContextStore.deleteRange(range: LongRange, sources: Set<Source>? = null): Int` at `ContextStore.kt:97-100` — usable directly for a time-window wipe across all sources or a filtered subset
+  - `EphemeralBufferWriter` interface at `EphemeralBuffer.kt:196-212` exposes `clear()` (:204) and `remove(predicate: (T) -> Boolean): Boolean` (:206) — no time-range API
+  - `EphemeralBufferRegistry` interface at `EphemeralBuffer.kt:381-401` exposes `writableObjectSourceIds(): Set<EphemeralBufferId>` (:386), `byteSourceIds(): Set<EphemeralBufferId>` (:388), `writer(id): EphemeralBufferWriter<Any>` (:392), `byteWriter(id): EphemeralBufferWriter<ByteArray>` (:396)
+- Gap: (a) user-facing action; (b) orchestrator handler; (c) buffer-side range-clear API
 - Contract:
-  - Add `ForgetWindowAction(endMs: Long, durationMs: Long)` to fulfillment models
+  - Add `fun clearRange(rangeMs: LongRange): Int` to `EphemeralBufferWriter` interface (`EphemeralBuffer.kt:196`); implement in `InMemoryEphemeralBuffer` (from `EphemeralBuffer.kt:246` onward) by traversing the timestamped entries and removing those whose `timestampMillis` falls in the range
+  - Add `ForgetWindowAction(endMs: Long, durationMs: Long)` to `FulfillmentModels.kt`
   - Add Gatekeeper intent label `FORGET_WINDOW`; either retrain BERT classifier with the new label OR add a regex pre-classifier that catches phrases "forget the last N (minutes|hours)" before BERT
   - New handler `ForgetWindowHandler.handle(action)`:
-    - `val range = (action.endMs - action.durationMs)..action.endMs`
-    - For each buffer in `EphemeralBufferRegistry.allBuffers()`: `buffer.clearRange(start = range.first, end = range.last)` (add the method to `EphemeralBuffer` interface if absent)
-    - `contextStore.deleteRange(range, sources = null)` — purges all sources in the window
-  - UI: Settings → "Forget last…" preset buttons (1m / 5m / 10m / 30m / 1h) calling the handler with `endMs = now()`
+    - `val rangeMs = (action.endMs - action.durationMs)..action.endMs`
+    - For each id in `bufferRegistry.writableObjectSourceIds()`: `bufferRegistry.writer(id).clearRange(rangeMs)`
+    - For each id in `bufferRegistry.byteSourceIds()`: `bufferRegistry.byteWriter(id).clearRange(rangeMs)`
+    - `contextStore.deleteRange(range = rangeMs, sources = null)` — purges all sources in the window
+  - UI: Settings → "Forget last…" preset buttons (1m / 5m / 10m / 30m / 1h) calling the handler with `endMs = System.currentTimeMillis()`
 - Done: voice phrase OR settings button → 0 events remain in any buffer between [end-duration, end]; 0 rows in ContextStore for the same window; events outside window survive.
 
 **M3.5 Card payload coverage per parity skill**
@@ -560,7 +590,7 @@ For each: **Where** (current file/line + the gap), **Present** (what's wired tod
 - Done: script runs in CI; reports clean.
 
 **M5.10 Rationale UI coverage for all dangerous permissions**
-- Where: `RuntimePermissionDescriptor` enum at `PermissionRationaleHelper.kt:48-107`. Current entries (10): Microphone, Camera, Notifications, FineLocation, ApproximateLocation, CalendarRead, CalendarWrite, PhoneCall, NearbyDevices, LocalNetwork. `PermissionRationaleHelper` class at :120-... with `states()` returning per-permission `RuntimePermissionState(descriptor, grantState)`.
+- Where: `RuntimePermissionDescriptor` enum at `PermissionRationaleHelper.kt:42-107` (declaration at :42; 10 enum entries from :48–:107). Current entries: Microphone, Camera, Notifications, FineLocation, ApproximateLocation, CalendarRead, CalendarWrite, PhoneCall, NearbyDevices, LocalNetwork. `PermissionRationaleHelper` class at :120 with `states()` returning per-permission `RuntimePermissionState(descriptor, grantState)`.
 - Present: enum covers all 10 *dangerous-runtime* permissions in the manifest. The other 13 manifest entries are NORMAL permissions (INTERNET, ACCESS_NETWORK_STATE, FOREGROUND_SERVICE_*, SCHEDULE_EXACT_ALARM, WAKE_LOCK, etc.) or signature-protected (ACCESS_CONTEXT_HUB) — no runtime rationale required.
 - Gap: **probably already done** at coverage level. The real risk is that future-added dangerous permissions get added to manifest without an enum entry — M5.8's self-check catches that. Spot-check: every current dangerous `<uses-permission>` does map to an enum entry.
 - Contract: keep this item open as a guard-rail. M5.8's script enforces the invariant going forward. No new code today unless a permission is genuinely missing — verify by running M5.8's script once written.
@@ -621,29 +651,32 @@ For each: **Where** (current file/line + the gap), **Present** (what's wired tod
 - Done: debug-override SocVariantResolver to report MT6989 → resolver picks the new variant → BERT load succeeds.
 
 **M6.4 Conformer EdgeTPU activation on Pixel**
-- Where: `lib/conformer/` or `lib/llm/conformer/` — engineer to grep `Conformer.*isAvailable` for the stub
-- Present: `isAvailable=false` hardcoded
-- Gap: real Tensor DarwinNN delegate probe
-- Contract: real `isAvailable` checks `Build.DEVICE in pixelModelsWithDarwinNN` AND probes EdgeTPU delegate construction without throw; returns false on emu / non-Pixel (preserving current behavior).
+- Where: `app/src/main/kotlin/com/google/research/air/cosmo/gatekeeping/backend/ConformerEdgeTpuBackend.kt`
+- Cosmo source: `~/Downloads/cosmo_baksmali/classes38/com/google/research/air/cosmo/gatekeeping/models/ConformerEncoderImpl.smali` (+ ConformerEncoder.smali, ConformerEncoderModule.smali) — port the real probe + initialize path
+- Present: `isAvailable` stub (engineer should read FM file + diff against cosmo smali to identify the gap)
+- Gap: real Tensor DarwinNN delegate probe (cosmo had the working version under platform-signed access)
+- Contract: real `isAvailable` checks `Build.DEVICE` membership in a Pixel-with-DarwinNN allowlist AND probes EdgeTPU delegate construction without throw; returns false on emu / non-Pixel (preserving current behavior).
 - Done: real Pixel device → Conformer route logged in LLMStatsRepository for transcription queries.
 
 **M6.5 AOC nanoapp transport**
-- Where: `app/src/main/kotlin/.../contexthub/NanoAppClient.kt` — currently degrades with log `ContextHubClientCallback is a class; cannot subclass without bytecode gen` (per baseline emu log)
+- Where: `app/src/main/kotlin/com/google/research/air/cosmo/lib/record/NanoAppClient.kt` — currently degrades with log `ContextHubClientCallback is a class; cannot subclass without bytecode gen` (per baseline emu log)
+- Cosmo source: `~/Downloads/cosmo_baksmali/classes38/com/google/research/air/cosmo/lib/record/NanoAppClient.smali` + `NanoAppClient$contextHubClientCallback$1.smali` — cosmo subclassed `ContextHubClientCallback` because cosmo's APK was platform-signed. FM does not have platform signing; the subclass must be generated at build time
 - Present: degraded probe path
 - Gap: real subclass of `ContextHubClientCallback`
 - Contract: prefer build-time bytecode gen (ByteBuddy or `kotlinx.metadata.jvm`-based gen) producing a concrete `ContextHubClientCallback` subclass that forwards to `Channel<NanoAppMessage>`. Alternative: platform-signed APK + manifest signing (requires platform signing access).
 - Done: emu (with mock ContextHub fixture) or platform-signed Pixel build → no "cannot subclass" log → nanoapp events flow through the channel.
 
-**M6.7 Per-subtype action handler split (22 handlers)**
-- Where: `app/src/main/kotlin/.../fulfillment/FulfillmentActionHandler.kt:29-138`; `when (action)` at :41; 22 action subtypes in `FulfillmentModels.kt`
+**M6.7 Per-subtype action handler split (24 handlers)**
+- Where: `app/src/main/kotlin/.../fulfillment/FulfillmentActionHandler.kt:29` (`FulfillmentActionHandlerImpl` class); `when (action)` at :41. Subtypes in `FulfillmentModels.kt:15` (`sealed class FulfillmentAction`) — **24 concrete subtypes** verified: AddTask, AddTimer, AddToList, AddToMemory, BrowsingAgent, CallAgent, CreateCalendarEvent, CreateDoc, DeepResearch, DefineTerm, DraftEmail, DraftSms, InvokeAgentQ, Navigation, PlayMusic, ProvideEventContext, ProvideInsight, ProvidePersonContext, ProvideRecall, QueryPhotos, WebSearch, ActiveDataPlan, RemovedAction, Unsupported.
+- Cosmo source: cosmo's `fulfillment/` smali does NOT have a per-handler split — only `fulfillment/actions/mariner/` as a subdir. So **this item is a clean-room improvement over cosmo's centralized `when`, not a port.**
 - Present: monolithic handler
-- Gap: 22 dedicated handler classes
-- Contract: 
+- Gap: 24 dedicated handler classes
+- Contract:
   ```kotlin
   sealed interface ActionHandler<A : FulfillmentAction> { suspend fun handle(action: A, ctx: HandlerContext): HandlerResult }
   ```
-  One file per subtype in `fulfillment/handlers/` (AddTaskHandler, AddTimerHandler, AddToListHandler, …, 22 total); `@IntoMap @ActionTypeKey` Dagger multibinding; replace `when (action)` with `handlers[action::class].handle(...)`.
-- Done: 22 handler files; central `when` deleted.
+  One file per subtype in `fulfillment/handlers/` (24 files total); `@IntoMap @ActionTypeKey` Dagger multibinding; replace `when (action)` with `handlers[action::class].handle(...)`.
+- Done: 24 handler files; central `when` deleted.
 - Refs: extends M2.1.
 
 **M6.8 Mariner browsing-agent backend**
