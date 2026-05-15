@@ -68,9 +68,11 @@ fun TabSurface(
         targetState = expanded,
         modifier = modifier,
         transitionSpec = {
-            fadeIn(animationSpec = tween(300)) togetherWith
-                    fadeOut(animationSpec = tween(200)) using
-                    SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> spring(dampingRatio = 0.7f, stiffness = 400f) })
+            fadeIn(animationSpec = tween(PresenceTokens.Motion.tabIdleToActiveMs)) togetherWith
+                    fadeOut(animationSpec = tween(150)) using
+                    SizeTransform(clip = false, sizeAnimationSpec = { _, _ ->
+                        spring(dampingRatio = PresenceTokens.Motion.tabExpandDamping, stiffness = PresenceTokens.Motion.tabExpandStiffness)
+                    })
         },
         label = "tabExpand"
     ) { isExpanded ->

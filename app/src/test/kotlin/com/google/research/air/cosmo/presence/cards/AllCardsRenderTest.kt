@@ -1,6 +1,7 @@
 package com.google.research.air.cosmo.presence.cards
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import com.google.research.air.cosmo.presence.CardAction
 import com.google.research.air.cosmo.presence.CardPayload
@@ -61,6 +62,11 @@ class AllCardsRenderTest {
         rule.setContent {
             CardStackSurface(cards = cards)
         }
+        rule.waitUntil(timeoutMillis = 5000) {
+            rule.onAllNodesWithTag("cardStack").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.mainClock.advanceTimeBy(3000)
+        rule.waitForIdle()
         rule.onNodeWithTag("cardStack").assertExists()
         samplePayloads.forEach { (id, _) ->
             rule.onNodeWithTag("card_$id").assertExists()

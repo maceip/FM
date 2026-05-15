@@ -1,12 +1,12 @@
 package com.google.research.air.cosmo.presence.surfaces
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -62,18 +62,26 @@ fun OrbSurface(
     }
 
     val shape = RoundedCornerShape(PresenceTokens.Size.orbCorner)
+    val orbEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
     val alpha by animateFloatAsState(
         targetValue = if (state == OrbVisualState.IDLE) 0.4f else 1f,
-        animationSpec = spring(),
+        animationSpec = tween(PresenceTokens.Motion.orbIdleToActiveMs, easing = orbEasing),
         label = "orbAlpha"
     )
+
+    val spinDuration = when (state) {
+        OrbVisualState.IDLE -> PresenceTokens.RotationSpeed.fast
+        OrbVisualState.LISTENING -> PresenceTokens.RotationSpeed.fast
+        OrbVisualState.WORKING -> PresenceTokens.RotationSpeed.medium
+        OrbVisualState.NEEDS_INPUT -> PresenceTokens.RotationSpeed.mediumFast
+    }
 
     val inf = rememberInfiniteTransition(label = "orbSpin")
     val spinAngle by inf.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(PresenceTokens.Ring.spinDurationMs, easing = LinearEasing),
+            animation = tween(spinDuration, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "spinAngle"

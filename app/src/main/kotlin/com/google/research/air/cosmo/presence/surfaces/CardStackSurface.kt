@@ -1,5 +1,12 @@
 package com.google.research.air.cosmo.presence.surfaces
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,7 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.google.research.air.cosmo.presence.CardPayload
@@ -26,6 +37,7 @@ import com.google.research.air.cosmo.presence.surfaces.cards.MessagingContent
 import com.google.research.air.cosmo.presence.surfaces.cards.PeopleContextContent
 import com.google.research.air.cosmo.presence.surfaces.cards.PermissionConfirmationContent
 import com.google.research.air.cosmo.presence.surfaces.cards.SourceCitationContent
+import kotlinx.coroutines.delay
 
 @Composable
 fun CardStackSurface(
@@ -33,22 +45,60 @@ fun CardStackSurface(
     modifier: Modifier = Modifier,
     onAction: (cardId: String, actionId: String) -> Unit = { _, _ -> }
 ) {
+    val visibleFlags = remember { mutableStateListOf<Boolean>() }
+
+    LaunchedEffect(cards.size) {
+        visibleFlags.clear()
+        repeat(cards.size) { visibleFlags.add(false) }
+        cards.indices.forEach { i ->
+            delay(i * 80L)
+            if (i < visibleFlags.size) visibleFlags[i] = true
+        }
+    }
+
     Column(
-        modifier = modifier.padding(horizontal = PresenceTokens.Spacing.cardPadding).testTag("cardStack"),
+        modifier = modifier
+            .padding(horizontal = PresenceTokens.Spacing.cardPadding)
+            .testTag("cardStack"),
         verticalArrangement = Arrangement.spacedBy(PresenceTokens.Spacing.cardGap)
     ) {
-        cards.forEach { card ->
-            GlassPanel(
-                showGlowEdge = true,
-                modifier = Modifier.fillMaxWidth().testTag("card_${card.id}")
+        cards.forEachIndexed { index, card ->
+            val depthFactor = 1f - (index * (1f - PresenceTokens.CardStack.depthScale))
+            val liftPx = PresenceTokens.CardStack.cardLift.value * index
+            val isVisible = index < visibleFlags.size && visibleFlags[index]
+
+            AnimatedVisibility(
+                visible = isVisible,
+                enter = slideInVertically(
+                    spring(PresenceTokens.Motion.cardLiftDamping, PresenceTokens.Motion.cardLiftStiffness)
+                ) { it / 3 } + fadeIn(tween(200)),
+                exit = slideOutHorizontally(tween(PresenceTokens.Motion.cardDismissMs)) { it } +
+                        fadeOut(tween(150))
             ) {
-                Column(Modifier.padding(PresenceTokens.Spacing.cardPadding)) {
-                    CardContent(card.payload)
-                    if (card.actions.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(PresenceTokens.Palette.BorderDim))
-                        Spacer(Modifier.height(12.dp))
-                        ActionButtonGrid(card.id, card.actions, onAction)
+                GlassPanel(
+                    showGlowEdge = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("card_${card.id}")
+                        .graphicsLayer {
+                            scaleX = depthFactor
+                            scaleY = depthFactor
+                            translationY = -liftPx
+                        }
+                ) {
+                    Column(Modifier.padding(PresenceTokens.Spacing.cardPadding)) {
+                        CardContent(card.payload)
+                        if (card.actions.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(PresenceTokens.Palette.BorderDim)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            ActionButtonGrid(card.id, card.actions, onAction)
+                        }
                     }
                 }
             }
