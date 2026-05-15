@@ -24,7 +24,7 @@ on:
       emu_run_seconds:
         description: "How long to run on the emu (5–180)"
         type: string
-        default: "30"
+        default: "90"
 
 jobs:
   compile-lint-test:

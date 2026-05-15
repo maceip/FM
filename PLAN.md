@@ -156,14 +156,15 @@ but the gate is collective.
 **Every item below is "done" only when it passes the emu gate.**
 
 The emu gate today: `scripts/emu-ci-run.sh` (defaults to debug APK,
-MainActivity, and a 30s smoke window; use flags for overrides)
+MainActivity, and a 90s smoke window; use flags for overrides)
 against the shared `emu.devkeys.net` service. The script:
 
 1. Posts the APK to the emu service.
 2. Installs + launches the named activity inside the remote emulator.
 3. Captures logcat + screen recording for the requested run window.
 4. **Fails if logcat matches `FATAL|ANR|CRASH|Exception|test.*fail|AssertionError`** within the window.
-5. Downloads the recording + logs to `artifacts/emu-run/job-<id>/` for review.
+5. Downloads the recording + logs to `artifacts/emu-run/job-<id>/` for review
+   and writes `summary.json` with the job URL and artifact paths.
 
 If the emu run passes → task counts as done. If the recording doesn't
 show the expected behavior — even if no crash fired — the task is **not
@@ -280,12 +281,12 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 
 **V0.3 emu-ci-run.sh manual trigger**
 - Where: `.github/workflows/ci.yml` workflow_dispatch + `scripts/emu-ci-run.sh`
-- Trigger: GH Actions → fm-ci → "Run workflow" with `run_emu=true`, `emu_run_seconds=30`
+- Trigger: GH Actions → fm-ci → "Run workflow" with `run_emu=true`, `emu_run_seconds=90`
 - Confirm: `emu-validate` job green; artifact `emu-<run>` contains `logcat.txt` + `screen.mp4`
 
 **V0.4 MainActivity Home render 30s**
 - Where: `app/src/main/kotlin/.../ui/mainscreen/MainActivity.kt:128`
-- Trigger: `scripts/emu-ci-run.sh --seconds 30`
+- Trigger: `scripts/emu-ci-run.sh --seconds 90`
 - Confirm: 0 lines matching `FATAL|ANR|Exception` in logcat; screen.mp4 shows non-blank Home
 
 **V0.5 Fresh clone → APK**

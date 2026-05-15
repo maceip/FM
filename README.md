@@ -152,8 +152,11 @@ EMU_TOKEN=xxx ./scripts/emu-ci-run.sh
 ```
 
 By default this uploads `app/build/outputs/apk/debug/app-debug.apk`, launches
-`MainActivity`, runs for 30 seconds, and writes logcat plus `screen.mp4` under
-`artifacts/emu-run/`. Use `./scripts/emu-ci-run.sh --help` for overrides.
+`MainActivity`, runs for 90 seconds, and writes logcat plus `screen.mp4` under
+`artifacts/emu-run/`. Each run also writes `summary.json` with the job URL and
+artifact paths. Use `./scripts/emu-ci-run.sh --list-jobs` to inspect existing
+jobs or `./scripts/emu-ci-run.sh --job-id <id>` to re-download artifacts without
+rerunning the APK.
 
 CI gates: `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`.
 The release path additionally runs `scripts/verify-phase6-release-gates.sh`
