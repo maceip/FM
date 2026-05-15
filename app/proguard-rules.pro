@@ -20,3 +20,38 @@
 -dontwarn com.google.mlkit.genai.**
 -dontwarn net.zetetic.**
 -dontwarn net.sqlcipher.**
+
+# The recovered SODA Java surface was extracted from a platform build and carries references to
+# stripped optional helpers and desugar-generated companion classes. Runtime entry points probe
+# native/SODA availability and fail closed before use when the full platform stack is absent.
+-dontwarn com.google.android.libraries.assistant.soda.AutoValue_SodaInitParams-IA
+-dontwarn com.google.android.libraries.assistant.soda.Soda-IA
+-dontwarn com.google.android.libraries.search.soda.HotwordModelConfigProto-IA
+-dontwarn com.google.apps.tiktok.tracing.contrib.concurrent.PropagatedFutures
+-dontwarn com.google.common.flogger.DurationRateLimiter-IA
+-dontwarn com.google.common.flogger.GoogleLogger-IA
+-dontwarn com.google.common.flogger.LogSite-IA
+-dontwarn com.google.common.flogger.RateLimitStatus-IA
+-dontwarn com.google.common.flogger.backend.FormatType-IA
+-dontwarn com.google.common.flogger.backend.LogSiteFormatters-IA
+-dontwarn com.google.common.flogger.backend.MetadataHandler-IA
+-dontwarn com.google.common.flogger.backend.MetadataProcessor-IA
+-dontwarn com.google.common.flogger.backend.android.SimpleAndroidLoggerBackend-IA
+-dontwarn com.google.common.flogger.backend.google.GooglePlatform
+-dontwarn com.google.common.flogger.backend.system.DefaultPlatform
+-dontwarn com.google.common.flogger.context.NoOpContextDataProvider-IA
+-dontwarn com.google.common.flogger.context.Tags-IA
+-dontwarn com.google.protobuf.kotlin.DslList
+-dontwarn com.google.protobuf.kotlin.DslMap
+-dontwarn com.google.rpc.Status-IA
+-dontwarn com.google.speech.soda.AudioProto-IA
+-dontwarn com.google.speech.soda.ClientInfoProto-IA
+-dontwarn com.google.speech.soda.HotwordDownloaderConfig-IA
+-dontwarn com.google.speech.soda.HybridAsrConfigProto-IA
+-dontwarn com.google.speech.soda.IntendedSpeechConfigProto-IA
+-dontwarn com.google.speech.soda.LoggingProto-IA
+-dontwarn com.google.speech.soda.SodaCoreConfigInternalProto-IA
+-dontwarn com.google.speech.soda.SodaCoreConfigProto-IA
+-dontwarn com.google.speech.soda.StatusProto-IA
+-dontwarn com.google.speech.soda.client.SodaClientConfigProto-IA
+-dontwarn java.util.DesugarCollections
