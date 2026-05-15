@@ -777,7 +777,7 @@ flags whether genesis builds an equivalent, replaces it, or skips it.
 | **DBW data pipeline** (server-side training-data ingestion of accessibility-tree captures for screen-understanding model distillation) | See §15.2 below — client side partly built; server pipeline is a future workstream | 🔵 planned (system-level only) |
 | **BARD Workspace grounding service** (server fetch of Gmail/Calendar/Drive content) | Replaced — genesis uses on-device Android content providers (`ContextStore` + per-source ephemeral buffers). User owns the read path | 🟡 explicitly skipped |
 | **Prompt-injection classifier service** (BARD's `PromptInjectionWorkspaceMetadata`-driven scanner) | Replaced by on-device CaMeL trust layer (§12) — control/data flow separation by design, not classifier-by-classifier | 🔵 planned (CaMeL — different mechanism, same threat) |
-| **Browsing-agent backend** (the agent that drives Mariner / TaskMonitor) | TaskMonitor UI ships; the agent loop runs server-side in cosmo. Genesis interim path: route through remote inference. Long-term: on-device tool-using agent when LLM context windows + tool-calling fidelity allow | ⚠️ UI live; agent backend not built |
+| **Browsing-agent backend** (Mariner — drives TaskMonitor surface) | See §15.7 for the cosmo gRPC contract (`com.google.labs.mariner.v1.ActionService`) and genesis port plan. Tier-2 path is Browser-Use behind the §15.4 transport | ⚠️ UI live; agent backend not built (§15.7) |
 | **Personal Intelligence (PI) service** (Google's personal-data aggregation backend) | Replaced — on-device `ContextStore` is the equivalent. No remote aggregation | 🟡 explicitly skipped |
 | **Telemetry aggregation** (sink for 309 typed Firebase events) | Firebase Analytics handles ingestion; no custom backend | ✅ |
 | **Model delivery / refresh** (LiteRT-LM bundle, audio gatekeeper assets, SODA packs, future Inherent model) | Two-tier: bundled-in-APK for stable assets (BERT, SODA packs); HTTPS download for variable-size bundles (LiteRT-LM, Inherent) | ⚠️ provisioning works locally; production CDN not configured |
@@ -827,6 +827,272 @@ gatekeeper/intent models," with mechanism chosen later.
 
 These are conscious privacy-driven choices, not gaps. The on-device path
 delivers equivalent functionality without an off-device data round-trip.
+
+### 15.4 Private inference HTTP transport (⚠️ structural complete; no live endpoint)
+
+When on-device LLMs (AICore / LiteRT-LM) can't fulfill a query — model not
+available, prompt exceeds context window, low device battery — genesis falls
+back to a **remote inference endpoint**. The transport is fully wired in
+genesis as a contract; the production service it talks to isn't running yet.
+
+**Client-side files** (`app/src/main/kotlin/com/google/research/air/cosmo/lib/llm/`):
+
+| File | Role |
+|---|---|
+| `LLM.kt` | `RemoteInferenceClient` interface — `infer(parts, onToken): String` |
+| `RemoteInferenceClient.kt` | `OkHttpRemoteInferenceClient` impl + `RemoteHttpClientFactory` |
+| `RequestSigner.kt` | `AndroidKeyStoreRequestSigner` — P-256 ECDSA, key alias `cosmo_remote_request_signing_v1` |
+| `RemoteCredentialStore.kt` | `AndroidKeyStoreRemoteCredentialStore` — Keystore AES-GCM encrypted credential storage |
+
+**HTTP contract** (`docs/remote-inference-contract.md`):
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/v1/private-token/issue` | POST | Issue an anonymous credential bound to the device's signing public key |
+| `/v1/inference` | POST | Run inference; consume one credential per call; return JSON or SSE stream |
+
+**Request signing canonical payload** (SHA256withECDSA):
+
+```
+METHOD\n
+/path?query\n
+timestamp_millis\n
+nonce\n
+base64url_sha256_body
+```
+
+**Headers per request:** `Authorization: PrivateToken <token>`,
+`X-Cosmo-Timestamp-Millis`, `X-Cosmo-Nonce`, `X-Cosmo-Body-SHA256`,
+`X-Cosmo-Signature-Key-Id`, `X-Cosmo-Signature-Alg=SHA256withECDSA`,
+`X-Cosmo-Signature` (base64url-encoded signature of the canonical payload).
+
+**SPKI pinning:** when `cosmo.remoteInference.certPin` is set, the client
+pins the configured Subject Public Key Info SHA-256 hash. Required for
+production; blank in default builds.
+
+**What's required server-side to make this live:**
+
+1. Issue an SPKI cert + decide on a pin format
+2. Stand up the `/v1/private-token/issue` issuer service (see §15.6 for the proto)
+3. Stand up the `/v1/inference` service:
+   - Verifies `Authorization: PrivateToken <token>` against the issuer
+   - Verifies `X-Cosmo-Signature` against the device's pinned public key (key ID embedded in token)
+   - Validates timestamp freshness (replay window — recommend 5 min)
+   - Validates `X-Cosmo-Body-SHA256` matches actual body hash
+   - Performs inference (any LLM backend — vLLM, TGI, Triton, etc.)
+   - Returns JSON envelope `{output, model_id, usage}` or SSE stream of token events
+4. Provision Gradle properties: `cosmo.remoteInference.baseUrl`,
+   `cosmo.remoteInference.certPin`, `cosmo.remoteInference.audience`
+
+**Status:** client structure complete; no live endpoint, no
+deployment-side service. Tier-2 fallback per
+[`docs/fallback-paths.md`](fallback-paths.md): vanilla self-hosted FastAPI
++ Caddy front-end with `Authorization: Bearer` for staging.
+
+### 15.5 Oak confidential-session compute (🔵 PLANNED — not wired)
+
+Cosmo's recovered upstream architecture cites a separate inference path
+called `PrivateInferenceArateaLLM` that uses an **Oak session** —
+attested, encrypted RPC over a Noise protocol channel, with the server
+side running inside a TEE (Trusted Execution Environment). The relevant
+recovered binaries are present in
+`~/Downloads/cosmo_recovered_native_libs/lib/arm64-v8a/`:
+
+- `liboak_session_config_builder_jni.so` — Oak client session config
+- `libpi_client_session_config_jni.so` — Private Inference client session config
+
+Neither is bundled in genesis. The pure-HTTPS + Private Tokens path (§15.4)
+is the **single production transport today**; Oak is reserved as a stronger
+confidentiality tier for sensitive workloads.
+
+**What Oak provides** (above and beyond TLS):
+- **Remote attestation** — the client verifies the server is running an
+  attested TEE image (e.g., AMD SEV-SNP, Intel TDX) before establishing
+  the session. The client doesn't trust the server operator, only the
+  attested workload binary.
+- **Noise-protocol session keys** — encrypted RPC payloads with forward
+  secrecy; the server operator can't decrypt traffic even with TLS keys.
+- **Open-source verifiable** — Oak is at [github.com/project-oak/oak](https://github.com/project-oak/oak).
+  The attestation chain is auditable end-to-end.
+
+**Genesis port plan** (when Oak workstream activates):
+
+1. **Bundle the recovered libraries:** add `liboak_session_config_builder_jni.so`
+   and `libpi_client_session_config_jni.so` to
+   `app/src/main/jniLibs/arm64-v8a/`. Both are gitignored — provision via
+   `scripts/provision-from-recovery.sh` (extend the script's
+   `MAP` array to include them).
+2. **Reflection-bridge the JNI surface:** like the AOC `NanoAppClient`
+   pattern (§2.2). Define a `OakSessionConfigBuilder` Kotlin class that
+   loads the .so and exposes `buildSession(endpoint, attestation): OakSession`.
+3. **Add a `PrivateOakLLM` backend** alongside `OkHttpRemoteInferenceClient`,
+   wrapping the Oak session as another `LLM` implementation.
+4. **Server side:** stand up an Oak Restricted Kernel + Oak Containers
+   workload that hosts the LLM inference; configure attestation roots.
+   This is the heavy part — Oak operations are non-trivial, the Oak docs
+   at oak's repo are the authoritative reference.
+
+**Status:** 🔵 planned. Native libs recovered but not bundled. Zero
+client-side or server-side code today. The HTTPS + PrivateToken path is
+sufficient for the current threat model. Activate Oak when:
+- A specific workload (e.g., medical-context queries) has a confidentiality
+  requirement that survives a compromised server operator, OR
+- A regulatory regime demands TEE-attested compute for the inference path.
+
+**Tier-2 fallback** per `docs/fallback-paths.md`: stay on the §15.4 HTTPS
+transport indefinitely; add Oak only when confidentiality > convenience.
+
+### 15.5a What `liboak_session_config_builder_jni.so` actually does
+
+For the eventual port, here's what the recovered binary exposes (per the
+upstream `~/cosmo-dev/repo/docs/audio_stack_map.md` and adjacent recovery
+notes, cross-referenced against the public Oak repo):
+
+1. **`OakSessionConfigBuilder`** — fluent builder that produces an
+   `OakSessionConfig` proto. Key fields: endorsement reference values
+   (the expected attestation evidence), client static key pair (Noise),
+   handshake type (`NN`, `NK`, or `KK` per Noise spec). Cosmo configures
+   for `NK` (server-static-known) so the client can verify the server's
+   long-term identity.
+2. **`OakSession`** — once the config is built, this object is the
+   stateful session: client-side handshake state, encrypt/decrypt
+   methods, send/receive over an arbitrary transport (cosmo wraps gRPC).
+3. **Attestation verifier** — invoked during handshake. Validates the
+   server's attestation evidence (TEE measurement + endorsement chain)
+   against the configured reference values.
+
+The Kotlin port wraps these via JNI reflection like `NanoAppClient` does for
+Context Hub. Server side runs a parallel Oak workload (Rust, per Oak's
+canonical implementation).
+
+### 15.6 Anonymous credentials & private tokens (⚠️ client done; issuer service needed)
+
+The auth model for the §15.4 inference endpoint is **unlinkable** — the
+inference server learns "this request came from a device with a valid
+token," not "this request came from device X." Devices get short-lived
+tokens from an issuer service; the issuer learns "device X requested N
+tokens" but not what they're for; the inference server learns "this is
+a valid token" but not which device. Conceptual inspiration: IETF
+Privacy Pass / Private Access Tokens
+([RFC 9577](https://datatracker.ietf.org/doc/rfc9577/)).
+
+**Client-side files** (already wired):
+
+| Type | File | Role |
+|---|---|---|
+| `AnonymousCredentialProvider` | `LLM.kt` | Returns a usable credential, refreshing if needed |
+| `AnonymousCredentialIssuerClient` | `LLM.kt` | Wraps the HTTP call to the issuer |
+| `OkHttpAnonymousCredentialIssuerClient` | `LLM.kt` | Production impl |
+| `RefreshingAnonymousCredentialProvider` | `LLM.kt` | Refresh-before-expiry logic with Clock injection |
+| `RemoteCredentialStore` | `RemoteCredentialStore.kt` | AES-GCM-encrypted DataStore-backed persistence |
+| `AndroidKeyStoreRemoteCredentialStore` | `RemoteCredentialStore.kt` | Keystore-wrapped AES-GCM impl |
+
+**Issue protocol:**
+
+```
+POST /v1/private-token/issue
+Request:
+{
+  "audience": "cosmo-remote-inference",
+  "client": "genesis-android",
+  "nonce": "base64url-random-16-bytes",
+  "request_signing_public_key_spki": "base64url-der-subject-public-key-info"
+}
+
+Response:
+{
+  "authorization_header": "PrivateToken token-value",
+  "expires_at_epoch_millis": 1770000000000
+}
+```
+
+The token is opaque to the client. The issuer can mint stateful or
+stateless tokens; the inference server validates them via either a
+shared verification key (stateless JWT-style) or a per-token lookup
+(stateful Redis-style).
+
+**What's required server-side to make this live:**
+
+1. **Issuer service**:
+   - Accepts the JSON above on `POST /v1/private-token/issue`
+   - Optionally rate-limits per-public-key (e.g., 1000 tokens/day)
+   - Optionally audits the public-key → token mapping (for abuse response, NOT linkability to inference traffic)
+   - Returns a signed token + expiry timestamp
+2. **Inference-side validator**:
+   - Validates the token signature (or looks it up)
+   - Validates the token hasn't expired
+   - Validates the device signature matches the public key the token was bound to
+3. **Optional issuer flavors:**
+   - **Anonymous** — issuer cannot link tokens to inference traffic at all (use blinded signatures, true Privacy Pass)
+   - **Pseudonymous** — issuer can link but inference cannot (simpler; genesis's current shape)
+   - **Identified** — both sides know the user (don't use; defeats the purpose)
+
+**Status:** ⚠️ client-side complete. No production issuer service. Local
+test fixtures can spoof the issuer for dev (`SimulationLLM` bypasses the
+whole path). For production, the issuer service is **the smallest server
+component genesis needs to stand up** — could be a single FastAPI
+endpoint that issues HMAC-signed tokens with a 1-hour TTL. ~150 LOC of
+server work.
+
+### 15.7 Mariner browsing-agent backend (⚠️ client wired; backend absent)
+
+The recovery surfaces concrete cosmo wire-level shape for the
+browsing-agent backend that drives the TaskMonitor UI surface (§6). Per
+`~/Downloads/cosmo_baksmali/.../fulfillment/actions/mariner/MarinerAction.smali`:
+
+- **Transport:** gRPC, `io.grpc.ManagedChannel`
+- **Stub:** `com.google.labs.mariner.v1.ActionServiceGrpcKt$ActionServiceCoroutineStub`
+- **Entry point:** `execute(query: String): Flow<MarinerState>` — server-streaming RPC that takes a natural-language query and streams `MarinerState` updates back as the agent navigates pages, extracts content, and resolves the task
+- **Auth in cosmo:** `OnePlatformAuth.smali` — Google's internal enterprise auth; **deeply Google-tied**, genesis replaces with generic OAuth/JWT bearer auth on the gRPC metadata
+
+**`MarinerState` proto** (per recovery): includes progress phase, current
+URL being browsed, extracted content snippets, agent thoughts, and the
+final answer. The TaskMonitor UI renders this stream as prompt/response
+bubbles (`fulfillment/actions/mariner/TaskMonitorActivity.kt` in genesis
+today renders against this same shape).
+
+**Genesis status:**
+
+- **Client side:** `TaskMonitorActivity` + `TaskMonitorNavigationBridge` ship (§6). The view renders incremental agent updates.
+- **gRPC stub:** the `com.google.labs.mariner.v1` proto + generated stub are NOT in genesis. Would either be regenerated from a cosmo-recovered `.proto` file (if extractable) or replaced with a genesis-defined contract that the genesis-side backend speaks.
+- **Backend:** not built. **This is the heaviest unbuilt server-side surface** — Mariner backend is essentially a tool-using LLM agent that controls a headless browser.
+
+**Server-side requirements for a genesis-equivalent Mariner backend:**
+
+1. **gRPC service** — `service ActionService { rpc Execute(ExecuteRequest) returns (stream ActionEvent); }` or equivalent (could use SSE-over-HTTP via the §15.4 transport instead, removing the gRPC dep)
+2. **Browser automation backend** — Playwright (Python/Node), Selenium, or Browser-Use (LangChain-ecosystem). Browser-Use is the closest off-the-shelf match
+3. **LLM tool-use loop** — the LLM proposes a plan, executes one browser action, observes the page state, repeats. Tier-2 per `docs/fallback-paths.md` is Browser-Use with GPT-4o or Claude as the LLM
+4. **Auth** — bearer token / Authorization header. The existing §15.4 + §15.6 (PrivateToken) infrastructure is sufficient; no need to mirror OnePlatformAuth
+5. **Result streaming** — incremental state updates so the user sees progress; matches the existing `Flow<MarinerState>` consumer pattern
+
+**Effort estimate** (per `docs/fallback-paths.md`): ~1 week to wire
+Browser-Use behind the §15.4 transport. The TaskMonitor UI is already
+built; this is just the backend service.
+
+**Status:** 🔵 planned. The cosmo gRPC contract is the spec; the backend
+is the work. Until built, "browsing agent" actions surface a graceful
+"not yet available" downgrade.
+
+### 15.8 What's NOT a server-side genesis target
+
+While scanning the recovery, several cosmo classes that *look* server-side
+turned out to be **cross-app Android IPC** or **deeply Google-internal**
+surfaces that genesis doesn't mirror:
+
+| Cosmo class | What it actually is | Why not server-side genesis work |
+|---|---|---|
+| `gboard/GBoardSuggestionsService` | Android `Service` exposing cosmo context to the GBoard keyboard via IPC | Cross-app IPC, not server. If genesis wants the same surface, it ships as a sibling to `AppFunctions` (§14) — not as a backend |
+| `altair/AltairActionSynchronizer` | Binds to `ICosmoAmbientContextService` from the `com.google.research.air.experiences.glimmer.altair` Android app (XR display surface) | Cross-app IPC to a different first-party app. Genesis can replicate via Android service binding; no server involved |
+| `voiceassistant/MainInteractionService` + `MainInteractionSessionService` | Android `VoiceInteractionService` / `VoiceInteractionSessionService` — the platform Assistant role binding | Platform binding, not server-side |
+| `voiceassistant/MainRecognitionService` | Android `RecognitionService` — voice-input platform binding | Platform binding |
+| `lib/google/auth/AuthManager` | Wraps Google account auth via Google Play Services | Genesis uses generic OAuth/JWT; deeply Google-tied; skip |
+| `agents/proactivesuggestions/InvokeAgentQ` | Action type that routes a "ask AgentQ" query to a Google-internal Q&A backend | Genesis replaces with generic LLM via existing fulfillment + remote-inference path; "AgentQ" name is Google-internal |
+| `skills/generation/SkillGenerator`, `GatekeepingGenerator` | App-start LLM calls that synthesize skill definitions from `filtered_skill_schema.textproto` | Uses generic `LLM` interface; no dedicated backend — routed via the existing LLM clients (§9) |
+| `agents/proactivesuggestions/*` (whole package) | On-device proactive-suggestion ML pipeline — `AmbientData` → `Context` → LLM → `ProactiveSuggestion` | Entirely on-device per recovery (no gRPC stubs or HTTP clients inside the package); just needs the LLM clients (§9) to be live |
+
+This list is the **deliberate scope cut**: surfaces that look server-side
+but either run on-device, route through existing infrastructure, or are
+deeply Google-internal and replaced with off-the-shelf alternatives.
 
 ---
 
