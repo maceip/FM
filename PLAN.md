@@ -278,6 +278,12 @@ Treat §3.0a as a work queue, not as proof that the app is ready. Current
 - Until Tier 0 and the Tier 1 timer flow are green on emu, Tier 6 items are
   parking-lot work. Do not staff CaMeL, Mariner backend, per-action handler
   splits, or hardware-only Pixel paths ahead of the minimum app flow.
+- For Tier 1/Tier 2, use the action path that exists before adding a second
+  skill architecture. `FulfillmentRunner` already parses `FulfillmentAction`,
+  `ActionsRepository` exposes actions to Home, and `ActionCard` confirms via
+  `requiresExecuteConfirmation()`. Validate that path first; do not make the
+  unused `SkillResult.SideEffectPending` path or a new 9-executor split a v1
+  prerequisite unless a failing acceptance test proves it is needed.
 
 Each item below is **self-contained**: file paths, current state, the gap,
 the contract to write, and what "done" looks like. An engineer should be
@@ -446,11 +452,11 @@ Per-item source markers (verified by searching `~/Downloads/cosmo_baksmali/class
 - **M1.2** — NEW/REORG. FM currently exposes a hardcoded debug Ask button, not
   a user query box. Cosmo's user input surface was composed through the
   voiceassistant/chat UI; FM needs a small app-shell input, not a large port.
-- **M1.3** — REORG. Cosmo has `SkillResult` proto at `gatekeeping/proto/SkillResultKt.smali`; the confirmation UI was rendered through `voiceassistant/ChatViewComposable` etc., not through FM's CardPayload abstraction.
+- **M1.3** — REORG. Cosmo has `SkillResult` proto at `gatekeeping/proto/SkillResultKt.smali`; FM's current shippable path is different: `FulfillmentRunner` parses `FulfillmentAction`, stores it in `ActionsRepository`, and Home confirms via `ActionCard`. Presence `PermissionConfirmation` cards can reuse that later, but they are not the Tier 1 blocker.
 - **M-StrictMode** — PORT/CLEAN. The eager-DI bug is FM-side; cosmo's class structure works fine because cosmo loaded sqlcipher elsewhere. Engineer should compare FM's `ContextStoreModule` against cosmo's equivalent (`~/Downloads/cosmo_baksmali/.../context/`).
 - **M3.3** — REORG. **No cosmo `presence/` namespace exists.** Cosmo's UX state ran through individual ViewModels (`voiceassistant/BrowsingAgentViewModel.smali`, `ChatViewComposable`, `FloatyScreen$VoiceMatch.smali`). FM has consolidated into a single PresenceState producer; this is genuinely new architectural work.
 - **M3.5** — REORG. Same as M3.3; CardPayload→Skill mapping is part of FM's redesigned presence layer, not cosmo.
-- **M2.1** — NEW. Cosmo's `fulfillment/actions/` only has `mariner/` as a subdir; no per-skill executor split existed in cosmo.
+- **M2.1** — VALIDATE/CLEANUP. Cosmo and FM both use a centralized action model. A new per-skill executor split is an optional cleanup, not a Tier 2 requirement.
 - **M2.7** — NEW. No retention-sweep class found in cosmo's `ephemeralbuffer/` or `context/`. The buffer-side eviction is cosmo-shaped (EvictionPolicy in `EphemeralBuffer.kt:141-144`) but the store-side sweep is FM-new.
 - **M2.8** — NEW. User-controlled RoutingMode is a clean-room addition. Cosmo's routing was driven by network policy automatically.
 - **M2.9** — NEW. No "forget last N" surface in cosmo (search for `forget` returned only a regex match in `gatekeeping/impl/RegexGatekeepingModelV0.smali`, not a delete action).
@@ -490,20 +496,26 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
   that string. This unblocks V1.2.
 - Refs: Tier 1 acceptance; M1.3 confirmation card surfacing.
 
-**M1.3 SkillResult.SideEffectPending → confirmation card surfacing**
+**M1.3 ActionDeck side-effect confirmation for timer**
 - Where:
-  - `app/src/main/kotlin/.../skills/Skills.kt:62-86` — `SkillResult` sealed; `SideEffectPending(confirmationToken: String, summary: String)` at :73; `SideEffectApplied(auditId, summary)` at :78
-  - `app/src/main/kotlin/.../skills/Skills.kt:88-107` — `SkillRegistry` already exposes `suspend fun confirm(token: String): SkillResult` (:104) and `suspend fun cancel(token: String)` (:106)
-  - `app/src/main/kotlin/.../presence/PresenceState.kt:43-103` — `CardPayload.PermissionConfirmation(prompt: String, actionLabel: String, undoable: Boolean)` at :99-103
-  - `app/src/main/kotlin/.../presence/surfaces/CardStackSurface.kt:42-107` — `CardStackSurface(cards, onAction: (cardId, actionId) -> Unit)`; renders `ActionButtonGrid(card.id, card.actions, onAction)` at :100
-  - `app/src/main/kotlin/.../presence/surfaces/cards/PermissionConfirmationCard.kt:28-53` — content composable; its inner "CONFIRM / UNDO" boxes are decorative (no click handlers)
-- Present: SkillResult emits SideEffectPending; SkillRegistry has confirm/cancel; CardStackSurface has onAction callback hook + per-card `actions: List<CardAction>` plumbing; PermissionConfirmation payload exists
-- Gap: no producer constructs a `PresenceCard(id = token, payload = PermissionConfirmation, actions = [Confirm, Cancel])` from a SideEffectPending emission; no host wires `onAction` → `SkillRegistry.confirm/cancel`. The card's inner buttons being decorative is fine — the real surface is the action grid added below the card by `CardStackSurface`.
-- Contract (sub-task of M3.3 producer):
-  - In M3.3's reducer: when a `SkillResult.SideEffectPending(token, summary)` arrives, emit `PresenceState.Ready(taskId = invocationTaskId, cards = listOf(PresenceCard(id = token, payload = CardPayload.PermissionConfirmation(prompt = summary, actionLabel = "Confirm", undoable = true), actions = listOf(CardAction("confirm", "Confirm", type = CardActionType.PRIMARY), CardAction("cancel", "Cancel", type = CardActionType.DESTRUCTIVE)))))`
-  - In the screen that hosts `CardStackSurface`: wire `onAction = { cardId, actionId -> scope.launch { when (actionId) { "confirm" -> skillRegistry.confirm(cardId); "cancel" -> skillRegistry.cancel(cardId) } } }`. cardId == confirmationToken by construction above.
-- Done: instrumented: `FulfillmentOrchestrator.handleUserQuery("set a timer for 10 minutes")` → screen shows Permission card with the summary + Confirm/Cancel buttons rendered by ActionButtonGrid. Tap Confirm → `SkillRegistry.confirm(token)` returns `SideEffectApplied(auditId, summary)`; `ActionsRepository.history()` grows by 1. Tap Cancel → SkillRegistry.cancel(token); no apply; card dismisses.
-- Refs: architecture.md §6 (fulfillment) + §13.2 (presence). Tightly coupled with M3.3.
+  - `app/src/main/kotlin/.../fulfillment/FulfillmentRunner.kt:35-65` — `fulfill()` parses LLM output into `List<FulfillmentAction>`, writes `ActionsRepository.maybeUpdateActionsList(actions, fulfillmentId)`, and records debug history.
+  - `app/src/main/kotlin/.../fulfillment/ActionsRepository.kt:11-18` — exposes `userFacingActions`, `fulfillmentHistory`, and `hasNewActions`.
+  - `app/src/main/kotlin/.../ui/mainscreen/MainActivity.kt:636-666` — Home renders `ActionCard`; confirmed actions call `actionHandler.execute(action)`.
+  - `app/src/main/kotlin/.../fulfillment/FulfillmentActionExtensions.kt:38-50` — `requiresExecuteConfirmation()` returns true for side-effect actions including `AddTimer`.
+- Present: the action confirmation path exists in the Home ActionDeck. It does
+  not depend on `SkillRegistry.invoke()` or `SkillResult.SideEffectPending`.
+- Gap: this path has not been validated from a real user query because M1.2
+  input is missing and the LLM/action fixture is not driven in an emu flow.
+- Contract: for v1, keep confirmation on the existing ActionDeck path. Add a
+  deterministic test/fixture so `handleUserQuery("set a timer for 10 minutes")`
+  produces `FulfillmentAction.AddTimer`, Home displays the action, tapping Run
+  calls `FulfillmentActionHandler.execute(action)`, and `ActionsRepository`
+  retires it as executed. Presence `PermissionConfirmation` cards are a later
+  M3.3/M3.5 integration, not a Tier 1 prerequisite.
+- Done: emu/instrumented: enter the timer query, see an AddTimer action card,
+  confirm it, and observe `ActionsRepository.executedActions` grow by one.
+- Refs: architecture.md §6. Presence card surfacing remains coupled with M3.3
+  but should not block the minimum timer flow.
 
 **M-StrictMode disk-read-on-main-thread (Tier 5 critical fix)**
 - Where: `app/src/main/kotlin/.../context/ContextStore.kt:381-396` `ContextStoreModule.provideDatabase` (object at :381; `System.loadLibrary("sqlcipher")` at :391; `.openHelperFactory(SupportOpenHelperFactory(...))` at :394); chain pulled in via `contentcapture/ScreenCapture.kt:32-64` (`PeriodicScreenCaptorImpl` class, injects `ContextStore` via the constructor at :32-39) → `controller/CosmoController.kt:35` (`private val periodicScreenCaptor: PeriodicScreenCaptor,`) → `MainActivity.kt:103` (`@Inject lateinit var cosmoController: CosmoController`)
@@ -516,13 +528,14 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
 **M3.3 PresenceState driver/producer**
 - Where: `app/src/main/kotlin/.../presence/PresenceState.kt` (file is 145 lines). Sealed variants at :7-14: `Hidden`, `Parked(mode: PresenceMode, activity: OrbActivity)`, `Working(taskId: String, phase: WorkPhase, pillText: String? = null)`, `NeedsInput(taskId, prompt)`, `Ready(taskId: String, cards: List<PresenceCard>, primaryAction: CardAction? = null)`, `Dismissed(until: Instant)`. `PresenceCard` at :24-28 wraps `(id, payload, actions)`. Supporting enums at :16-18 (`PresenceMode { ORB, TAB }`, `OrbActivity { IDLE, LISTENING, RECENTLY_DISMISSED }`, `WorkPhase { STARTED, SYNCING, PROCESSING, FINALIZING }`). Surfaces (OrbSurface, TabSurface, CardStackSurface) already consume `PresenceState`. No producer file today.
 - Present: state shapes + surfaces wired; no orchestrator emits the state
-- Gap: no `StateFlow<PresenceState>` producer that watches Gatekeeper output + SkillResult emissions + dismiss events
+- Gap: no `StateFlow<PresenceState>` producer that watches Gatekeeper output,
+  `ActionsRepository` action updates, and dismiss events
 - Contract: new `presence/PresenceStateProducer.kt`:
   ```kotlin
   @Singleton
   class PresenceStateProducer @Inject constructor(
       gatekeeperOutput: GatekeeperOutputSource,           // emits GatekeepingResult flow
-      orchestrator: FulfillmentOrchestrator,              // (or its SkillResult emission source)
+      actionsRepository: ActionsRepositoryContract,       // emits user-facing FulfillmentAction state
       // dismissal channel from the host UI
   ) {
       private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -533,27 +546,31 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
   Reducer mapping:
   - Idle (no recent input + no pending result) → `Parked(mode = ORB, activity = IDLE)`
   - Gatekeeper detects directed audio → `Parked(mode = ORB, activity = LISTENING)`; then on triggeredFulfillment → `Working(taskId, phase = STARTED)`; phase advances as runner emits progress
-  - `SkillResult.SideEffectPending(token, summary)` → `Ready(taskId, cards = [PresenceCard(id = token, payload = PermissionConfirmation(prompt = summary, actionLabel = "Confirm"), actions = [Confirm, Cancel])])` (see M1.3 for exact CardAction shape)
-  - `SkillResult.Answer(text)` / `Draft(...)` / `SideEffectApplied(...)` → `Ready(taskId, cards = [...payload-specific...])` per skill-card mapping (M3.5)
-  - `SkillResult.Failed(reason)` → `Ready(taskId, cards = [error-card])` OR back to `Parked` with a transient toast (designer's call; document the choice)
+  - `ActionsRepository.userFacingActions` non-empty → `Ready(taskId = lastFulfillmentId ?: "latest", cards = actions.map(::toPresenceCard))`
+  - Side-effect actions (`AddTimer`, `CreateCalendarEvent`, etc.) map to cards with Confirm/Cancel actions and call the existing ActionDeck execution path (`FulfillmentActionHandler.execute`) instead of inventing a parallel `SkillRegistry.confirm` path
+  - Non-side-effect answer/context actions (`ProvideRecall`, `ProvideInsight`, etc.) map to payload-specific result cards per M3.5
+  - Failed/empty fulfillment → `Ready(taskId, cards = [error-card])` OR back to `Parked` with a transient toast (designer's call; document the choice)
   - Dismiss action from UI → `Dismissed(until = now + 10.minutes)`; auto-return to `Parked` when `Instant.now() >= until`
-- Done: instrumented harness: post fake GatekeepingResult with triggeredFulfillment=true → `state.value` is `Working`. Emit SideEffectPending → `state.value` is `Ready(cards=[PermissionConfirmation])`. Fire dismiss → `Dismissed`. Advance time-control past `until` → `Parked`.
+- Done: instrumented harness: post fake GatekeepingResult with triggeredFulfillment=true → `state.value` is `Working`. Push `FulfillmentAction.AddTimer` through `ActionsRepository.maybeUpdateActionsList` → `state.value` is `Ready(cards=[PermissionConfirmation-like timer card])`. Fire dismiss → `Dismissed`. Advance time-control past `until` → `Parked`.
 - Refs: architecture.md §13.2.
 
-**M2.1 Per-subtype skill executor split (9 parity skills)**
+**M2.1 9 parity skills/actions end-to-end**
 - Where: `app/src/main/kotlin/.../skills/Skills.kt:88-107` SkillRegistry (uses 4-bucket `SkillCategory` PRODUCTIVITY/CAPTURE/KNOWLEDGE/UTILITY); `app/src/main/kotlin/.../fulfillment/FulfillmentActionHandler.kt:29-138` central `when (action)` at :41
-- Present: SkillRegistry interface; SkillsRepositoryImpl with category-only descriptors; central FulfillmentActionHandlerImpl dispatching to inline blocks
-- Gap: no per-skill executor classes; 9 parity skills not formally enumerated as distinct types
-- Contract: 
-  ```kotlin
-  sealed interface SkillExecutor {
-      val id: SkillId
-      suspend fun execute(query: ParsedQuery, ctx: List<ContextEvent>): SkillResult
-  }
-  ```
-  One impl per parity skill in `skills/executors/`: TimerSkill, ListSkill, CalendarSkill, DocSkill, WebSearchSkill, JargonSkill, InsightSkill, RecallSkill, SummarySkill. Bind via `@IntoMap @SkillIdKey` Dagger multibinding; replace central `when` with `executors[query.skillId]?.execute(query, ctx)`.
-- Done: 9 executor files exist; central `when` block deleted or only delegates; instrumented test routes each skill to its dedicated class.
-- Refs: precursor to M6.7 (24-handler split for FulfillmentAction). Architecture.md §6.1.
+- Present: Skill descriptors exist and fulfillment already uses typed
+  `FulfillmentAction` variants. `FulfillmentActionHandlerImpl` is centralized
+  but functional for the current action set.
+- Gap: the 9 parity flows are not validated end-to-end from query → action →
+  optional confirmation → result/history. The gap is proof and fixtures, not a
+  required executor architecture.
+- Contract: build a 9-flow acceptance fixture around the existing action path:
+  Timer, List, Calendar, Doc, WebSearch, Jargon/DefineTerm, Insight, Recall,
+  and Summary. Each fixture should drive `FulfillmentRunner` or
+  `FulfillmentOrchestrator`, assert the expected `FulfillmentAction`, and
+  assert `ActionsRepository` / UI state. Keep the central handler unless a
+  concrete test failure shows it prevents shipping.
+- Done: 9 emu/instrumented flows pass using current `FulfillmentAction`
+  plumbing. No new executor split is required for v1.
+- Refs: optional cleanup is M6.7 (24-handler split). Architecture.md §6.1.
 
 **M2.7 ContextStore retention sweep**
 - Where:
@@ -600,9 +617,9 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
 **M3.5 Card payload coverage per parity skill**
 - Where: `app/src/main/kotlin/.../presence/PresenceState.kt:43-104` (CardPayload sealed — 10 variants: Browser, Calling, Messaging, Document, ListTasks, CalendarTime, PeopleContext, MediaImage, SourceCitation, PermissionConfirmation)
 - Present: 10 payloads + card composables in `presence/surfaces/cards/` (correction: PLAN.md previously claimed 3 — wrong)
-- Gap: the mapping `SkillResult → CardPayload variant` per parity skill is not documented or wired uniformly. Some skills emit payloads; some may emit only `Done` with no card.
-- Contract: new `skills/SkillCardMapping.kt` — exhaustive `fun SkillResult.toCardPayload(): CardPayload?` for each of 9 parity skills. Wire into M3.3's reducer.
-- Done: each of 9 skills executed in instrumented harness → card renders with correct payload variant + correct content.
+- Gap: the mapping `FulfillmentAction → CardPayload variant` per parity flow is not documented or wired uniformly. Some actions should render rich cards; some can stay as simple ActionDeck rows.
+- Contract: new `presence/ActionCardMapping.kt` — exhaustive `fun FulfillmentAction.toPresenceCard(): PresenceCard?` for the 9 parity flows. Wire into M3.3's reducer. If `SkillResult` becomes a real upstream path later, add a second adapter then; do not block v1 on that unused path.
+- Done: each of 9 parity flows executed in instrumented harness → card renders with correct payload variant + correct content.
 
 **M4.2 LiteRT-LM bundle provisioning default**
 - Where: `scripts/provision-gemma4-litertlm.sh` exists; `app/src/main/kotlin/.../lib/llm/LiteRtLmLLM.kt:32-266` loads from `models/${storageSlug()}/bundled.litertlm` (line 225)
@@ -779,7 +796,7 @@ to set a timer, see confirmation, see the timer get set.
 |---|---|---|---|
 | 1.1 | First-launch permission rationale flow: app starts, asks for mic + notifications + accessibility with clear rationale text, handles deny + don't-ask-again | ⚠️ helper exists; full flow validation pending | emu-ci-run launches; instrumented test grants permissions programmatically; screen.mp4 shows rationale dialog before any permission ask |
 | 1.2 | Text input on Home: user types "set a timer for 10 minutes" → `FulfillmentOrchestrator.handleUserQuery` runs | 🔴 blocked by M1.2: Home has only hardcoded Ask/Batch buttons today | emu run + instrumented test simulates text input → logcat shows `Gatekeeper:` BERT classification → `Fulfillment:` action parsed → confirmation surface rendered |
-| 1.3 | Side-effect confirmation: timer skill returns `SideEffectPending` → user taps Confirm → Android Clock provider receives `ACTION_SET_TIMER` → audit trail records the apply | ⚠️ skill registry wired; confirmation UI may not surface from a real `FulfillmentResult` | emu run + instrumented test confirms the action → adb shell query Clock provider shows new timer; `ActionsRepository` history grows by one entry |
+| 1.3 | Side-effect confirmation: timer query produces `FulfillmentAction.AddTimer` → user confirms from Home ActionDeck → Android Clock receives `ACTION_SET_TIMER` → audit trail records the apply | ⚠️ action confirmation UI exists; not validated from real Home query until M1.2 lands | emu run + instrumented test confirms the action → `ActionsRepository.executedActions` grows by one entry; Clock intent path observed |
 | 1.4 | Voice input on Home: user speaks (instrumented `MediaRecorder` fixture audio) → SODA transcribes → Gatekeeper classifies → same flow as 1.2 | ⚠️ SODA wired on-device but not validated end-to-end via emu (emu lacks mic; need fixture-audio inject) | emu run plays a WAV fixture through `GatekeeperDebugReceiver` `ACTION_INJECT_AUDIO` → SODA produces transcript → same end of 1.2/1.3 |
 | 1.5 | State persists across `am force-stop`: timer history, settings, permission grants survive | ⚠️ DataStore + SQLCipher wired; round-trip-across-kill not regression-tested | emu run: do flow 1.1–1.3, `am force-stop` the app, relaunch, query `ActionsRepository.history()` via debug receiver → previous timer entry present |
 | 1.6 | App handles airplane mode without crash (local-LLM-only path stays alive) | ⚠️ NetworkAwareLLM degradation path exists; not validated via emu | emu run: simulate airplane mode (`adb shell svc data disable`); do flow 1.2 with a query that AICore can answer locally; no `LlmUnavailableException` for both lanes |
@@ -797,7 +814,7 @@ This is M2 + M3 of the original milestone plan. The user can demo the full
 
 | # | Item | Status | Emu gate |
 |---|---|---|---|
-| 2.1 | 9 parity skills end-to-end: list (add to grocery list), timer, calendar draft, doc draft, web search, jargon definitions, insight, recall, conversation summary | ⚠️ skill registry wired; each subtype's executor is single-handler stub today (architecture.md §6.1) — needs per-subtype split | emu run: instrumented test invokes each of 9 skills in turn → each emits `SideEffectApplied` or `Result` event in `ActionsRepository` |
+| 2.1 | 9 parity skills/actions end-to-end: list (add to grocery list), timer, calendar draft, doc draft, web search, jargon definitions, insight, recall, conversation summary | ⚠️ action schema/handler path exists; needs 9 deterministic acceptance fixtures, not a new executor split | emu run: instrumented test invokes each of 9 flows in turn → each emits the expected `FulfillmentAction` and result/history state |
 | 2.2 | Ambient mic capture via SODA: speech detected, Magic Mic directedness gate fires, transcript flows into `@AmbientAudioEphemeralBuffer` | ✅ on-device wired; emu validation needed (mic-fixture inject) | emu run: inject directed speech fixture → buffer count increases by 1; inject undirected speech → buffer count unchanged (gate suppressed) |
 | 2.3 | Notification capture: `NotificationListenerService` receives a posted notification → flows into `@NotificationEphemeralBuffer` | ✅ wired; emu validation needed | emu run: `adb shell cmd notification post` a notification → `@NotificationEphemeralBuffer` count increases |
 | 2.4 | Screen text capture: AccessibilityService observes screen text → flows into `@ScreenEphemeralBuffer` | ✅ wired; emu validation needed | emu run: launch a known activity with known text → buffer contains that text |
