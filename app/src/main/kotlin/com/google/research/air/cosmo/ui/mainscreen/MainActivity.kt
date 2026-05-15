@@ -65,6 +65,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
+import com.google.research.air.cosmo.BuildConfig
 import com.google.research.air.cosmo.controller.CosmoController
 import com.google.research.air.cosmo.fulfillment.ActionsRepositoryContract
 import com.google.research.air.cosmo.fulfillment.FulfillmentAction
@@ -97,11 +98,15 @@ import com.google.research.air.cosmo.voiceassistant.camera.DeviceCameraCaptureSu
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlin.jvm.JvmSuppressWildcards
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+
+internal const val EXTRA_DEBUG_TIMER_FLOW = "com.google.research.air.cosmo.extra.DEBUG_TIMER_FLOW"
+private const val DEBUG_TIMER_FLOW_QUERY = "set a timer for 10 minutes"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -131,6 +136,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val debugTimerFlowEnabled = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_DEBUG_TIMER_FLOW, false)
         cosmoController.init()
         setCosmoContent(wallpaperDriven = true) {
             CosmoGenesisApp(
@@ -144,7 +150,8 @@ class MainActivity : ComponentActivity() {
                 cameraViewComposable = cameraViewComposable,
                 permissionRationaleHelper = permissionRationaleHelper,
                 taskMonitorNavigationBridge = taskMonitorNavigationBridge,
-                debugPanels = debugPanels
+                debugPanels = debugPanels,
+                debugTimerFlowEnabled = debugTimerFlowEnabled
             )
         }
     }
@@ -254,7 +261,8 @@ private fun CosmoGenesisApp(
     cameraViewComposable: DeviceCameraCaptureSurface,
     permissionRationaleHelper: PermissionRationaleHelper,
     taskMonitorNavigationBridge: TaskMonitorNavigationBridge,
-    debugPanels: Set<CosmoDebugPanel>
+    debugPanels: Set<CosmoDebugPanel>,
+    debugTimerFlowEnabled: Boolean
 ) {
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
     val isSupportingPaneMode =
@@ -461,6 +469,7 @@ private fun CosmoGenesisApp(
                                 cameraViewComposable = cameraViewComposable,
                                 permissionRationaleHelper = permissionRationaleHelper,
                                 debugPanels = debugPanels,
+                                debugTimerFlowEnabled = debugTimerFlowEnabled,
                                 onNavigate = ::pushRoute,
                                 onBack = ::handleBack,
                                 modifier = Modifier.weight(1f)
@@ -480,6 +489,7 @@ private fun CosmoGenesisApp(
                             cameraViewComposable = cameraViewComposable,
                             permissionRationaleHelper = permissionRationaleHelper,
                             debugPanels = debugPanels,
+                            debugTimerFlowEnabled = debugTimerFlowEnabled,
                             onNavigate = ::pushRoute,
                             onBack = ::handleBack,
                             modifier = Modifier.fillMaxSize()
@@ -537,6 +547,7 @@ private fun CosmoNavDisplay(
     cameraViewComposable: DeviceCameraCaptureSurface,
     permissionRationaleHelper: PermissionRationaleHelper,
     debugPanels: Set<CosmoDebugPanel>,
+    debugTimerFlowEnabled: Boolean,
     onNavigate: (CosmoRoute) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -546,10 +557,10 @@ private fun CosmoNavDisplay(
         modifier = modifier,
         onBack = onBack,
         sceneStrategies = sceneStrategies,
-        entryProvider =
+            entryProvider =
             entryProvider {
                 entry<CosmoRoute.Actions>(metadata = SupportingPaneSceneStrategy.mainPane()) {
-                    ActionsScreen(actionsRepository, actionHandler, fulfillmentOrchestrator, onNavigate)
+                    ActionsScreen(actionsRepository, actionHandler, fulfillmentOrchestrator, debugTimerFlowEnabled, onNavigate)
                 }
                 entry<CosmoRoute.Capture>(metadata = SupportingPaneSceneStrategy.mainPane()) {
                     CaptureScreen(settingStore, stateManager, notificationCaptureManager, glassManager, permissionRationaleHelper)
@@ -599,6 +610,7 @@ private fun ActionsScreen(
     actionsRepository: ActionsRepositoryContract,
     actionHandler: FulfillmentActionHandler,
     orchestrator: FulfillmentOrchestrator,
+    debugTimerFlowEnabled: Boolean,
     onNavigate: (CosmoRoute) -> Unit
 ) {
     val actions by actionsRepository.userFacingActions.collectAsState()
@@ -612,6 +624,17 @@ private fun ActionsScreen(
         askQuery = ""
         scope.launch { orchestrator.handleUserQuery(submitted, "") }
     }
+    DebugTimerFlowAutomation(
+        enabled = debugTimerFlowEnabled,
+        actions = actions,
+        onAskQueryChange = { askQuery = it },
+        onSubmit = ::submitAsk,
+        onShowConfirmation = { pendingConfirmation = it },
+        onConfirm = { action ->
+            pendingConfirmation = null
+            scope.launch { actionHandler.execute(action) }
+        }
+    )
     pendingConfirmation?.let { pending ->
         AlertDialog(
             onDismissRequest = { pendingConfirmation = null },
@@ -709,6 +732,39 @@ private fun ActionsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DebugTimerFlowAutomation(
+    enabled: Boolean,
+    actions: List<FulfillmentAction>,
+    onAskQueryChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onShowConfirmation: (FulfillmentAction) -> Unit,
+    onConfirm: (FulfillmentAction) -> Unit
+) {
+    var submitted by rememberSaveable(enabled) { mutableStateOf(false) }
+    var confirmedActionId by rememberSaveable(enabled) { mutableStateOf<String?>(null) }
+    LaunchedEffect(enabled) {
+        if (!enabled || submitted) return@LaunchedEffect
+        submitted = true
+        DEBUG_TIMER_FLOW_QUERY.indices.forEach { index ->
+            onAskQueryChange(DEBUG_TIMER_FLOW_QUERY.take(index + 1))
+            delay(45)
+        }
+        delay(300)
+        onSubmit()
+    }
+    LaunchedEffect(enabled, actions) {
+        if (!enabled) return@LaunchedEffect
+        val timer = actions.filterIsInstance<FulfillmentAction.AddTimer>().firstOrNull()
+        if (timer == null || timer.id == confirmedActionId) return@LaunchedEffect
+        confirmedActionId = timer.id
+        delay(700)
+        onShowConfirmation(timer)
+        delay(800)
+        onConfirm(timer)
     }
 }
 
