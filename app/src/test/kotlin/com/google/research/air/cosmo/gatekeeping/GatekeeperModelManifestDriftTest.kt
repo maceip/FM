@@ -13,9 +13,9 @@ import org.junit.Test
  *  - `GatekeeperModelIds.FILENAMES` (and the corresponding `const val` id) — the runtime
  *    asset-bytes loader's id → filename map.
  *
- * If the two get out of sync, BERT or AudioGatekeepingModel silently load null bytes at runtime
- * and surface as `bert_vocab_unavailable` / `audio_frontend_unavailable`. This test fails the
- * build if any manifest entry is missing from the Kotlin map (or vice versa).
+ * If the two get out of sync, runtime loaders silently miss bundled assets and surface as
+ * unavailable model paths. This test fails the build if any manifest entry is missing from the
+ * Kotlin map (or vice versa).
  */
 class GatekeeperModelManifestDriftTest {
     @Test
@@ -56,7 +56,9 @@ class GatekeeperModelManifestDriftTest {
             GatekeeperModelIds.BERT_EDGETPU_P25,
             GatekeeperModelIds.BERT_NPU_MT6989,
             GatekeeperModelIds.AUDIO_FRONTEND,
-            GatekeeperModelIds.AUDIO_GATEKEEPER
+            GatekeeperModelIds.AUDIO_GATEKEEPER,
+            GatekeeperModelIds.INHERENT_V0,
+            GatekeeperModelIds.INHERENT_V0_METADATA
         ).associateWith { id ->
             requireNotNull(GatekeeperModelIds.filenameFor(id)) {
                 "GatekeeperModelIds.filenameFor($id) returned null — update FILENAMES"

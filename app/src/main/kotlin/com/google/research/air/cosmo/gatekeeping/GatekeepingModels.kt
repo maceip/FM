@@ -368,6 +368,7 @@ object GatekeeperModelIds {
     const val AUDIO_FRONTEND = "gatekeeper_audio_frontend"
     const val AUDIO_GATEKEEPER = "gatekeeper_audio_gatekeeper"
     const val INHERENT_V0 = "gatekeeper_inherent_v0"
+    const val INHERENT_V0_METADATA = "gatekeeper_inherent_v0_metadata"
 
     private val FILENAMES =
         mapOf(
@@ -378,7 +379,8 @@ object GatekeeperModelIds {
             BERT_NPU_MT6989 to "bert_v0_mt6989.tflite",
             AUDIO_FRONTEND to "audio_frontend.tflite",
             AUDIO_GATEKEEPER to "audio_gatekeeper_edgetpu.tflite",
-            INHERENT_V0 to "inherent.tflite"
+            INHERENT_V0 to "inherent.tflite",
+            INHERENT_V0_METADATA to "inherent.metadata.json"
         )
 
     fun filenameFor(id: String): String? = FILENAMES[id]

@@ -12,7 +12,8 @@ import org.json.JSONObject
 
 private fun inherentMetadataTextLoader(context: Context): () -> String? = {
     runCatching {
-        context.assets.open("models/inherent.metadata.json").bufferedReader().use { it.readText() }
+        val filename = checkNotNull(GatekeeperModelIds.filenameFor(GatekeeperModelIds.INHERENT_V0_METADATA))
+        context.assets.open("models/$filename").bufferedReader().use { it.readText() }
     }.getOrNull()
 }
 
@@ -173,7 +174,6 @@ class InherentAudioGatekeepingModel internal constructor(
     private fun failUnavailable(reason: String): Nothing = throw IllegalStateException(reason)
 
     companion object {
-        const val METADATA_ASSET_PATH = "models/inherent.metadata.json"
         const val MEL_BINS: Int = 128
         const val MAX_FRAMES: Int = 3_000
         const val MAX_SAMPLES: Int = 960_000
