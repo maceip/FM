@@ -193,6 +193,14 @@ tasks.register<Exec>("verifyCosmoReleaseModelManifest") {
     commandLine("bash", "-c", "scripts/download-models.sh --verify-only")
 }
 
+tasks.register<Exec>("verifyCosmoDevelopmentModelManifest") {
+    group = "verification"
+    description =
+        "Development gate: verify model manifest shape while tolerating private recovered binaries that are absent on fresh machines."
+    workingDir = rootProject.layout.projectDirectory.asFile
+    commandLine("bash", "-c", "scripts/download-models.sh --verify-only --allow-missing-binaries")
+}
+
 tasks.register<Exec>("verifySodaAssets") {
     group = "verification"
     description = "Verifies bundled recovered SODA language-pack assets by checksum and size."
@@ -200,14 +208,26 @@ tasks.register<Exec>("verifySodaAssets") {
     commandLine("bash", "scripts/verify-soda-assets.sh")
 }
 
+tasks.register<Exec>("verifyDevelopmentSodaAssets") {
+    group = "verification"
+    description = "Development gate: verify SODA asset checksums when present, while tolerating absent private packs."
+    workingDir = rootProject.layout.projectDirectory.asFile
+    commandLine("bash", "scripts/verify-soda-assets.sh", "--allow-missing-binaries")
+}
+
 afterEvaluate {
     tasks
-        .matching { it.name in setOf("assembleDebug", "assembleRelease", "bundleRelease") }
+        .matching { it.name == "assembleDebug" }
+        .configureEach { dependsOn("verifyCosmoDevelopmentModelManifest") }
+    tasks
+        .matching { it.name in setOf("assembleRelease", "bundleRelease") }
         .configureEach { dependsOn("verifyCosmoReleaseModelManifest") }
+    tasks
+        .matching { it.name == "assembleDebug" }
+        .configureEach { dependsOn("verifyDevelopmentSodaAssets") }
     tasks
         .matching {
             it.name in setOf(
-                "assembleDebug",
                 "assembleRelease",
                 "assembleReleaseInternal",
                 "bundleRelease"

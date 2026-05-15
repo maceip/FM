@@ -145,6 +145,16 @@ scripts/provision-from-recovery.sh   # copies binaries into the assets/jniLibs t
 ./gradlew :app:installDebug
 ```
 
+**Remote emu smoke:**
+
+```bash
+EMU_TOKEN=xxx ./scripts/emu-ci-run.sh
+```
+
+By default this uploads `app/build/outputs/apk/debug/app-debug.apk`, launches
+`MainActivity`, runs for 30 seconds, and writes logcat plus `screen.mp4` under
+`artifacts/emu-run/`. Use `./scripts/emu-ci-run.sh --help` for overrides.
+
 CI gates: `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`.
 The release path additionally runs `scripts/verify-phase6-release-gates.sh`
 (strict model-manifest verification, architecture-delta check, signing config,

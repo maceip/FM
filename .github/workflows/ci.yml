@@ -24,7 +24,7 @@ on:
       emu_run_seconds:
         description: "How long to run on the emu (5–180)"
         type: string
-        default: "90"
+        default: "30"
 
 jobs:
   compile-lint-test:
@@ -64,6 +64,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.run_emu == true
     env:
       EMU_API_TOKEN: ${{ secrets.EMU_API_TOKEN }}
+      EMU_TOKEN: ${{ secrets.EMU_TOKEN }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -72,10 +73,10 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v5
 
-      - name: Guard — EMU_API_TOKEN must be set as a repo secret
+      - name: Guard — emu token must be set as a repo secret
         run: |
-          if [[ -z "${EMU_API_TOKEN:-}" ]]; then
-            echo "::error::EMU_API_TOKEN secret is not configured."
+          if [[ -z "${EMU_API_TOKEN:-}" && -z "${EMU_TOKEN:-}" ]]; then
+            echo "::error::EMU_API_TOKEN or EMU_TOKEN secret is not configured."
             echo "Set it at https://github.com/${{ github.repository }}/settings/secrets/actions"
             echo "Value lives at ~/cosmo-dev/emu-provision/.token on dev machines."
             exit 1
@@ -93,10 +94,7 @@ jobs:
       - name: Run on emu.devkeys.net
         run: |
           chmod +x scripts/emu-ci-run.sh
-          ./scripts/emu-ci-run.sh \
-            app/build/outputs/apk/debug/app-debug.apk \
-            "com.google.research.air.cosmo/.ui.mainscreen.MainActivity" \
-            "${{ inputs.emu_run_seconds }}"
+          ./scripts/emu-ci-run.sh --seconds "${{ inputs.emu_run_seconds }}"
 
       - name: Upload artifacts (logcat + screen.mp4)
         if: always()

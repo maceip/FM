@@ -3,8 +3,40 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SODA_DIR="${ROOT_DIR}/app/src/main/assets/soda"
+ALLOW_MISSING_BINARIES=0
+
+usage() {
+  cat >&2 <<'EOF'
+usage: scripts/verify-soda-assets.sh [--allow-missing-binaries]
+
+Verifies recovered SODA language packs by checksum and size.
+Use --allow-missing-binaries for debug/dev builds on machines without private
+recovered packs; present files are still verified strictly.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --allow-missing-binaries)
+      ALLOW_MISSING_BINARIES=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      exit 64
+      ;;
+  esac
+done
 
 if [[ ! -d "${SODA_DIR}" ]]; then
+  if [[ "${ALLOW_MISSING_BINARIES}" -eq 1 ]]; then
+    echo "WARNING: SODA assets directory missing but tolerated (--allow-missing-binaries): ${SODA_DIR}" >&2
+    exit 0
+  fi
   echo "SODA assets directory not found: ${SODA_DIR}" >&2
   exit 66
 fi
@@ -13,6 +45,10 @@ verified=0
 while IFS=$'\t' read -r filename expected_size expected_sha; do
   target="${SODA_DIR}/${filename}"
   if [[ ! -f "${target}" ]]; then
+    if [[ "${ALLOW_MISSING_BINARIES}" -eq 1 ]]; then
+      echo "WARNING: required SODA pack missing but tolerated (--allow-missing-binaries): ${filename}" >&2
+      continue
+    fi
     echo "required SODA pack is missing: ${filename}" >&2
     exit 66
   fi
@@ -32,6 +68,11 @@ lp_cpu.zip	56458465	fac23ca956f473c5025621784a1657a1663a16b0754886b975f3cde3f134
 lp_lga_tpu.zip	145607304	b10205a4fe668123c17c3f1405e8acc6d072894574c875db05af6372e9993d2c
 lp_zuma_tpu.zip	146456436	c808fd151178adfffd99906f9290935ba189898e9700e47e8fa37a1701effd41
 EOF
+
+if [[ "${ALLOW_MISSING_BINARIES}" -eq 1 ]]; then
+  echo "Verified ${verified} bundled SODA language packs (missing packs tolerated)."
+  exit 0
+fi
 
 checksums_tmp="$(mktemp)"
 (
