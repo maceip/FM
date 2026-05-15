@@ -521,5 +521,5 @@ object LLMModule {
     fun provideDefault(
         @HybridLLM hybrid: LLM,
         @SimulatedLLM simulated: LLM
-    ): LLM = if (BuildConfig.DEBUG) simulated else hybrid
+    ): LLM = if (BuildConfig.DEBUG || BuildConfig.DEBUG_TIMER_FLOW_AUTOMATION) simulated else hybrid
 }

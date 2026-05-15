@@ -82,6 +82,7 @@ android {
         buildConfigField("String", "SODA_PACK_ZUMA_TPU_URL", "\"${providers.gradleProperty("cosmo.soda.languagePack.zumaTpuUrl").orNull.orEmpty()}\"")
         buildConfigField("String", "SODA_PACK_ZUMA_TPU_SHA256", "\"${providers.gradleProperty("cosmo.soda.languagePack.zumaTpuSha256").orNull ?: "c808fd151178adfffd99906f9290935ba189898e9700e47e8fa37a1701effd41"}\"")
         buildConfigField("long", "SODA_PACK_ZUMA_TPU_SIZE_BYTES", "${providers.gradleProperty("cosmo.soda.languagePack.zumaTpuSizeBytes").orNull ?: "146456436"}L")
+        buildConfigField("boolean", "DEBUG_TIMER_FLOW_AUTOMATION", "false")
     }
 
     signingConfigs {
@@ -106,6 +107,7 @@ android {
         debug {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("genesisDebug")
+            buildConfigField("boolean", "DEBUG_TIMER_FLOW_AUTOMATION", "true")
         }
         release {
             isMinifyEnabled = true
@@ -117,6 +119,22 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("emuDebug") {
+            initWith(getByName("debug"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = true
+            signingConfig = signingConfigs.getByName("genesisDebug")
+            matchingFallbacks += listOf("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            buildConfigField("boolean", "DEBUG_TIMER_FLOW_AUTOMATION", "true")
+            ndk {
+                abiFilters += "x86_64"
+            }
         }
         create("releaseInternal") {
             initWith(getByName("release"))
@@ -150,6 +168,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    sourceSets {
+        getByName("emuDebug") {
+            java.srcDir("src/debug/kotlin")
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
     }
 
     packaging {

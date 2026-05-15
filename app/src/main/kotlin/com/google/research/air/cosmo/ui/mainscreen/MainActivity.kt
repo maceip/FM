@@ -136,7 +136,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val debugTimerFlowEnabled = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_DEBUG_TIMER_FLOW, false)
+        val debugTimerFlowEnabled =
+            BuildConfig.DEBUG_TIMER_FLOW_AUTOMATION && intent.getBooleanExtra(EXTRA_DEBUG_TIMER_FLOW, false)
         cosmoController.init()
         setCosmoContent(wallpaperDriven = true) {
             CosmoGenesisApp(
@@ -557,7 +558,7 @@ private fun CosmoNavDisplay(
         modifier = modifier,
         onBack = onBack,
         sceneStrategies = sceneStrategies,
-            entryProvider =
+        entryProvider =
             entryProvider {
                 entry<CosmoRoute.Actions>(metadata = SupportingPaneSceneStrategy.mainPane()) {
                     ActionsScreen(actionsRepository, actionHandler, fulfillmentOrchestrator, debugTimerFlowEnabled, onNavigate)
