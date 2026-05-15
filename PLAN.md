@@ -233,7 +233,7 @@ produced these findings (full artifacts at
 - AICore wrapper / LLM invocation (no LLM calls in idle state)
 - Fulfillment runner (no user query fired)
 - Presence surfaces (no UI navigation; MainActivity is the Nav3 home, not Presence)
-- 22 fulfillment action types
+- 24 fulfillment action types
 - Telemetry event emission (Firebase Analytics disabled — no `google-services.json` in debug build)
 
 The validation baseline confirms Tier 0.4 + Tier 0.6 ✅ but leaves Tier 1
@@ -259,6 +259,26 @@ who picks it up:
 Items move M → V once written; not the other way (a validation-failure
 means the feature regressed, not that the bucket flipped).
 
+#### Audit guardrail — 2026-05-15
+
+Treat §3.0a as a work queue, not as proof that the app is ready. Current
+`main` still has three verified blockers that must keep the team focused:
+
+- The local hard gate `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`
+  currently stops at `detekt` with 15 weighted issues. Run separately:
+  `:app:testDebugUnitTest` fails `GatekeeperModelManifestDriftTest` (132
+  tests, 1 failed), and `lintDebug` fails with 14 errors (first:
+  `AudioCaptors.kt:224` missing Bluetooth permission handling). In CI, unit
+  tests and lint/detekt are still best-effort (`|| true`), so a green PR does
+  not yet mean Tier 0 is green.
+- The Home "Ask" path is not a free-text user input. `MainActivity.kt:642-646`
+  has hardcoded `Ask` / `Batch` buttons; the Ask button calls
+  `handleUserQuery("summarize what I should do next", "")`. Tier 1 is blocked
+  on M1.2 before V1.2 can be validated.
+- Until Tier 0 and the Tier 1 timer flow are green on emu, Tier 6 items are
+  parking-lot work. Do not staff CaMeL, Mariner backend, per-action handler
+  splits, or hardware-only Pixel paths ahead of the minimum app flow.
+
 Each item below is **self-contained**: file paths, current state, the gap,
 the contract to write, and what "done" looks like. An engineer should be
 able to start either bucket without re-reading the rest of PLAN.md.
@@ -270,7 +290,9 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 **V0.1 PR gate green**
 - Where: `.github/workflows/ci.yml`
 - Trigger: open any PR
-- Confirm: `compile-lint-test` job green; `emu-validate` skipped (manual)
+- Confirm: compile step green, then verify whether unit tests and lint/detekt
+  were hard-gated. Current workflow tolerates both via `|| true`, so V0.1 is
+  not complete until those steps fail the PR on red.
 
 **V0.2 dev-loop.sh on hardware**
 - Where: `scripts/dev-loop.sh`
@@ -304,7 +326,8 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 
 **V1.2 Text → FulfillmentOrchestrator E2E**
 - Where: `app/src/main/kotlin/.../fulfillment/FulfillmentOrchestrator.kt:12-23` `handleUserQuery(query, conversationHistory)`
-- Trigger: Home text field → type "set a timer for 10 minutes" → submit
+- Trigger: blocked on M1.2. After the Home input lands: Home text field → type
+  "set a timer for 10 minutes" → submit
 - Confirm: logcat shows `FulfillmentOrchestrator.handleUserQuery` → `Gatekeeper:` BERT classification → action parsed; a `CardPayload` renders on screen
 
 **V1.4 Voice → SODA → Gatekeeper**
@@ -420,6 +443,9 @@ For each: **Where** (entry point), **Trigger** (how to exercise), **Confirm** (w
 - **NEW** — no cosmo equivalent exists; the contract is genuinely new
 
 Per-item source markers (verified by searching `~/Downloads/cosmo_baksmali/classes38/com/google/research/air/cosmo/`):
+- **M1.2** — NEW/REORG. FM currently exposes a hardcoded debug Ask button, not
+  a user query box. Cosmo's user input surface was composed through the
+  voiceassistant/chat UI; FM needs a small app-shell input, not a large port.
 - **M1.3** — REORG. Cosmo has `SkillResult` proto at `gatekeeping/proto/SkillResultKt.smali`; the confirmation UI was rendered through `voiceassistant/ChatViewComposable` etc., not through FM's CardPayload abstraction.
 - **M-StrictMode** — PORT/CLEAN. The eager-DI bug is FM-side; cosmo's class structure works fine because cosmo loaded sqlcipher elsewhere. Engineer should compare FM's `ContextStoreModule` against cosmo's equivalent (`~/Downloads/cosmo_baksmali/.../context/`).
 - **M3.3** — REORG. **No cosmo `presence/` namespace exists.** Cosmo's UX state ran through individual ViewModels (`voiceassistant/BrowsingAgentViewModel.smali`, `ChatViewComposable`, `FloatyScreen$VoiceMatch.smali`). FM has consolidated into a single PresenceState producer; this is genuinely new architectural work.
@@ -430,7 +456,9 @@ Per-item source markers (verified by searching `~/Downloads/cosmo_baksmali/class
 - **M2.9** — NEW. No "forget last N" surface in cosmo (search for `forget` returned only a regex match in `gatekeeping/impl/RegexGatekeepingModelV0.smali`, not a delete action).
 - **M4.2** — PORT. Cosmo has `lib/llm/LiteRtLm*.smali` (LiteRtLmLLM exists in cosmo). The provisioning script is the FM-side gap.
 - **M4.3** — NEW (server side). The client at `RemoteInferenceClient.kt` is structurally cosmo-derived (P-256 signing, PrivateToken bearer); the server stub never lived in the client APK.
-- **M5.8** — NEW. CI self-check is FM tooling, not in cosmo.
+- **M5.8** — NEW. CI self-check is FM tooling, not in cosmo. Current
+  `main` has 21 `<uses-permission>` entries; the overlay PR adds more, so
+  re-count against the branch under review.
 - **M5.10** — PORT-style. Cosmo had per-permission rationale strings; FM's `RuntimePermissionDescriptor` enum currently covers all 10 dangerous manifest permissions. The risk is regression, not a current gap.
 - **M6.1** — PORT. Cosmo has the full Voice Match UI: `voiceassistant/VoiceMatchViewComposable.smali` + `VoiceMatchEnrollingScreen` + `VoiceMatchEnrollmentEnrolledScreen`. FM has the JNI bridge at `SodaEnrollmentManagerImpl.kt`; the UI port is what's missing.
 - **M6.2** — NEW. CaMeL is from the arxiv paper (2503.18813), not cosmo.
@@ -442,6 +470,25 @@ Per-item source markers (verified by searching `~/Downloads/cosmo_baksmali/class
 - **M6.8** — Mixed. UI source in cosmo: `voiceassistant/BrowsingAgentViewModel.smali` + `BrowsingAgentScreenKt.smali` + `fulfillment/FulfillmentAction$BrowsingAgent.smali` (UI is PORT). Server-side backend is NEW.
 
 For each item below: **Where** (current file/line + the gap), **Present** (what's wired today), **Gap** (what's missing), **Contract** (what to write), **Done** (acceptance), **Refs**.
+
+**M1.2 Home free-text Ask input**
+- Where: `app/src/main/kotlin/.../ui/mainscreen/MainActivity.kt:642-646`.
+  The current Home action row has only `Ask` and `Batch` buttons; `Ask`
+  calls `orchestrator.handleUserQuery("summarize what I should do next", "")`.
+  No `TextField`, `OutlinedTextField`, or `BasicTextField` exists in that
+  file.
+- Present: the orchestrator can be invoked from Home, but only with a
+  hardcoded query.
+- Gap: no user can type the Tier 1 acceptance query ("set a timer for 10
+  minutes") from the app shell.
+- Contract: add a minimal free-text query state to the Home action row:
+  text input, submit button, IME send action, disabled/working state while the
+  coroutine is active, and error text/logging if `handleUserQuery` throws.
+  Keep the existing Batch button as a debug affordance.
+- Done: emu/instrumented test enters "set a timer for 10 minutes", presses
+  send, and observes `FulfillmentOrchestrator.handleUserQuery` receive exactly
+  that string. This unblocks V1.2.
+- Refs: Tier 1 acceptance; M1.3 confirmation card surfacing.
 
 **M1.3 SkillResult.SideEffectPending → confirmation card surfacing**
 - Where:
@@ -506,7 +553,7 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
   ```
   One impl per parity skill in `skills/executors/`: TimerSkill, ListSkill, CalendarSkill, DocSkill, WebSearchSkill, JargonSkill, InsightSkill, RecallSkill, SummarySkill. Bind via `@IntoMap @SkillIdKey` Dagger multibinding; replace central `when` with `executors[query.skillId]?.execute(query, ctx)`.
 - Done: 9 executor files exist; central `when` block deleted or only delegates; instrumented test routes each skill to its dedicated class.
-- Refs: precursor to M6.7 (22-handler split for FulfillmentAction). Architecture.md §6.1.
+- Refs: precursor to M6.7 (24-handler split for FulfillmentAction). Architecture.md §6.1.
 
 **M2.7 ContextStore retention sweep**
 - Where:
@@ -583,7 +630,7 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
 - Refs: architecture.md §15.4–§15.6.
 
 **M5.8 Permission posture self-check**
-- Where: `app/src/main/AndroidManifest.xml` (23 `<uses-permission>` entries — verified by `grep -c "<uses-permission " AndroidManifest.xml`); `app/src/main/kotlin/.../lib/permission/PermissionRationaleHelper.kt:51-107` (RuntimePermissionDescriptor enum)
+- Where: `app/src/main/AndroidManifest.xml` (21 `<uses-permission>` entries on current `main`, verified by `grep -c "<uses-permission " AndroidManifest.xml`); `app/src/main/kotlin/.../lib/permission/PermissionRationaleHelper.kt:42-107` (RuntimePermissionDescriptor enum)
 - Present: enum has descriptors for some permissions
 - Gap: no scripted self-check
 - Contract: new `scripts/verify-permission-posture.sh` (Python): parse AndroidManifest.xml uses-permission entries; for each dangerous permission, assert an entry exists in `RuntimePermissionDescriptor`; assert foreground-service types declared in `<service>` match `<uses-permission android:name="android.permission.FOREGROUND_SERVICE_*">` set; exit non-zero on any mismatch. Add to CI compile-lint-test as a non-blocking step initially, then hard gate after M5.10.
@@ -711,7 +758,7 @@ For each item below: **Where** (current file/line + the gap), **Present** (what'
 
 | # | Item | Status | Emu gate |
 |---|---|---|---|
-| 0.1 | `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug` green on every PR | ⚠️ (pre-existing `Color.kt` detekt MatchingDeclarationName issue blocks `detekt`; build + lint + unit tests green) | CI runs the four commands; both Kotlin + Java sources clean |
+| 0.1 | `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug` green on every PR | 🔴 local run currently fails: `detekt` has 15 weighted issues; `:app:testDebugUnitTest` has 132 tests / 1 failed (`GatekeeperModelManifestDriftTest`); `lintDebug` has 14 errors. CI also marks unit tests and lint/detekt best-effort via `|| true` | CI runs the four commands as hard gates; both Kotlin + Java sources clean |
 | 0.2 | `scripts/dev-loop.sh` launches FM on a connected device, streams logs, exits cleanly when interrupted | ✅ smoke-tested via `--help`; not exercised end-to-end on hardware | Run `dev-loop.sh --no-logs --no-launch --apk-only` against emu — APK produced, size sane |
 | 0.3 | `scripts/emu-ci-run.sh` integrated into PR CI; fails on any FATAL/ANR within a 60s run window | ⚠️ script exists; CI not yet calling it on every PR | A PR opens with a deliberate crash injection → emu-ci-run reports FATAL → PR fails |
 | 0.4 | `MainActivity` launches and renders the Home destination of Nav3 without exception | ✅ build succeeds; live behavior unverified on emu | emu-ci-run launches MainActivity for 30s; no `FATAL` in logcat; screen.mp4 shows non-blank Home screen |
@@ -731,7 +778,7 @@ to set a timer, see confirmation, see the timer get set.
 | # | Item | Status | Emu gate |
 |---|---|---|---|
 | 1.1 | First-launch permission rationale flow: app starts, asks for mic + notifications + accessibility with clear rationale text, handles deny + don't-ask-again | ⚠️ helper exists; full flow validation pending | emu-ci-run launches; instrumented test grants permissions programmatically; screen.mp4 shows rationale dialog before any permission ask |
-| 1.2 | Text input on Home: user types "set a timer for 10 minutes" → `FulfillmentOrchestrator.handleUserQuery` runs | ⚠️ Fulfillment wired (architecture.md §6); end-to-end from Home not verified on emu | emu run + instrumented test simulates text input → logcat shows `Gatekeeper:` BERT classification → `Fulfillment:` action parsed → confirmation surface rendered |
+| 1.2 | Text input on Home: user types "set a timer for 10 minutes" → `FulfillmentOrchestrator.handleUserQuery` runs | 🔴 blocked by M1.2: Home has only hardcoded Ask/Batch buttons today | emu run + instrumented test simulates text input → logcat shows `Gatekeeper:` BERT classification → `Fulfillment:` action parsed → confirmation surface rendered |
 | 1.3 | Side-effect confirmation: timer skill returns `SideEffectPending` → user taps Confirm → Android Clock provider receives `ACTION_SET_TIMER` → audit trail records the apply | ⚠️ skill registry wired; confirmation UI may not surface from a real `FulfillmentResult` | emu run + instrumented test confirms the action → adb shell query Clock provider shows new timer; `ActionsRepository` history grows by one entry |
 | 1.4 | Voice input on Home: user speaks (instrumented `MediaRecorder` fixture audio) → SODA transcribes → Gatekeeper classifies → same flow as 1.2 | ⚠️ SODA wired on-device but not validated end-to-end via emu (emu lacks mic; need fixture-audio inject) | emu run plays a WAV fixture through `GatekeeperDebugReceiver` `ACTION_INJECT_AUDIO` → SODA produces transcript → same end of 1.2/1.3 |
 | 1.5 | State persists across `am force-stop`: timer history, settings, permission grants survive | ⚠️ DataStore + SQLCipher wired; round-trip-across-kill not regression-tested | emu run: do flow 1.1–1.3, `am force-stop` the app, relaunch, query `ActionsRepository.history()` via debug receiver → previous timer entry present |
@@ -777,7 +824,7 @@ Without it FM is a settings screen, not an assistant.
 | 3.2 | Tab surface expands from orb on tap; cards render for `DeepResearch`, `SendResults`, `CalendarTimer` payloads | ✅ surfaces exist; tap-expand behavior unverified | emu run: simulate tap on orb → screen.mp4 shows tab expanded with 3 stub cards |
 | 3.3 | Presence state driver: a producer observes `Gatekeeper.results` + `IntentBuffer` + `FulfillmentEvent` and emits `PresenceState` transitions; surfaces collect from a single `StateFlow<PresenceState>` | ⚠️ surfaces render against `PresenceState`; the producer/orchestrator is the missing piece (`architecture.md §13.2`) | emu run + instrumented harness: post a `GatekeepingResult` to a fake gatekeeper → assert `PresenceState` flow emits `Working(taskId, STARTED)` |
 | 3.4 | Dismiss + snooze + reopen: user can dismiss a card for N minutes; reopen on demand | ⚠️ `Dismissed(until)` state exists; dismiss control wiring unverified | emu run: dismiss a Ready card → state transitions to Dismissed → after time-control advance, returns to Parked |
-| 3.5 | Card payload library covers all 9 parity skills (today: 3 payloads exist — `DeepResearch`, `SendResults`, `CalendarTimer`) | ⚠️ payload-per-skill mapping incomplete | emu run renders each of 9 skill-result payloads → screen.mp4 shows each cleanly |
+| 3.5 | Card payload library covers all 9 parity skills | ⚠️ 10 `CardPayload` variants and card composables exist; the missing piece is the skill-result-to-card mapping | emu run renders each of 9 skill-result payloads → screen.mp4 shows each cleanly |
 | 3.6 | Glass / projected XR rendering wired (`GlassPanel` exists; `CosmoProjectedGlassCaptureService` binds; producer from `PresenceState` not driven today) | 🟡 stays deferred for v1; slot reserved | (deferred; no v1 gate) |
 
 **Tier 3 acceptance:** the emu can run a 30-second loop where the orb parks
@@ -818,7 +865,7 @@ right lane is chosen each time, logged with the reason.
 | 5.7 | Cert pinning + cleartext disabled (`AndroidManifest.xml usesCleartextTraffic="false"`) + non-launcher activities not exported | ✅ wired | emu run: instrumented test attempts cleartext HTTP — fails as expected |
 | 5.8 | Permission posture passes a Play Store policy self-check: every dangerous permission has rationale, accessibility service shows justification, foreground service has correct type bitmask | ⚠️ posture mostly correct; self-check not formalized | (no emu gate; CI script `scripts/verify-phase6-release-gates.sh` covers the static checks) |
 | 5.9 | Encrypted ContextStore (Room + SQLCipher) round-trips data; backup-extraction yields ciphertext only | ✅ wired | emu run: instrumented test inserts → adb pull the `.db` → `file` reports SQLCipher header / data not readable as plain SQLite |
-| 5.10 | All 29 manifest permissions requested with rationale; none silently held without UI | ⚠️ `PermissionRationaleHelper` exists; full coverage audit pending | emu run + audit script: every `<uses-permission>` matches a UI rationale entry |
+| 5.10 | All dangerous runtime permissions have rationale; normal/signature permissions are documented and not presented as runtime asks | ⚠️ `PermissionRationaleHelper` has 10 runtime descriptors; M5.8 must keep manifest drift from regressing this | emu run + audit script: every dangerous `<uses-permission>` matches a UI rationale entry |
 
 **Tier 5 acceptance:** the emu can run the full demo (Tier 1+2+3) for 30+
 minutes with monkey load and no FATAL/ANR/StrictMode/cleartext-egress
@@ -839,7 +886,7 @@ Ordered by leverage per `docs/fallback-paths.md` triage table.
 | 6.4 | Conformer EdgeTPU activation on Pixel (flip `isAvailable=false` → real probe) | ~1 day after Pixel arrives | 🔵 (gated on hardware) | (real-device gate only; emu lacks Tensor Darwinn) |
 | 6.5 | AOC nanoapp transport (platform-signed compile or bytecode-gen for `ContextHubClientCallback` subclass) | ~1 day after platform-signing access | 🔵 (gated on signing) | (platform-signed gate; emu may not expose Context Hub) |
 | 6.6 | Inherent joint model delivery (`~/inherent` ships `inherent.tflite` + `inherent.metadata.json`) | 5–6 weeks per inherent project plan | ⚠️ in progress | emu run: provision new assets → `InherentBackend.isAvailable=true` → routing picks it on appropriate query |
-| 6.7 | Per-subtype action handler split (`FulfillmentActionHandlerImpl` → 22 dedicated handlers) | ~1 week | ⚠️ central handler today | emu run: each of 22 action types invokes its dedicated handler → none falls through to a generic catch |
+| 6.7 | Per-subtype action handler split (`FulfillmentActionHandlerImpl` → 24 dedicated handlers) | ~1 week | ⚠️ central handler today | emu run: each of 24 action types invokes its dedicated handler → none falls through to a generic catch |
 | 6.8 | Mariner browsing-agent backend (tier-2 Browser-Use behind §15.4 transport) | ~1 week | 🔵 | emu run: invoke a `BrowsingAgent` action → TaskMonitor surface shows incremental `MarinerState` updates → final answer returned |
 | 6.9 | Real Pixel hardware integration full sweep (every Tier 0–5 item validated on real device, not just emu) | ~1 day after Pixel arrives | 🔵 | (real-device gate; emu cannot validate; this is when the "soon to also be a real device" half of §3.0 activates) |
 
@@ -935,9 +982,18 @@ For per-component status, see [`docs/architecture.md`](docs/architecture.md)
 
 **Headline:**
 
-- **M1 + M2 complete.** Capture, ContextStore, Gatekeeper, Intent extraction, Fulfillment, Skill registry all live.
-- **M3 mostly complete.** All routing paths shipped; one of the three lanes (remote inference) needs a live endpoint; one (LiteRT-LM) needs Gemma 4 bundle provisioning.
-- **M4 not started.** Privacy enforcement tests partially written; final visual pass not done; release-readiness gates pass except for the unrelated `Color.kt` MatchingDeclarationName detekt issue.
+- **M1 / M2 architecture is present but the acceptance gates are not green.**
+  Capture, ContextStore, Gatekeeper, Intent extraction, Fulfillment, and Skill
+  registry code exist, but the Tier 1 Home free-text input is missing and the
+  Tier 2 privacy/recall flows are not yet validated as end-to-end emu runs.
+- **M3 routing plumbing exists, but hybrid is not demo-complete.** AICore,
+  LiteRT-LM, and remote lanes have client code, but LiteRT-LM still needs its
+  bundle provisioned by default and remote inference still needs a live server
+  endpoint.
+- **M4/release readiness is not green.** Privacy tests are partial, final
+  visual pass is not done, local `detekt` currently fails with 15 weighted
+  issues, unit tests fail on gatekeeper manifest drift, `lintDebug` fails with
+  14 errors, and release gates still need separate cleanup.
 
 **In-flight work (as of 2026-05-15):**
 
