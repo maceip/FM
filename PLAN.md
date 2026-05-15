@@ -1,5 +1,14 @@
 # FM Engineering Plan
 
+**Stop:** this file is the long audit trail and reference backlog.
+
+For current execution, read [`SHIP.md`](SHIP.md). It is the short operating
+plan and the source of truth for what to do next. Do not add new workstreams,
+contracts, or architecture sections here while Tier 0 and the first timer flow
+are still red.
+
+---
+
 This is the master engineering plan. It consolidates planning, design, and
 status content previously scattered across
 `~/cosmo-dev/repo/docs/cosmo_apk_consolidated_plan.md`, `marching-orders.md`,
