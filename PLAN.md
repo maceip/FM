@@ -20,14 +20,14 @@ can answer "what did cosmo do?" They are not a work queue.
 
 ## Current Truth
 
-As of 2026-05-16, Steps 1 through 4 are green on `codex/ship-plan-audit`.
+As of 2026-05-16, Steps 1 through 5 are green on `codex/ship-plan-audit`.
 
 - Tier 0 passes locally:
   `scripts/verify-relocation-safety.sh`,
   `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`,
   and `./gradlew :app:assembleReleaseInternal`.
 - CI now runs the hard gates without `|| true`; remote runs are green through
-  parity fixture commit `e4aed0e`, with privacy commit `a751bdb` running.
+  plan-status commit `9aad34a`, with presence commit `8a86884` running.
 - Home has a free-text Ask input wired to
   `FulfillmentOrchestrator.handleUserQuery`.
 - Debug/test builds have a deterministic `SimulationLLM` path for the timer
@@ -51,12 +51,8 @@ failing acceptance test proves the existing path cannot ship.
 
 ## Next Milestone
 
-The next milestone is presence wiring on the same action path as the timer flow.
-Do not fork into skill-specific executors.
-
-Done means `PresenceState` reflects actionable fulfillment and gatekeeper
-signals, maps `FulfillmentAction` into `PresenceCard`, and leaves ActionDeck as
-the side-effect confirmation source of truth.
+No new architecture milestone is active in this plan. Keep the branch
+merge-ready and watch remote CI for the latest presence commit.
 
 ## Work Order
 
@@ -149,7 +145,10 @@ Four tests must pass:
 
 Owner: presence owner.
 
-Start only after Step 2 is green.
+Status: Done on `codex/ship-plan-audit`; commit `8a86884` drives
+`PresenceState` from `ActionsRepository` plus Gatekeeper output and maps
+`FulfillmentAction` to `PresenceCard` while leaving ActionDeck authoritative for
+confirmation.
 
 - Drive `PresenceState` from `ActionsRepository` and Gatekeeper output.
 - Map `FulfillmentAction` to `PresenceCard`.
@@ -225,9 +224,9 @@ Owned by the presence owner after Step 2 is green.
   remains authoritative until parity is proven by the same timer-flow test.
 - Done means Presence can be disabled and the timer flow still ships.
 
-## Do Not Work On Yet
+## Parked Work
 
-These are parked until Steps 1 and 2 are green:
+These are parked unless a concrete ship-blocking test pulls them in:
 
 - CaMeL.
 - Mariner/browser backend.
