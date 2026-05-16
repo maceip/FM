@@ -172,7 +172,6 @@ android {
 
     sourceSets {
         getByName("emuDebug") {
-            java.srcDir("src/debug/kotlin")
             manifest.srcFile("src/debug/AndroidManifest.xml")
         }
     }

@@ -10,6 +10,7 @@ class DebugTimerFlowActivity : Activity() {
         startActivity(
             Intent(this, MainActivity::class.java)
                 .putExtra(EXTRA_DEBUG_TIMER_FLOW, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
         finish()
     }
