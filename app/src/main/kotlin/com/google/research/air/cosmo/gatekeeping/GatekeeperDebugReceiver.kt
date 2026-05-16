@@ -24,7 +24,9 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Debug-build only entry point that injects PCM audio into the gatekeeper / SODA pipelines for
@@ -113,22 +115,29 @@ constructor(
     private fun handleAudio(intent: Intent) {
         val path = intent.getStringExtra(EXTRA_PATH)?.takeIf { it.isNotBlank() } ?: return
         val target = intent.getStringExtra(EXTRA_TARGET)?.lowercase() ?: TARGET_BOTH
+        scope.launch { injectAudioFile(path, target) }
+    }
+
+    private suspend fun injectAudioFile(
+        path: String,
+        target: String
+    ) {
         val file = File(path)
-        if (!file.isFile || !file.canRead()) {
+        val readable = withContext(Dispatchers.IO) { file.isFile && file.canRead() }
+        if (!readable) {
             Log.w(TAG, "audio inject: file unreadable path=$path")
             return
         }
-        val pcm = readWavAsPcm16Mono16k(file)
+        val pcm = withContext(Dispatchers.IO) { readWavAsPcm16Mono16k(file) }
         if (pcm == null) {
-            Log.w(TAG, "audio inject: not a 16k mono PCM16 WAV path=$path size=${file.length()}")
+            val size = withContext(Dispatchers.IO) { file.length() }
+            Log.w(TAG, "audio inject: not a 16k mono PCM16 WAV path=$path size=$size")
             return
         }
         Log.i(TAG, "audio inject: target=$target bytes=${pcm.size} (~${pcm.size / 32}ms @ 16k mono PCM16)")
         val chunks = pcm.toList().chunked(FRAME_BYTES).map { it.toByteArray() }
-        scope.launch {
-            if (target == TARGET_AMBIENT || target == TARGET_BOTH) feedAmbient(chunks)
-            if (target == TARGET_SODA || target == TARGET_BOTH) feedSoda(chunks)
-        }
+        if (target == TARGET_AMBIENT || target == TARGET_BOTH) feedAmbient(chunks)
+        if (target == TARGET_SODA || target == TARGET_BOTH) feedSoda(chunks)
     }
 
     private suspend fun feedAmbient(chunks: List<ByteArray>) {
@@ -138,12 +147,12 @@ constructor(
         Log.i(TAG, "audio inject ambient: result=$result")
     }
 
-    private fun feedSoda(chunks: List<ByteArray>) {
+    private suspend fun feedSoda(chunks: List<ByteArray>) {
         if (!sodaCapability.isAvailable) {
             Log.w(TAG, "audio inject soda: capability unavailable (libsoda_dev_jni missing or load failed)")
             return
         }
-        val prepared = kotlinx.coroutines.runBlocking { sodaCapability.prepare() }
+        val prepared = sodaCapability.prepare()
         if (prepared !is SodaPrepareResult.Available) {
             Log.w(TAG, "audio inject soda: prepare failed: $prepared")
             return
@@ -164,6 +173,11 @@ constructor(
             session.addAudio(direct, chunk.size)
         }
         Log.i(TAG, "audio inject soda: pushed ${chunks.size} chunks; awaiting transcripts on callback")
+        scope.launch {
+            delay(DEBUG_SODA_SESSION_STOP_DELAY_MS)
+            session.stop()
+            Log.i(TAG, "audio inject soda: stopped debug session")
+        }
     }
 
     /**
@@ -251,6 +265,7 @@ constructor(
         const val TARGET_SODA = "soda"
         const val TARGET_BOTH = "both"
         const val FRAME_BYTES = 1280 // 40 ms at 16 kHz mono PCM16
+        const val DEBUG_SODA_SESSION_STOP_DELAY_MS = 10_000L
         const val TAG = "GatekeeperDebug"
     }
 }

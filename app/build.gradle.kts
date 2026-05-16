@@ -4,13 +4,12 @@ private data class CosmoReleaseSigning(
     val storeFile: File,
     val storePassword: String,
     val keyAlias: String,
-    val keyPassword: String,
+    val keyPassword: String
 )
 
 private fun Project.resolveCosmoReleaseSigning(): CosmoReleaseSigning? {
-    fun envOrGradle(envKey: String, propKey: String): String? =
-        providers.environmentVariable(envKey).orNull?.takeIf { it.isNotBlank() }
-            ?: (findProperty(propKey) as String?)?.takeIf { it.isNotBlank() }
+    fun envOrGradle(envKey: String, propKey: String): String? = providers.environmentVariable(envKey).orNull?.takeIf { it.isNotBlank() }
+        ?: (findProperty(propKey) as String?)?.takeIf { it.isNotBlank() }
 
     val path = envOrGradle("COSMO_RELEASE_STORE_FILE", "cosmo.release.storeFile") ?: return null
     val storePassword = envOrGradle("COSMO_RELEASE_STORE_PASSWORD", "cosmo.release.storePassword") ?: return null
@@ -28,14 +27,12 @@ private fun Project.resolveCosmoReleaseSigning(): CosmoReleaseSigning? {
 
 private val cosmoReleaseSigning: CosmoReleaseSigning? = project.resolveCosmoReleaseSigning()
 
-private fun String?.isTruthyFlag(): Boolean =
-    this?.let { value ->
-        value == "1" || value.equals("true", ignoreCase = true) || value.equals("yes", ignoreCase = true)
-    } == true
+private fun String?.isTruthyFlag(): Boolean = this?.let { value ->
+    value == "1" || value.equals("true", ignoreCase = true) || value.equals("yes", ignoreCase = true)
+} == true
 
-private fun Project.allowMissingRecoveredBinaries(): Boolean =
-    providers.environmentVariable("COSMO_ALLOW_MISSING_BINARIES").orNull.isTruthyFlag() ||
-        (findProperty("cosmo.allowMissingBinaries") as String?).isTruthyFlag()
+private fun Project.allowMissingRecoveredBinaries(): Boolean = providers.environmentVariable("COSMO_ALLOW_MISSING_BINARIES").orNull.isTruthyFlag() ||
+    (findProperty("cosmo.allowMissingBinaries") as String?).isTruthyFlag()
 
 plugins {
     alias(libs.plugins.android.application)
@@ -279,7 +276,7 @@ gradle.taskGraph.whenReady {
                 Set COSMO_RELEASE_STORE_FILE, COSMO_RELEASE_STORE_PASSWORD, COSMO_RELEASE_KEY_ALIAS, COSMO_RELEASE_KEY_PASSWORD
                 or cosmo.release.storeFile / cosmo.release.storePassword / cosmo.release.keyAlias / cosmo.release.keyPassword in Gradle properties.
                 For minified CI/local builds without Play keys, use assembleReleaseInternal or bundleReleaseInternal.
-                """.trimIndent(),
+                """.trimIndent()
             )
     require(signing.storeFile.isFile) {
         "Release keystore must exist at ${signing.storeFile.absolutePath} (COSMO_RELEASE_STORE_FILE / cosmo.release.storeFile)"

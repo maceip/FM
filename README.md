@@ -145,6 +145,22 @@ scripts/provision-from-recovery.sh   # copies binaries into the assets/jniLibs t
 ./gradlew :app:installDebug
 ```
 
+**Device smoke checks:**
+
+```bash
+scripts/run-device-core-capability-smoke.sh
+
+# Optional: push a recorded phrase through the debug SODA audio path.
+# WAV must be mono, 16 kHz, signed 16-bit PCM.
+scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav
+```
+
+Convert a phone recording before injection:
+
+```bash
+ffmpeg -i phrase.m4a -ac 1 -ar 16000 -sample_fmt s16 phrase.wav
+```
+
 CI gates: `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`.
 The release path additionally runs `scripts/verify-phase6-release-gates.sh`
 (strict model-manifest verification, architecture-delta check, signing config,

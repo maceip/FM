@@ -39,6 +39,16 @@ As of 2026-05-16, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   `2506BPN68G` (`Xiaomi/klimt_eea/klimt:16/BP2A.250605.031.A3/OS3.0.13.0.WOSEUXM:user/release-keys`)
   with app-private `google-gemma-4-E2B-it-litertlm` LiteRT-LM. Artifacts:
   `artifacts/device-model-routing/20260516-165925-fallback/`.
+- Xiaomi core capability smoke passed on device with
+  `scripts/run-device-core-capability-smoke.sh`: gatekeeper timer detection,
+  debug/test fulfillment actions for timer/list/doc/calendar/search/email,
+  Presence `Ready`, local memory action execution, and SODA native startup with
+  injected PCM. Artifacts:
+  `artifacts/device-core-capability/20260516-172858/`.
+- The same core smoke can push recorded phrases through SODA:
+  `scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav`. The
+  synthetic timer fixture validated injection + SODA directedness events, but
+  produced a blank transcript; real human-recorded phrases are still needed.
 - The existing path to ship next remains:
 
 ```text
