@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LANE="${1:-${DEVICE_LANE:-fallback}}"
 PACKAGE_NAME="${PACKAGE_NAME:-com.google.research.air.cosmo}"
+LITERTLM_MODEL_ID="${LITERTLM_MODEL_ID:-${MODEL_ID:-google-gemma-4-E4B-it-litertlm}}"
 TEST_RUNNER="$PACKAGE_NAME.test/com.google.research.air.cosmo.GenesisTestRunner"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_DIR/artifacts/device-model-routing/$STAMP-$LANE}"
@@ -27,13 +28,15 @@ esac
 mkdir -p "$ARTIFACT_DIR"
 
 COSMO_ALLOW_MISSING_BINARIES="${COSMO_ALLOW_MISSING_BINARIES:-1}" \
-  "$ROOT_DIR/gradlew" -p "$ROOT_DIR" :app:assembleDebug :app:assembleDebugAndroidTest
+  "$ROOT_DIR/gradlew" -p "$ROOT_DIR" \
+  -Pcosmo.localLlm.litertLmModelId="$LITERTLM_MODEL_ID" \
+  :app:assembleDebug :app:assembleDebugAndroidTest
 
-"${ADB[@]}" install -r -t "$ROOT_DIR/app/build/outputs/apk/debug/app-debug.apk" >/dev/null
-"${ADB[@]}" install -r -t "$ROOT_DIR/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" >/dev/null
+"${ADB[@]}" install -r -t -g "$ROOT_DIR/app/build/outputs/apk/debug/app-debug.apk" >/dev/null
+"${ADB[@]}" install -r -t -g "$ROOT_DIR/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" >/dev/null
 
 if [[ "${DEPLOY_LITERTLM:-0}" == "1" || "${DEPLOY_LITERTLM:-}" == "true" ]]; then
-  "$ROOT_DIR/scripts/deploy-gemma4-litertlm.sh"
+  MODEL_ID="$LITERTLM_MODEL_ID" "$ROOT_DIR/scripts/deploy-gemma4-litertlm.sh"
 fi
 
 "${ADB[@]}" logcat -c || true

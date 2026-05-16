@@ -15,7 +15,7 @@ PR notes should point here instead of maintaining parallel blocker lists.
 
 | ID | Blocker | Current State | Exit Evidence |
 | --- | --- | --- | --- |
-| B-P0-001 | No real-device production model-routing proof. | Emulator UI proof is green but uses `SimulationLLM`. Production routing exists (`@HybridLLM` -> local cascade -> remote fallback), but Pixel 10/Nano v3 and fallback-device behavior have not been proven on hardware. | Run the production `@HybridLLM` smoke on Pixel 10 and Xiaomi. Pixel lane requires AICore visibility; fallback lane does not. Record command, device/build fingerprint, route path/reason, model identifier or unavailable reason, and redacted output. |
+| B-P0-001 | Pixel 10 production model-routing proof remains open. | Xiaomi fallback lane passed on `2506BPN68G` with app-private `google-gemma-4-E2B-it-litertlm` (2,583,085,056 bytes, SHA-256 `ab7838cdfc8f77e54d8ca45eadceb20452d9f01e4bfade03e5dce27911b27e42`), route `LOCAL_LLM / LOCAL_ELIGIBLE`, redacted output `ok`, artifacts `artifacts/device-model-routing/20260516-165925-fallback/`. Pixel 10/Nano v3 lane has not run yet. | Run the production `@HybridLLM` smoke on Pixel 10. Pixel lane requires AICore visibility. Record command, device/build fingerprint, route path/reason, model identifier or unavailable reason, and redacted output. |
 
 ## P1 Blockers
 

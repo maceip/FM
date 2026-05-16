@@ -35,6 +35,10 @@ As of 2026-05-16, Steps 1 through 5 are green on `codex/ship-plan-audit`.
 - The timer flow passed in remote emulator job
   `e872fb0d19e44808ba290684f1eaecf6`; artifacts are in
   `artifacts/timer-flow-sqlcipher-fixed/job-e872fb0d19e44808ba290684f1eaecf6/`.
+- Xiaomi fallback-lane production model routing passed on device
+  `2506BPN68G` (`Xiaomi/klimt_eea/klimt:16/BP2A.250605.031.A3/OS3.0.13.0.WOSEUXM:user/release-keys`)
+  with app-private `google-gemma-4-E2B-it-litertlm` LiteRT-LM. Artifacts:
+  `artifacts/device-model-routing/20260516-165925-fallback/`.
 - The existing path to ship next remains:
 
 ```text
@@ -96,6 +100,9 @@ Lane A, Pixel 10 happy path:
   where available, but do not let it block the fallback lane.
 
 Lane B, fallback path:
+
+Status: Done on Xiaomi with app-private E2B LiteRT-LM. Still rerun this lane
+on Pixel 10 if Lane A fails.
 
 - Command: `scripts/run-device-model-routing-smoke.sh fallback`
 - Local-only fallback command:
