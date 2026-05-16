@@ -24,7 +24,7 @@ class FulfillmentRunnerTest {
     private val mockClock = mockk<Clock>()
     private val mockTelemetry = mockk<CosmosTelemetry>(relaxed = true)
 
-    private fun runner(): FulfillmentRunner {
+    private fun runner(actionsRepository: ActionsRepository = ActionsRepository()): FulfillmentRunner {
         every { mockSettings.isGatekeeperEnabled() } returns false
         every { mockSettings.isRawAudioGatekeeperEnabled() } returns false
         every { mockSettings.isVoiceMatchEnabled() } returns false
@@ -35,7 +35,7 @@ class FulfillmentRunnerTest {
             screenBuffer = mockk(relaxed = true),
             notificationBuffer = mockk(relaxed = true),
             intentBuffer = mockk(relaxed = true),
-            actionsRepository = ActionsRepository(),
+            actionsRepository = actionsRepository,
             llm = simulationLlm,
             settings = mockSettings,
             clock = mockClock,
@@ -64,6 +64,41 @@ class FulfillmentRunnerTest {
         assertEquals("sim-timer", timer.id)
         assertEquals(600, timer.durationSeconds)
         assertEquals("Set 10 minute timer", timer.title)
+    }
+
+    @Test
+    fun `parity fixtures use existing fulfillment action path`() = runTest {
+        parityFixtures().forEach { fixture ->
+            val repository = ActionsRepository()
+            val actions =
+                runner(repository).fulfill(
+                    prompt = "Reactive fulfillment. Conversation:",
+                    trigger = FulfillmentTriggerType.USER_QUERY,
+                    userQuery = fixture.query
+                )
+            val action = actions.single()
+
+            assertEquals(fixture.actionType, action.actionTypeName())
+            fixture.verify(action)
+            assertEquals(listOf(action), repository.userFacingActions.value)
+
+            val history = repository.fulfillmentHistory.value.single()
+            assertEquals(FulfillmentTriggerType.USER_QUERY, history.fulfillmentTriggerType)
+            assertEquals(fixture.query, history.userQuery)
+            assertTrue(history.llmQuery.contains("User query: ${fixture.query}"))
+            assertEquals(listOf(action.id), history.actionIds)
+            assertEquals(1, history.numNewActions)
+
+            if (action.requiresExecuteConfirmation()) {
+                repository.markActionAsExecuted(action.id)
+                assertTrue(repository.userFacingActions.value.none { it.id == action.id })
+                assertTrue(
+                    repository.executedActions.value.any {
+                        it.id == action.id && it.status == FulfillmentAction.Status.EXECUTED
+                    }
+                )
+            }
+        }
     }
 
     @Test
@@ -198,4 +233,53 @@ class FulfillmentRunnerTest {
             )
         }
     }
+
+    private fun parityFixtures(): List<ParityFixture> =
+        listOf(
+            ParityFixture("set a timer for 10 minutes", "add_timer") { action ->
+                val timer = action as FulfillmentAction.AddTimer
+                assertEquals(600, timer.durationSeconds)
+            },
+            ParityFixture("add eggs and milk to my grocery list", "add_to_list") { action ->
+                val list = action as FulfillmentAction.AddToList
+                assertEquals(listOf("eggs", "milk"), list.items)
+            },
+            ParityFixture("put a team sync on my calendar", "create_calendar_event") { action ->
+                val event = action as FulfillmentAction.CreateCalendarEvent
+                assertEquals("Team sync", event.title)
+                assertTrue(event.endMillis > event.startMillis)
+            },
+            ParityFixture("draft a document about launch risks", "create_doc") { action ->
+                val doc = action as FulfillmentAction.CreateDoc
+                assertEquals("Draft project brief", doc.title)
+                assertTrue(doc.body.contains("Project brief"))
+            },
+            ParityFixture("search the web for current weather", "web_search") { action ->
+                val search = action as FulfillmentAction.WebSearch
+                assertEquals("current weather", search.query)
+            },
+            ParityFixture("define this jargon NPU", "define_term") { action ->
+                val definition = action as FulfillmentAction.DefineTerm
+                assertEquals("NPU", definition.term)
+            },
+            ParityFixture("give me an insight about the launch plan", "provide_insight") { action ->
+                val insight = action as FulfillmentAction.ProvideInsight
+                assertTrue(insight.answer.contains("existing action flow"))
+            },
+            ParityFixture("recall what I said about the timer flow", "provide_recall") { action ->
+                val recall = action as FulfillmentAction.ProvideRecall
+                assertTrue(recall.answer.contains("ActionDeck"))
+            },
+            ParityFixture("summarize the standup", "create_doc") { action ->
+                val summary = action as FulfillmentAction.CreateDoc
+                assertEquals("Summary", summary.title)
+                assertTrue(summary.body.startsWith("Summary:"))
+            }
+        )
+
+    private data class ParityFixture(
+        val query: String,
+        val actionType: String,
+        val verify: (FulfillmentAction) -> Unit
+    )
 }

@@ -32,54 +32,28 @@ class SimulationLLM @Inject constructor() : LlmBackendAdapter(
         val query = prompt.userQueryOrFullPrompt()
         val lower = query.lowercase()
 
-        return when {
-            "play music" in lower || "song" in lower -> """
-                [
-                  {"action_type": "play_music", "id": "sim-001", "title": "Play lofi beats", "query": "lofi hip hop radio"}
-                ]
-            """.trimIndent()
+        return staticResponse(lower)
+            ?: when {
+                "timer" in lower || "remind me in" in lower -> {
+                    val durationSeconds = timerDurationSeconds(lower)
+                    val title = timerTitle(durationSeconds)
+                    """
+                    [
+                      {"action_type": "add_timer", "id": "sim-timer", "title": "$title", "duration_seconds": $durationSeconds}
+                    ]
+                    """.trimIndent()
+                }
 
-            "timer" in lower || "remind me in" in lower -> {
-                val durationSeconds = timerDurationSeconds(lower)
-                val title = timerTitle(durationSeconds)
-                """
-                [
-                  {"action_type": "add_timer", "id": "sim-timer", "title": "$title", "duration_seconds": $durationSeconds}
-                ]
+                else -> """
+                    [
+                      {"action_type": "provide_insight", "id": "sim-999", "title": "Insight", "answer": "I simulated a helpful response based on the context you provided."}
+                    ]
                 """.trimIndent()
             }
-
-            "calendar" in lower || "meeting" in lower -> """
-                [
-                  {"action_type": "create_calendar_event", "id": "sim-003", "title": "Team sync", "start_millis": 1746504000000, "end_millis": 1746507600000}
-                ]
-            """.trimIndent()
-
-            "search" in lower || "who is" in lower -> """
-                [
-                  {"action_type": "web_search", "id": "sim-004", "title": "Web search", "query": "current weather"}
-                ]
-            """.trimIndent()
-
-            "navigate" in lower || "directions" in lower -> """
-                [
-                  {"action_type": "navigation", "id": "sim-005", "title": "Navigate home", "destination": "home"}
-                ]
-            """.trimIndent()
-
-            "email" in lower || "draft" in lower -> """
-                [
-                  {"action_type": "draft_email", "id": "sim-006", "title": "Draft reply", "to": "team@company.com", "subject": "Update", "body": "Here is the latest status..."}
-                ]
-            """.trimIndent()
-
-            else -> """
-                [
-                  {"action_type": "provide_insight", "id": "sim-999", "title": "Insight", "answer": "I simulated a helpful response based on the context you provided."}
-                ]
-            """.trimIndent()
-        }
     }
+
+    private fun staticResponse(query: String): String? =
+        STATIC_RESPONSES.firstOrNull { it.matches(query) }?.response
 
     private fun String.userQueryOrFullPrompt(): String =
         lineSequence()
@@ -108,5 +82,95 @@ class SimulationLLM @Inject constructor() : LlmBackendAdapter(
         const val SECONDS_PER_MINUTE = 60
         val TIMER_MINUTES = Regex("""\b(\d+)\s*(?:minutes?|mins?)\b""")
         val TIMER_SECONDS = Regex("""\b(\d+)\s*(?:seconds?|secs?)\b""")
+        val STATIC_RESPONSES =
+            listOf(
+                SimulatedResponse(Regex("""\b(?:summarize|summary)\b""")) {
+                    """
+                    [
+                      {"action_type": "create_doc", "id": "sim-summary", "title": "Summary", "body": "Summary: the standup covered launch risks, timer flow status, and privacy validation."}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:document|doc|brief)\b""")) {
+                    """
+                    [
+                      {"action_type": "create_doc", "id": "sim-doc", "title": "Draft project brief", "body": "Project brief draft with goals, risks, and next steps."}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:list|groceries|shopping)\b""")) {
+                    """
+                    [
+                      {"action_type": "add_to_list", "id": "sim-list", "title": "Add grocery list items", "items": ["eggs", "milk"]}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:define|jargon|what does)\b""")) {
+                    """
+                    [
+                      {"action_type": "define_term", "id": "sim-define", "title": "Define NPU", "term": "NPU"}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:recall|remember)\b""")) {
+                    """
+                    [
+                      {"action_type": "provide_recall", "id": "sim-recall", "title": "Recall launch note", "answer": "You noted that timer flow must stay on the existing ActionDeck path."}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:insight|why)\b""")) {
+                    """
+                    [
+                      {"action_type": "provide_insight", "id": "sim-insight", "title": "Insight", "answer": "The fastest path is to harden the existing action flow before adding new executors."}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:play music|song)\b""")) {
+                    """
+                    [
+                      {"action_type": "play_music", "id": "sim-001", "title": "Play lofi beats", "query": "lofi hip hop radio"}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:calendar|meeting)\b""")) {
+                    """
+                    [
+                      {"action_type": "create_calendar_event", "id": "sim-003", "title": "Team sync", "start_millis": 1746504000000, "end_millis": 1746507600000}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:search|who is)\b""")) {
+                    """
+                    [
+                      {"action_type": "web_search", "id": "sim-004", "title": "Web search", "query": "current weather"}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:navigate|directions)\b""")) {
+                    """
+                    [
+                      {"action_type": "navigation", "id": "sim-005", "title": "Navigate home", "destination": "home"}
+                    ]
+                    """.trimIndent()
+                },
+                SimulatedResponse(Regex("""\b(?:email|draft)\b""")) {
+                    """
+                    [
+                      {"action_type": "draft_email", "id": "sim-006", "title": "Draft reply", "to": "team@company.com", "subject": "Update", "body": "Here is the latest status..."}
+                    ]
+                    """.trimIndent()
+                }
+            )
     }
+}
+
+private data class SimulatedResponse(
+    val pattern: Regex,
+    val responseFactory: () -> String
+) {
+    val response: String
+        get() = responseFactory()
+
+    fun matches(query: String): Boolean = pattern.containsMatchIn(query)
 }

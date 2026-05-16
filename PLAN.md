@@ -120,7 +120,8 @@ Done when the milestone flow above passes in an emulator run.
 
 Owner: validation owner.
 
-Status: Next.
+Status: Done on `codex/ship-plan-audit`; the nine parity fixtures pass through
+`FulfillmentRunner -> ActionsRepository -> fulfillmentHistory`.
 
 Add deterministic fixtures for these flows:
 
