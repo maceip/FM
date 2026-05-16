@@ -20,17 +20,22 @@ can answer "what did cosmo do?" They are not a work queue.
 
 ## Current Truth
 
-As of 2026-05-15, FM does not yet have a shippable app flow.
+As of 2026-05-16, Steps 1 and 2 are green on `codex/ship-plan-audit`.
 
-- Tier 0 is red.
-- Home has no free-text Ask input. The current Ask button sends a hardcoded
-  query from `MainActivity.kt:642-646`.
-- The default `LLM` binding is `@HybridLLM`, not `SimulationLLM`. On emulator,
-  without AICore, LiteRT-LM, or remote inference config, fulfillment can fail
-  closed with no actions.
-- Release is not green: `:app:assembleReleaseInternal` fails in R8 on missing
-  SODA/Flogger/protobuf/desugar classes.
-- The existing path to ship first is:
+- Tier 0 passes locally:
+  `scripts/verify-relocation-safety.sh`,
+  `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`,
+  and `./gradlew :app:assembleReleaseInternal`.
+- CI now runs the hard gates without `|| true`; current remote runs are green
+  through `c2c0bd8`, with later emulator-proof commits still running.
+- Home has a free-text Ask input wired to
+  `FulfillmentOrchestrator.handleUserQuery`.
+- Debug/test builds have a deterministic `SimulationLLM` path for the timer
+  flow.
+- The timer flow passed in remote emulator job
+  `e872fb0d19e44808ba290684f1eaecf6`; artifacts are in
+  `artifacts/timer-flow-sqlcipher-fixed/job-e872fb0d19e44808ba290684f1eaecf6/`.
+- The existing path to ship next remains:
 
 ```text
 Home input
@@ -46,17 +51,21 @@ failing acceptance test proves the existing path cannot ship.
 
 ## Next Milestone
 
-The next milestone is not another plan. It is this recorded flow:
+The next milestone is a deterministic parity fixture suite on the same action
+path as the timer flow. Do not fork into skill-specific executors.
 
-```text
-clean install
-  -> type "set a timer for 10 minutes"
-  -> AddTimer action card appears
-  -> user confirms
-  -> action is marked executed
-```
+Done means these flows all prove expected `FulfillmentAction` output and
+resulting UI/history state:
 
-It must be captured with emulator logs and video, with Tier 0 checks green.
+- Timer
+- List
+- Calendar draft
+- Document draft
+- Web search
+- Define term / jargon
+- Insight
+- Recall
+- Summary
 
 ## Work Order
 
@@ -65,6 +74,8 @@ Do these in order. Do not start a lower item while a higher item is red.
 ### 1. Make The Repo Honest
 
 Owner: build captain.
+
+Status: Done on `codex/ship-plan-audit`.
 
 Fix the gates that currently fail:
 
@@ -91,6 +102,9 @@ all pass locally and in CI.
 
 Owner: app-flow owner.
 
+Status: Done on `codex/ship-plan-audit`; remote emulator job
+`e872fb0d19e44808ba290684f1eaecf6` captured the timer flow.
+
 Implement only what is needed for the timer flow:
 
 - Add a Home free-text Ask input.
@@ -105,6 +119,8 @@ Done when the milestone flow above passes in an emulator run.
 ### 3. Validate The Parity Demo On The Existing Action Path
 
 Owner: validation owner.
+
+Status: Next.
 
 Add deterministic fixtures for these flows:
 
