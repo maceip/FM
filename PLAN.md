@@ -20,14 +20,14 @@ can answer "what did cosmo do?" They are not a work queue.
 
 ## Current Truth
 
-As of 2026-05-16, Steps 1 and 2 are green on `codex/ship-plan-audit`.
+As of 2026-05-16, Steps 1 through 4 are green on `codex/ship-plan-audit`.
 
 - Tier 0 passes locally:
   `scripts/verify-relocation-safety.sh`,
   `./gradlew detekt lintDebug :app:testDebugUnitTest :app:assembleDebug`,
   and `./gradlew :app:assembleReleaseInternal`.
-- CI now runs the hard gates without `|| true`; current remote runs are green
-  through `c2c0bd8`, with later emulator-proof commits still running.
+- CI now runs the hard gates without `|| true`; remote runs are green through
+  parity fixture commit `e4aed0e`, with privacy commit `a751bdb` running.
 - Home has a free-text Ask input wired to
   `FulfillmentOrchestrator.handleUserQuery`.
 - Debug/test builds have a deterministic `SimulationLLM` path for the timer
@@ -51,21 +51,12 @@ failing acceptance test proves the existing path cannot ship.
 
 ## Next Milestone
 
-The next milestone is a deterministic parity fixture suite on the same action
-path as the timer flow. Do not fork into skill-specific executors.
+The next milestone is presence wiring on the same action path as the timer flow.
+Do not fork into skill-specific executors.
 
-Done means these flows all prove expected `FulfillmentAction` output and
-resulting UI/history state:
-
-- Timer
-- List
-- Calendar draft
-- Document draft
-- Web search
-- Define term / jargon
-- Insight
-- Recall
-- Summary
+Done means `PresenceState` reflects actionable fulfillment and gatekeeper
+signals, maps `FulfillmentAction` into `PresenceCard`, and leaves ActionDeck as
+the side-effect confirmation source of truth.
 
 ## Work Order
 
@@ -142,6 +133,10 @@ failure shows it blocks shipping.
 ### 4. Prove Privacy
 
 Owner: validation owner with WS2/WS3 help.
+
+Status: Done on `codex/ship-plan-audit`; commit `a751bdb` adds automated tests
+for disabled-source persistence/prompt gating, retention sweep, local-only
+network egress, and forget-window deletion.
 
 Four tests must pass:
 
