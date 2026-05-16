@@ -223,7 +223,6 @@ androidComponents {
         variant.packaging.jniLibs.excludes.add("**/liblitertlm_jni.so")
         variant.packaging.jniLibs.excludes.add("**/libLiteRt.so")
         variant.packaging.jniLibs.excludes.add("**/libLiteRtClGlAccelerator.so")
-        variant.packaging.jniLibs.excludes.add("**/libsqlcipher.so")
     }
 }
 
