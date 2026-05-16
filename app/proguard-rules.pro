@@ -4,6 +4,7 @@
 -keep class com.google.research.air.cosmo.logging.** { *; }
 -keep class com.google.ai.edge.aicore.** { *; }
 -keep class com.google.ai.edge.litertlm.** { *; }
+-keep class com.google.android.apps.hardware.protostar.components.delegate.** { *; }
 -keep class com.google.mlkit.genai.** { *; }
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }

@@ -2,6 +2,7 @@
 agp = "9.1.1"
 aicore = "0.0.1-exp02"
 litertlm = "0.11.0"
+tensorflow-lite = "2.16.1"
 androidx-activity = "1.13.0"
 androidx-camera = "1.6.0"
 androidx-core = "1.18.0"
@@ -49,6 +50,7 @@ turbine = "1.2.1"
 [libraries]
 aicore = { group = "com.google.ai.edge.aicore", name = "aicore", version.ref = "aicore" }
 ai-edge-litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
+tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflow-lite" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidx-activity" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "androidx-camera" }
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "androidx-camera" }

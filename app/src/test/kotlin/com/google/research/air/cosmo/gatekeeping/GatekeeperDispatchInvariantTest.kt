@@ -13,7 +13,7 @@ import com.google.research.air.cosmo.lib.soda.TranscriptionData
 import com.google.research.air.cosmo.setting.CosmoSettingStore
 import io.mockk.every
 import io.mockk.mockk
-import java.nio.FloatBuffer
+import java.nio.ByteBuffer
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -128,21 +128,27 @@ class GatekeeperDispatchInvariantTest {
         val makeModel: () -> AudioGatekeepingModel = {
             AudioGatekeepingModel(
                 ConformerEncoderImpl(
-                    loadAssetBytes = fakeLoader(
+                    loadAssetBuffer = fakeBufferLoader(
                         mapOf(
                             GatekeeperModelIds.AUDIO_FRONTEND to byteArrayOf(1),
                             GatekeeperModelIds.AUDIO_GATEKEEPER to byteArrayOf(2)
                         )
                     ),
-                    nativeCreate = { _, useNpu -> if (useNpu) 11L else 10L },
-                    nativeRun = { handle, _: FloatBuffer, output: FloatBuffer ->
-                        if (handle == 11L) {
-                            audioBackendRuns += 1
-                            output.put(0, 0.91f)
+                    runtimeFactory = { _, _ ->
+                        object : SplitConformerRuntime {
+                            override fun run(
+                                audioInputTensor: Array<FloatArray>,
+                                spectrogramBuffer: ByteBuffer,
+                                paddingMaskTensor: Array<BooleanArray>,
+                                intentOutputBuffer: Array<FloatArray>
+                            ) {
+                                audioBackendRuns += 1
+                                intentOutputBuffer[0][0] = 0.91f
+                            }
+
+                            override fun close() = Unit
                         }
-                        true
-                    },
-                    nativeDestroy = {}
+                    }
                 )
             )
         }
@@ -238,18 +244,26 @@ class GatekeeperDispatchInvariantTest {
     private fun audioModel(): AudioGatekeepingModel =
         AudioGatekeepingModel(
             ConformerEncoderImpl(
-                loadAssetBytes = fakeLoader(
+                loadAssetBuffer = fakeBufferLoader(
                     mapOf(
                         GatekeeperModelIds.AUDIO_FRONTEND to byteArrayOf(1),
                         GatekeeperModelIds.AUDIO_GATEKEEPER to byteArrayOf(2)
                     )
                 ),
-                nativeCreate = { _, useNpu -> if (useNpu) 11L else 10L },
-                nativeRun = { _, _, output ->
-                    output.put(0, 0.91f)
-                    true
-                },
-                nativeDestroy = {}
+                runtimeFactory = { _, _ ->
+                    object : SplitConformerRuntime {
+                        override fun run(
+                            audioInputTensor: Array<FloatArray>,
+                            spectrogramBuffer: ByteBuffer,
+                            paddingMaskTensor: Array<BooleanArray>,
+                            intentOutputBuffer: Array<FloatArray>
+                        ) {
+                            intentOutputBuffer[0][0] = 0.91f
+                        }
+
+                        override fun close() = Unit
+                    }
+                }
             )
         )
 
@@ -311,4 +325,8 @@ class GatekeeperDispatchInvariantTest {
     }
 
     private fun fakeLoader(assets: Map<String, ByteArray>): (String) -> ByteArray? = { id -> assets[id] }
+
+    private fun fakeBufferLoader(assets: Map<String, ByteArray>): (String) -> ByteBuffer? = { id ->
+        assets[id]?.let { ByteBuffer.wrap(it) }
+    }
 }

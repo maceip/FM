@@ -174,6 +174,9 @@ android {
     }
 
     packaging {
+        jniLibs {
+            pickFirsts += setOf("**/libtensorflowlite_jni.so")
+        }
         resources {
             excludes +=
                 setOf(
@@ -316,6 +319,7 @@ dependencies {
     // which uses ReLinker as its robust System.loadLibrary fallback.
     implementation(libs.relinker)
     implementation(libs.ai.edge.litertlm.android)
+    implementation(libs.tensorflow.lite)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.core)

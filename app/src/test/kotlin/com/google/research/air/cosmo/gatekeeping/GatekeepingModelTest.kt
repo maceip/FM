@@ -1,5 +1,6 @@
 package com.google.research.air.cosmo.gatekeeping
 
+import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -185,7 +186,7 @@ class GatekeepingModelTest {
 
     @Test
     fun rawAudioGatekeeperFailsClosedWhenFrontendAssetIsMissing() = runTest {
-        val model = audioModel(fakeLoader(emptyMap()))
+        val model = audioModel(fakeBufferLoader(emptyMap()))
 
         val result = model.predict(byteArrayOf(1, 0, 2, 0))
 
@@ -200,54 +201,67 @@ class GatekeepingModelTest {
         val model =
             audioModel(
                 loader =
-                    fakeLoader(
+                    fakeBufferLoader(
                         mapOf(
                             GatekeeperModelIds.AUDIO_FRONTEND to byteArrayOf(0xfe.toByte()),
                             GatekeeperModelIds.AUDIO_GATEKEEPER to byteArrayOf(0xbe.toByte())
                         )
                     ),
-                nativeCreate = { _, _ -> 0L }
+                runtimeFactory = { _, _ -> throw IllegalStateException("audio_tflite_split_create_failed") }
             )
 
         val result = model.predict(byteArrayOf(1, 0, 2, 0))
 
-        assertEquals("raw_audio_unavailable:audio_litert_cpu_create_failed", result.modelId)
+        assertEquals("raw_audio_unavailable:audio_tflite_split_create_failed", result.modelId)
         assertEquals(GatekeepingDetector.NONE, result.detector)
     }
 
     @Test
-    fun rawAudioGatekeeperRunsFrontendAndBackendInterpreters() = runTest {
-        val createRequests = mutableListOf<Boolean>()
+    fun rawAudioGatekeeperRunsSmaliShapedFrontendAndBackendRuntime() = runTest {
+        var runtimeRuns = 0
         val model =
             audioModel(
                 loader =
-                    fakeLoader(
+                    fakeBufferLoader(
                         mapOf(
                             GatekeeperModelIds.AUDIO_FRONTEND to byteArrayOf(0xfe.toByte()),
                             GatekeeperModelIds.AUDIO_GATEKEEPER to byteArrayOf(0xbe.toByte())
                         )
                     ),
-                nativeCreate = { _, useNpu ->
-                    createRequests += useNpu
-                    if (useNpu) 11L else 10L
-                },
-                nativeRun = { handle, input, output ->
-                    if (handle == 10L) {
-                        assertEquals(ConformerEncoderImpl.MAX_SAMPLES, input.capacity())
-                        assertEquals(ConformerEncoderImpl.MAX_FRAMES * ConformerEncoderImpl.MEL_BINS, output.capacity())
-                        output.put(0, 0.25f)
-                    } else {
-                        assertEquals(ConformerEncoderImpl.MAX_FRAMES * ConformerEncoderImpl.MEL_BINS, input.capacity())
-                        assertEquals(ConformerEncoderImpl.NUM_INTENTS, output.capacity())
-                        output.put(0, 0.91f)
+                runtimeFactory = { _, _ ->
+                    object : SplitConformerRuntime {
+                        override fun run(
+                            audioInputTensor: Array<FloatArray>,
+                            spectrogramBuffer: ByteBuffer,
+                            paddingMaskTensor: Array<BooleanArray>,
+                            intentOutputBuffer: Array<FloatArray>
+                        ) {
+                            runtimeRuns += 1
+                            assertEquals(1, audioInputTensor.size)
+                            assertEquals(ConformerEncoderImpl.MAX_SAMPLES, audioInputTensor[0].size)
+                            assertEquals(
+                                ConformerEncoderImpl.MAX_FRAMES * ConformerEncoderImpl.MEL_BINS * Float.SIZE_BYTES,
+                                spectrogramBuffer.capacity()
+                            )
+                            assertEquals(1, paddingMaskTensor.size)
+                            assertEquals(ConformerEncoderImpl.MAX_FRAMES, paddingMaskTensor[0].size)
+                            assertEquals(1, intentOutputBuffer.size)
+                            assertEquals(ConformerEncoderImpl.NUM_INTENTS, intentOutputBuffer[0].size)
+                            assertEquals(0f, audioInputTensor[0][0])
+                            assertEquals(32767f / 32768f, audioInputTensor[0][1])
+                            assertEquals(true, paddingMaskTensor[0][0])
+                            assertEquals(false, paddingMaskTensor[0][1])
+                            intentOutputBuffer[0][0] = 0.91f
+                        }
+
+                        override fun close() = Unit
                     }
-                    true
                 }
             )
 
         val result = model.predict(byteArrayOf(0, 0, 0xff.toByte(), 0x7f))
 
-        assertEquals(listOf(false, true), createRequests)
+        assertEquals(1, runtimeRuns)
         assertEquals(mapOf("add_to_memory" to 0.91f), result.detectedSkills)
     }
 
@@ -349,23 +363,34 @@ class GatekeepingModelTest {
         )
 
     private fun audioModel(
-        loader: (String) -> ByteArray?,
-        nativeCreate: (ByteArray, Boolean) -> Long = { _, useNpu -> if (useNpu) 11L else 10L },
-        nativeRun: (Long, FloatBuffer, FloatBuffer) -> Boolean = { _, _, output ->
-            output.put(0, 0.91f)
-            true
+        loader: (String) -> ByteBuffer?,
+        runtimeFactory: (ByteBuffer, ByteBuffer) -> SplitConformerRuntime = { _, _ ->
+            object : SplitConformerRuntime {
+                override fun run(
+                    audioInputTensor: Array<FloatArray>,
+                    spectrogramBuffer: ByteBuffer,
+                    paddingMaskTensor: Array<BooleanArray>,
+                    intentOutputBuffer: Array<FloatArray>
+                ) {
+                    intentOutputBuffer[0][0] = 0.91f
+                }
+
+                override fun close() = Unit
+            }
         }
     ): AudioGatekeepingModel =
         AudioGatekeepingModel(
             ConformerEncoderImpl(
-                loadAssetBytes = loader,
-                nativeCreate = nativeCreate,
-                nativeRun = nativeRun,
-                nativeDestroy = {}
+                loadAssetBuffer = loader,
+                runtimeFactory = runtimeFactory
             )
         )
 
     private fun fakeLoader(assets: Map<String, ByteArray>): (String) -> ByteArray? = { id -> assets[id] }
+
+    private fun fakeBufferLoader(assets: Map<String, ByteArray>): (String) -> ByteBuffer? = { id ->
+        assets[id]?.let { ByteBuffer.wrap(it) }
+    }
 
     private data class NativeCreateAttempt(
         val model: ByteArray,
