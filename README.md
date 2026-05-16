@@ -68,10 +68,10 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| Public AICore (Gemini Nano via `GenerativeModel`) | 🟩🟩🟩🟩🟩 | Production default when AICore feature available |
+| Public AICore (Gemini Nano via `GenerativeModel`) | 🟩🟩🟩🟩🟩 | Pixel/Nano happy path; Pixel 10 device proof pending |
 | Simulation LLM (deterministic test) | 🟩🟩🟩🟩🟩 | Test fixture |
-| LiteRT-LM (on-device Gemma bundle) | 🟩🟩🟩⬜⬜ | Needs official Gemma 4 `.litertlm` bundle provisioning |
-| Remote inference (Oak session) | 🟩🟩🟩⬜⬜ | Needs endpoint + cert pin + audience config |
+| LiteRT-LM (on-device Gemma bundle) | 🟩🟩🟩⬜⬜ | Local fallback for any device, including Pixel if Nano/AICore fails |
+| Remote inference (Oak session) | 🟩🟩🟩⬜⬜ | Network fallback when local paths are unavailable; needs endpoint + cert pin + audience config |
 | Network-aware fallback selector | 🟩🟩🟩🟩🟩 | Local / remote / hybrid routing |
 
 ### Memory + state

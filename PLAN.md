@@ -51,8 +51,65 @@ failing acceptance test proves the existing path cannot ship.
 
 ## Next Milestone
 
-No new architecture milestone is active in this plan. Keep the branch
-merge-ready and watch remote CI for the latest presence commit.
+Production LLM and real-device validation are one milestone. We are not adding
+a second model architecture; we are proving the existing `LLM -> @LocalLLM /
+@ServerLLM / @HybridLLM` tree on hardware.
+
+### Production LLM Routing Tree
+
+The app has one production tree and two validation lanes.
+
+```text
+Production caller
+  -> @HybridLLM / NetworkAwareLLM
+  -> local first
+       -> AICore public GenerativeModel
+       -> ML Kit GenAI Prompt
+       -> LiteRT-LM
+  -> remote fallback only if local fails before tokens and network policy allows it
+       -> RemoteInferenceLLM
+```
+
+Important constraints:
+
+- Debug UI flow uses `SimulationLLM`; it is not production LLM evidence.
+- A Pixel 10 with Nano v3 should not need LiteRT-LM for the text happy path if
+  AICore initializes and generates.
+- The fallback lane is for every device where Nano v3, AICore, or recovered
+  acceleration is unavailable or fails, including the Pixel 10.
+- Non-Nano phones need at least one real fallback: ML Kit GenAI Prompt,
+  provisioned LiteRT-LM, or configured remote inference. For offline/local-only
+  non-Nano validation, LiteRT-LM is required unless ML Kit is proven available
+  and good enough on that device.
+- Recovered SODA, BERT, Conformer EdgeTPU, AOC, and Inherent assets are
+  gatekeeping/capture paths. They are not substitutes for a production LLM.
+
+### Device Lanes
+
+Lane A, Pixel 10 happy path:
+
+- Command: `scripts/run-device-model-routing-smoke.sh pixel10`
+- Require AICore visibility.
+- Run the production `@HybridLLM` smoke and record path, reason, model output,
+  build fingerprint, and model identifier.
+- Probe recovered Pixel-only acceleration (EdgeTPU Conformer / AOC / Nano v3)
+  where available, but do not let it block the fallback lane.
+
+Lane B, fallback path:
+
+- Command: `scripts/run-device-model-routing-smoke.sh fallback`
+- Local-only fallback command:
+  `DEPLOY_LITERTLM=1 scripts/run-device-model-routing-smoke.sh fallback`
+- Run on Xiaomi and also on Pixel 10 if Lane A fails.
+- Do not require AICore.
+- Prove ML Kit, LiteRT-LM, or remote inference produces a non-empty response
+  through the same `@HybridLLM` route.
+- If this lane is intended to be local-only, deploy a LiteRT-LM bundle first
+  and prove no remote route was used.
+
+Done when both lanes have artifacts and logs, or when a failed lane has an
+explicit unavailable reason and the other lane still gives us a shippable demo
+path.
 
 ## Work Order
 
@@ -232,9 +289,10 @@ These are parked unless a concrete ship-blocking test pulls them in:
 - Mariner/browser backend.
 - Per-action handler split.
 - Voice Match enrollment UI.
-- Pixel-only EdgeTPU/AOC activation.
+- Pixel-only EdgeTPU/AOC activation beyond the Lane A probe.
 - Inherent model integration.
-- Remote inference production server.
+- Remote inference production server unless it becomes the chosen Lane B
+  fallback.
 - New contract documents.
 - Recovered APK repair.
 

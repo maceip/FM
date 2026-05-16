@@ -16,6 +16,7 @@ import com.google.ai.edge.litertlm.Message
 import com.google.research.air.cosmo.runtime.CosmoBuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.security.MessageDigest
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -89,7 +90,7 @@ constructor(
         engineMutex.withLock {
             initializedEngine?.let { return@withLock it }
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
-            val modelFile = stageBundledModel()
+            val modelFile = resolveModelFile()
             ExperimentalFlags.enableSpeculativeDecoding = modelSupportsSpeculativeDecoding(modelFile)
             val failures = mutableListOf<Pair<String, Throwable>>()
             backendCandidates().forEach { candidate ->
@@ -179,15 +180,20 @@ constructor(
         }
 
     /**
-     * Stages the bundled LiteRT-LM asset into the app's private files dir. Replaces the
-     * 4-mode `LocalLlmModelDelivery` state machine (deleted per architecture-delta C4 row 6).
-     * If the runtime-download or app-private-files paths are ever needed again, re-introduce
-     * them here at the call site rather than as a separate indirection layer.
+     * Resolves an app-private LiteRT-LM file deployed by `scripts/deploy-gemma4-litertlm.sh`
+     * before falling back to the bundled asset. Replaces the 4-mode `LocalLlmModelDelivery`
+     * state machine deleted per architecture-delta C4 row 6. If runtime download is ever
+     * needed again, re-introduce it here at the call site rather than as a separate layer.
      *
-     * The bundled-asset path is keyed by `cosmo.localLlm.litertLmModelId` via [stagedFile] +
-     * [bundledAssetPath]; both derive from the model id to keep multiple model variants from
-     * colliding in the same files dir.
+     * Paths are keyed by `cosmo.localLlm.litertLmModelId` via [storageSlug], which mirrors
+     * `scripts/model-storage-id.py` so deployment scripts and runtime lookup agree.
      */
+    private fun resolveModelFile(): File {
+        val appPrivate = appPrivateModelFile()
+        if (appPrivate.exists() && appPrivate.length() > 0) return appPrivate
+        return stageBundledModel()
+    }
+
     private fun stageBundledModel(): File {
         val target = stagedFile()
         if (target.exists() && target.length() > 0) return target
@@ -226,9 +232,11 @@ constructor(
 
     private fun stagedFile(): File = File(appContext.filesDir, "models/${storageSlug()}/bundled.litertlm")
 
+    private fun appPrivateModelFile(): File = File(appContext.filesDir, "models/${storageSlug()}/model.litertlm")
+
     private fun storageSlug(): String {
-        val raw = CosmoBuildConfig.localLiteRtLmModelId.trim().ifEmpty { "default-litertlm" }
-        return raw.replace(Regex("[^A-Za-z0-9._-]+"), "-").trim('-', '_', '.').ifEmpty { "default-litertlm" }
+        val raw = CosmoBuildConfig.localLiteRtLmModelId.trim()
+        return liteRtLmModelStorageSlug(raw)
     }
 
     private fun liteRtUnavailable(
@@ -263,4 +271,27 @@ constructor(
         private const val MAX_CPU_THREADS = 6
         private const val SYSTEM_INSTRUCTION = "You are Cosmo's on-device assistant. Answer concisely and follow the user request."
     }
+}
+
+private const val DEFAULT_MODEL_STORAGE_ID = "default-litertlm"
+private const val MODEL_ID_HASH_CHARS = 16
+private const val MAX_MODEL_STORAGE_ID_CHARS = 96
+private val UNSAFE_MODEL_ID_CHARS = Regex("[^A-Za-z0-9._-]+")
+
+internal fun liteRtLmModelStorageSlug(modelId: String): String {
+    val raw = modelId.trim()
+    val normalized =
+        UNSAFE_MODEL_ID_CHARS
+            .replace(raw, "-")
+            .trim('-', '_', '.')
+            .ifEmpty { DEFAULT_MODEL_STORAGE_ID }
+    val hashSuffix = raw.sha256Hex().take(MODEL_ID_HASH_CHARS)
+    val maxSlugChars = MAX_MODEL_STORAGE_ID_CHARS - MODEL_ID_HASH_CHARS - 1
+    val slug = normalized.take(maxSlugChars).trim('-', '_', '.').ifEmpty { DEFAULT_MODEL_STORAGE_ID }
+    return "$slug-$hashSuffix"
+}
+
+private fun String.sha256Hex(): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
+    return digest.joinToString(separator = "") { byte -> "%02x".format(byte) }
 }

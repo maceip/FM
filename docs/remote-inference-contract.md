@@ -10,8 +10,8 @@ The Android client side is implemented and covered by unit tests:
 - `RequestSigner.kt` signs requests with an Android Keystore P-256 key.
 - `RemoteCredentialStore.kt` stores anonymous credentials encrypted locally.
 - `RefreshingAnonymousCredentialProvider` refreshes credentials before expiry.
-- `RemoteInferenceConfigProvider.kt` resolves runtime overrides from encrypted local storage before falling back to build-time Gradle properties. This exists for internal/teamfood provisioning; `docs/architecture-delta.md` PR6 still targets deleting it if no active workflow consumes runtime overrides.
-- `NetworkAwareLLM` uses the remote path only after local inference fails and network policy allows remote fallback.
+- `RemoteInferenceConfig.fromBuildConfig()` reads build-time Gradle properties for endpoint, pin, and audience.
+- `NetworkAwareLLM` uses the remote path only after local inference fails before emitting tokens and network policy allows remote fallback.
 
 The path is not live by default. Runtime config and `BuildConfig.REMOTE_INFERENCE_*` values default to blank, so production remote inference requires provisioning:
 
@@ -25,7 +25,7 @@ Until those values and services exist, remote inference cleanly downgrades to un
 
 ## Transport
 
-- Base URL is resolved through `RemoteInferenceConfigProvider`; the build-time fallback is `BuildConfig.REMOTE_INFERENCE_BASE_URL`.
+- Base URL is resolved through `RemoteInferenceConfig.fromBuildConfig()` from `cosmo.remoteInference.*` Gradle properties.
 - Production URLs must use HTTPS.
 - The app pins the configured SPKI certificate hash when the resolved certificate pin is non-empty.
 - Requests include `X-Cosmo-Timestamp-Millis`, `X-Cosmo-Nonce`, `X-Cosmo-Body-SHA256`, `X-Cosmo-Signature-Key-Id`, `X-Cosmo-Signature-Alg`, and `X-Cosmo-Signature`.
