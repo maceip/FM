@@ -169,10 +169,11 @@ class NetworkAwareLLMTest {
 
     @Test
     fun propagatesLocalFailureWhenNetworkCannotUseRemote() = runTest {
+        val remote = CountingLLM("remote")
         val llm =
             NetworkAwareLLM(
                 local = FailingLLM(LlmFailureCause.MODEL_NOT_READY),
-                remote = FixedLLM("remote"),
+                remote = remote,
                 networkPolicyProvider = FakeNetworkPolicyProvider(NetworkPolicy.UNAVAILABLE)
             )
 
@@ -187,6 +188,23 @@ class NetworkAwareLLMTest {
         assertEquals(LlmFailureCause.MODEL_NOT_READY, exception.reason)
         assertEquals(ModelPath.LOCAL_LLM, llm.activePath.value)
         assertEquals(LLMRouteReason.NETWORK_UNAVAILABLE, llm.routeDecision.value.reason)
+        assertEquals(0, remote.calls)
+    }
+
+    @Test
+    fun localOnlyNetworkPolicyDoesNotInvokeRemote() = runTest {
+        val remote = CountingLLM("remote")
+        val llm =
+            NetworkAwareLLM(
+                local = FixedLLM("local"),
+                remote = remote,
+                networkPolicyProvider = FakeNetworkPolicyProvider(NetworkPolicy.UNAVAILABLE)
+            )
+
+        assertEquals("local", llm.generateText("hello"))
+        assertEquals(ModelPath.LOCAL_LLM, llm.activePath.value)
+        assertEquals(LLMRouteReason.NETWORK_UNAVAILABLE, llm.routeDecision.value.reason)
+        assertEquals(0, remote.calls)
     }
 
     private class FakeNetworkPolicyProvider(
@@ -233,5 +251,30 @@ class NetworkAwareLLMTest {
             parts: List<PromptPart>,
             onToken: (String) -> Unit
         ): String = throw LlmUnavailableException(reason, "failed")
+    }
+
+    private class CountingLLM(
+        private val response: String
+    ) : LLM {
+        var calls = 0
+            private set
+
+        override suspend fun inference(
+            prompt: String,
+            onToken: (String) -> Unit
+        ): String {
+            calls += 1
+            onToken(response)
+            return response
+        }
+
+        override suspend fun inference(
+            parts: List<PromptPart>,
+            onToken: (String) -> Unit
+        ): String {
+            calls += 1
+            onToken(response)
+            return response
+        }
     }
 }

@@ -59,10 +59,10 @@ constructor(
                 actionIds = actions.map { it.id },
                 sourceBufferCounts =
                     mapOf(
-                        "ambient_audio" to audioBuffer.size(),
-                        "screen" to screenBuffer.size(),
-                        "notification" to notificationBuffer.size(),
-                        "intent" to intentBuffer.size()
+                        "ambient_audio" to enabledBufferSize(settings.isAmbientAudioEnabled(), audioBuffer),
+                        "screen" to enabledBufferSize(settings.isScreenContextEnabled(), screenBuffer),
+                        "notification" to enabledBufferSize(settings.isNotificationCaptureEnabled(), notificationBuffer),
+                        "intent" to enabledBufferSize(settings.isIntentExtractionEnabled(), intentBuffer)
                     ),
                 llmModelPath = llmRouteState?.activePath?.value,
                 llmRouteReason = llmRouteState?.routeDecision?.value?.reason
@@ -86,15 +86,26 @@ constructor(
             appendLine(
                 "gatekeeper=${settings.isGatekeeperEnabled()}, rawAudioGatekeeper=${settings.isRawAudioGatekeeperEnabled()}, voiceMatch=${settings.isVoiceMatchEnabled()}"
             )
-            appendLine("Audio:")
-            audioBuffer.snapshotReversed().take(8).forEach { appendLine(it.value.toString()) }
-            appendLine("Screens:")
-            screenBuffer.snapshotReversed().take(8).forEach { appendLine(it.value.toString()) }
-            appendLine("Notifications:")
-            notificationBuffer.snapshotReversed().take(8).forEach { appendLine(it.value.toString()) }
-            appendLine("Intents:")
-            intentBuffer.snapshotReversed().take(8).forEach { appendLine(it.value.toString()) }
+            appendContextSection("Audio", settings.isAmbientAudioEnabled(), audioBuffer)
+            appendContextSection("Screens", settings.isScreenContextEnabled(), screenBuffer)
+            appendContextSection("Notifications", settings.isNotificationCaptureEnabled(), notificationBuffer)
+            appendContextSection("Intents", settings.isIntentExtractionEnabled(), intentBuffer)
         }
+
+    private fun StringBuilder.appendContextSection(
+        label: String,
+        enabled: Boolean,
+        buffer: InMemoryEphemeralBuffer<Any>
+    ) {
+        if (!enabled) return
+        appendLine("$label:")
+        buffer.snapshotReversed().take(8).forEach { appendLine(it.value.toString()) }
+    }
+
+    private fun enabledBufferSize(
+        enabled: Boolean,
+        buffer: InMemoryEphemeralBuffer<Any>
+    ): Int = if (enabled) buffer.size() else 0
 
     private fun assetPromptFor(trigger: FulfillmentTriggerType): String =
         readAsset(

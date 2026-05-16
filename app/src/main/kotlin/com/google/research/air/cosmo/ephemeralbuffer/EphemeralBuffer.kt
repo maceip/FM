@@ -205,6 +205,8 @@ interface EphemeralBufferWriter<T> {
 
     fun remove(predicate: (T) -> Boolean): Boolean
 
+    fun removeEntries(predicate: (Timestamped<T>) -> Boolean): Boolean
+
     fun replace(
         predicate: (T) -> Boolean,
         value: T
@@ -264,10 +266,14 @@ class InMemoryEphemeralBuffer<T>(
     }
 
     override fun remove(predicate: (T) -> Boolean): Boolean {
+        return removeEntries { predicate(it.value) }
+    }
+
+    override fun removeEntries(predicate: (Timestamped<T>) -> Boolean): Boolean {
         val (changed, snapshot) =
             synchronized(lock) {
                 val before = entries.size
-                entries.removeAll { predicate(it.value) }
+                entries.removeAll(predicate)
                 val changed = before != entries.size
                 changed to snapshotLocked()
             }
@@ -398,6 +404,8 @@ interface EphemeralBufferRegistry {
     fun ambientAudioBytesReader(): EphemeralBufferReader<ByteArray>
 
     fun ambientAudioBytesWriter(): EphemeralBufferWriter<ByteArray>
+
+    fun removeRange(range: LongRange): Int
 }
 
 @Singleton
@@ -483,6 +491,10 @@ constructor(
     override fun ambientAudioBytesReader(): EphemeralBufferReader<ByteArray> = ambientAudioBytes
 
     override fun ambientAudioBytesWriter(): EphemeralBufferWriter<ByteArray> = ambientAudioBytes
+
+    override fun removeRange(range: LongRange): Int =
+        objectBuffers.values.count { buffer -> buffer.removeEntries { it.timestampMillis in range } } +
+            byteBuffers.values.count { buffer -> buffer.removeEntries { it.timestampMillis in range } }
 
     private fun objectBuffer(id: EphemeralBufferId): EphemeralBuffer<Any> =
         objectBuffers[id] ?: error("$id is not an object buffer")

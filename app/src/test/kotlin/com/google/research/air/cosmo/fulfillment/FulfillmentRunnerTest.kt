@@ -1,6 +1,9 @@
 package com.google.research.air.cosmo.fulfillment
 
 import androidx.test.core.app.ApplicationProvider
+import com.google.research.air.cosmo.ephemeralbuffer.InMemoryEphemeralBuffer
+import com.google.research.air.cosmo.lib.llm.LLM
+import com.google.research.air.cosmo.lib.llm.PromptPart
 import com.google.research.air.cosmo.lib.llm.SimulationLLM
 import com.google.research.air.cosmo.logging.CosmosTelemetry
 import com.google.research.air.cosmo.logging.TelemetryEvent
@@ -9,8 +12,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,20 +29,28 @@ class FulfillmentRunnerTest {
     private val mockSettings = mockk<CosmoSettingStore>(relaxed = true)
     private val mockClock = mockk<Clock>()
     private val mockTelemetry = mockk<CosmosTelemetry>(relaxed = true)
+    private val bufferClock = Clock.fixed(Instant.ofEpochMilli(1_746_000_000_000L), ZoneOffset.UTC)
 
-    private fun runner(actionsRepository: ActionsRepository = ActionsRepository()): FulfillmentRunner {
+    private fun runner(
+        actionsRepository: ActionsRepository = ActionsRepository(),
+        llm: LLM = simulationLlm,
+        audioBuffer: InMemoryEphemeralBuffer<Any> = mockk(relaxed = true),
+        screenBuffer: InMemoryEphemeralBuffer<Any> = mockk(relaxed = true),
+        notificationBuffer: InMemoryEphemeralBuffer<Any> = mockk(relaxed = true),
+        intentBuffer: InMemoryEphemeralBuffer<Any> = mockk(relaxed = true)
+    ): FulfillmentRunner {
         every { mockSettings.isGatekeeperEnabled() } returns false
         every { mockSettings.isRawAudioGatekeeperEnabled() } returns false
         every { mockSettings.isVoiceMatchEnabled() } returns false
         every { mockClock.millis() } returns 1_746_000_000_000L
         return FulfillmentRunner(
             context = ApplicationProvider.getApplicationContext(),
-            audioBuffer = mockk(relaxed = true),
-            screenBuffer = mockk(relaxed = true),
-            notificationBuffer = mockk(relaxed = true),
-            intentBuffer = mockk(relaxed = true),
+            audioBuffer = audioBuffer,
+            screenBuffer = screenBuffer,
+            notificationBuffer = notificationBuffer,
+            intentBuffer = intentBuffer,
             actionsRepository = actionsRepository,
-            llm = simulationLlm,
+            llm = llm,
             settings = mockSettings,
             clock = mockClock,
             telemetry = mockTelemetry
@@ -99,6 +113,45 @@ class FulfillmentRunnerTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `disabled sources are excluded from prompt context`() = runTest {
+        val audioBuffer = objectBuffer()
+        val screenBuffer = objectBuffer()
+        val notificationBuffer = objectBuffer()
+        val intentBuffer = objectBuffer()
+        audioBuffer.add("disabled audio secret", bufferClock.millis())
+        screenBuffer.add("disabled screen secret", bufferClock.millis())
+        notificationBuffer.add("disabled notification secret", bufferClock.millis())
+        intentBuffer.add("disabled intent secret", bufferClock.millis())
+        every { mockSettings.isAmbientAudioEnabled() } returns false
+        every { mockSettings.isScreenContextEnabled() } returns false
+        every { mockSettings.isNotificationCaptureEnabled() } returns false
+        every { mockSettings.isIntentExtractionEnabled() } returns false
+        val llm = PromptCapturingLLM("[]")
+        val repository = ActionsRepository()
+
+        runner(
+            actionsRepository = repository,
+            llm = llm,
+            audioBuffer = audioBuffer,
+            screenBuffer = screenBuffer,
+            notificationBuffer = notificationBuffer,
+            intentBuffer = intentBuffer
+        ).fulfill(
+            prompt = "Reactive fulfillment. Conversation:",
+            trigger = FulfillmentTriggerType.USER_QUERY,
+            userQuery = "privacy check"
+        )
+
+        val prompt = llm.prompts.single()
+        assertTrue(prompt.contains("User query: privacy check"))
+        assertFalse(prompt.contains("disabled audio secret"))
+        assertFalse(prompt.contains("disabled screen secret"))
+        assertFalse(prompt.contains("disabled notification secret"))
+        assertFalse(prompt.contains("disabled intent secret"))
+        assertEquals(0, repository.fulfillmentHistory.value.single().sourceBufferCounts.values.sum())
     }
 
     @Test
@@ -282,4 +335,30 @@ class FulfillmentRunnerTest {
         val actionType: String,
         val verify: (FulfillmentAction) -> Unit
     )
+
+    private fun objectBuffer(): InMemoryEphemeralBuffer<Any> = InMemoryEphemeralBuffer(8, 60_000L, bufferClock)
+
+    private class PromptCapturingLLM(
+        private val response: String
+    ) : LLM {
+        val prompts = mutableListOf<String>()
+
+        override suspend fun inference(
+            prompt: String,
+            onToken: (String) -> Unit
+        ): String {
+            prompts += prompt
+            onToken(response)
+            return response
+        }
+
+        override suspend fun inference(
+            parts: List<PromptPart>,
+            onToken: (String) -> Unit
+        ): String {
+            prompts += parts.joinToString("\n") { it.toString() }
+            onToken(response)
+            return response
+        }
+    }
 }
