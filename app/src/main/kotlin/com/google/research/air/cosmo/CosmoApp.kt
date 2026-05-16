@@ -11,6 +11,7 @@ import com.google.research.air.cosmo.lib.battery.BatteryStateReceiver
 import com.google.research.air.cosmo.lib.performance.DebugDiagnostics
 import com.google.research.air.cosmo.lib.performance.MemoryPressureTrimmer
 import com.google.research.air.cosmo.notifications.CosmoNotificationManager
+import com.google.research.air.cosmo.presence.PresenceController
 import com.google.research.air.cosmo.runtime.ProcessInitializerRunner
 import com.google.research.air.cosmo.runtime.PureProcess
 import com.google.research.air.cosmo.setting.CosmoStateManager
@@ -35,6 +36,8 @@ class CosmoApp :
 
     @Inject lateinit var intentExtractor: IntentExtractor
 
+    @Inject lateinit var presenceController: PresenceController
+
     private var batteryReceiver: BatteryStateReceiver? = null
 
     override fun onCreate() {
@@ -52,9 +55,9 @@ class CosmoApp :
                 sticky?.let { receiver.onReceive(this, it) }
             }
         gatekeeperDebugReceiver.registerIfDebug(this)
-        // C7: second consumer of GatekeeperOutputSource.results (action pipeline being the first).
-        // Subscribes once at app start; idempotent.
+        // C7: app-level GatekeeperOutputSource consumers subscribe once at app start.
         intentExtractor.start()
+        presenceController.start()
     }
 
     override fun onTerminate() {
@@ -62,6 +65,7 @@ class CosmoApp :
         batteryReceiver = null
         gatekeeperDebugReceiver.unregister(this)
         intentExtractor.close()
+        presenceController.close()
         super.onTerminate()
     }
 
