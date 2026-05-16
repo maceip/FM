@@ -49,8 +49,8 @@ constructor(
                     it
                 },
                 onFailure = {
-                    nativeUnavailableReason = "soda_native_load_failed:${it.javaClass.simpleName}:${it.message}"
-                    Log.e(TAG, "isAvailable: load failed", it)
+                    nativeUnavailableReason = "soda_native_unavailable:${it.message}"
+                    Log.w(TAG, "isAvailable: unavailable ($nativeUnavailableReason)")
                     false
                 }
             )

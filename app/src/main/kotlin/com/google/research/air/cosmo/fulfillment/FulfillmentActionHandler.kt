@@ -43,7 +43,10 @@ constructor(
                     launchIntent(
                         Intent(
                             AlarmClock.ACTION_SET_TIMER
-                        ).putExtra(AlarmClock.EXTRA_LENGTH, action.durationSeconds).putExtra(AlarmClock.EXTRA_MESSAGE, action.title)
+                        )
+                            .putExtra(AlarmClock.EXTRA_LENGTH, action.durationSeconds)
+                            .putExtra(AlarmClock.EXTRA_MESSAGE, action.title)
+                            .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
                     )
                 is FulfillmentAction.CreateCalendarEvent -> insertCalendarEvent(action)
                 is FulfillmentAction.WebSearch ->

@@ -1,5 +1,6 @@
 package com.google.research.air.cosmo.context
 
+import android.os.StrictMode
 import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
@@ -388,11 +389,17 @@ object ContextStoreModule {
         // device image — on Android 14+/MIUI we hit UnsatisfiedLinkError on
         // SQLiteConnection.nativeOpen even though the .so is bundled. Forcing the load before
         // the first Room operation fixes that. System.loadLibrary is idempotent.
-        System.loadLibrary("sqlcipher")
-        return Room
-            .databaseBuilder(context, CosmoDatabase::class.java, "cosmo_context.db")
-            .openHelperFactory(SupportOpenHelperFactory(passphraseProvider.passphrase()))
-            .build()
+        val previousPolicy = StrictMode.getThreadPolicy()
+        StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX)
+        return try {
+            System.loadLibrary("sqlcipher")
+            Room
+                .databaseBuilder(context, CosmoDatabase::class.java, "cosmo_context.db")
+                .openHelperFactory(SupportOpenHelperFactory(passphraseProvider.passphrase()))
+                .build()
+        } finally {
+            StrictMode.setThreadPolicy(previousPolicy)
+        }
     }
 
     @Provides fun provideContextDao(database: CosmoDatabase): ContextEventDao = database.contextEventDao()

@@ -3,6 +3,7 @@ package com.google.research.air.cosmo.logging
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
+import com.google.firebase.FirebaseOptions
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.research.air.cosmo.setting.CosmoSettingStore
 import dagger.Binds
@@ -628,14 +629,28 @@ constructor(
 class FirebaseAnalyticsWrapperImpl
 @Inject
 constructor(
-    private val firebaseAnalytics: FirebaseAnalytics,
+    @ApplicationContext private val context: Context,
     private val settings: CosmoSettingStore
 ) : FirebaseAnalyticsWrapper {
+    private val firebaseAnalytics: FirebaseAnalytics? by lazy {
+        if (!hasGoogleAppId()) {
+            Log.w(CosmoLogTag.FIREBASE.tag, "Firebase Analytics disabled: google_app_id resource missing")
+            null
+        } else {
+            FirebaseAnalytics.getInstance(context)
+        }
+    }
+
     override fun logEvent(
         name: String,
         params: Bundle
     ) {
-        if (settings.isAnalyticsEnabled()) firebaseAnalytics.logEvent(name, params)
+        if (settings.isAnalyticsEnabled()) firebaseAnalytics?.logEvent(name, params)
+    }
+
+    private fun hasGoogleAppId(): Boolean {
+        val options = FirebaseOptions.fromResource(context)
+        return options?.applicationId?.isNotBlank() == true
     }
 }
 
@@ -650,11 +665,6 @@ abstract class LoggingBindings {
 @Module
 @InstallIn(SingletonComponent::class)
 object LoggingModule {
-    @Provides @Singleton
-    fun provideFirebaseAnalytics(
-        @ApplicationContext context: Context
-    ): FirebaseAnalytics = FirebaseAnalytics.getInstance(context)
-
     @Provides @Singleton
     fun provideObservabilitySchema(): ObservabilitySchema = GenesisObservabilitySchema
 }

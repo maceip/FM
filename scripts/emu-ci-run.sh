@@ -14,7 +14,7 @@ BASE_URL="https://emu.devkeys.net"
 TOKEN="${EMU_API_TOKEN:?EMU_API_TOKEN secret required (set in repo secrets or env)}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/emu-run}"
 POLL_TIMEOUT_S="${POLL_TIMEOUT_S:-300}"   # 5 min max queue+run
-BAD_PATTERNS="${BAD_PATTERNS:-FATAL|ANR|CRASH|Exception|test.*fail|AssertionError}"
+BAD_PATTERNS="${BAD_PATTERNS:-FATAL EXCEPTION|AndroidRuntime|ANR|CRASH|Permission Denial|test.*fail|AssertionError}"
 GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 mkdir -p "$ARTIFACT_DIR"

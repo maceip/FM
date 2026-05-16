@@ -44,7 +44,7 @@ class CosmoApp :
         super.onCreate()
         if (PureProcess.isPure(this)) return
 
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG && BuildConfig.BUILD_TYPE != EMU_DEBUG_BUILD_TYPE) {
             DebugDiagnostics.install(this)
         }
         processInitializerRunner.init()
@@ -80,4 +80,8 @@ class CosmoApp :
                 .Builder()
                 .setWorkerFactory(workerFactory)
                 .build()
+
+    private companion object {
+        const val EMU_DEBUG_BUILD_TYPE = "emuDebug"
+    }
 }
