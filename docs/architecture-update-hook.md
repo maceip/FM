@@ -29,10 +29,11 @@ Before declaring a phase complete:
 
 1. Phase 1 must have at least one live LLM path verified on device or webshell/device-equivalent runtime: remote inference, public AICore/ML Kit, or provisioned LiteRT-LM.
 2. Phase 2 must have source-specific captor tests, manifest-backed BERT CPU model loading, directedness-gate dispatch tests, AOC fallback/transport tests, raw-audio gatekeeper unavailable/available tests, intent-extractor subscriber tests, and connected-device SODA fixture evidence for both directed and undirected audio.
-3. Phase 3 must have typed action validation and side-effect confirmation coverage for every schema action subtype.
+3. Phase 3 must have typed action validation, side-effect confirmation coverage for every schema action subtype, and executor-owned dispatch.
 4. Phase 4 must have Nav3 saveable route-state coverage and adaptive layout checks for compact, unfolded, and tablet widths.
 5. Phase 5 must have release-specific signing/model/telemetry gates.
-6. Phase 6 must keep `scripts/verify-phase6-release-gates.sh` green before dogfood or release-candidate builds.
+6. Dogfood contract drift must be caught by `scripts/verify-dogfood-contract-gates.sh`: SODA IntendedSpeech, selector-routed gatekeeping, AOC fail-closed behavior, fulfillment executor split, and README progress bars.
+7. Phase 6 must keep `scripts/verify-phase6-release-gates.sh` green before dogfood or release-candidate builds.
 
 The CI workflow runs the first two checks before the Gradle build so missing
 architecture deltas and malformed large-asset manifests fail before slower work.

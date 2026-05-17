@@ -12,9 +12,14 @@ fail() {
 scripts/download-models.sh --verify-only
 scripts/verify-architecture-delta.sh
 scripts/verify-relocation-safety.sh
+scripts/verify-dogfood-contract-gates.sh
 
 if grep -Fq "download-models.sh --verify-only --allow-empty" ".github/workflows/ci.yml"; then
   fail "CI still allows an empty model manifest"
+fi
+
+if ! grep -Fq "scripts/verify-dogfood-contract-gates.sh" ".github/workflows/ci.yml"; then
+  fail "CI does not run the dogfood contract gate"
 fi
 
 if ! grep -Fq "scripts/download-models.sh --verify-only" ".github/workflows/ci.yml"; then

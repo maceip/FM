@@ -44,6 +44,9 @@ jobs:
       - name: Relocation safety gate
         run: scripts/verify-relocation-safety.sh
 
+      - name: Dogfood contract gate
+        run: scripts/verify-dogfood-contract-gates.sh
+
       - name: Model manifest (tolerant of missing binaries on CI)
         run: scripts/download-models.sh --verify-only --allow-missing-binaries
 

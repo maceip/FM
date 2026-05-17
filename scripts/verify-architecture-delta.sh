@@ -50,6 +50,7 @@ required_paths=(
   "gradle.properties"
   "scripts/download-models.sh"
   "scripts/generate-baseline-profile.sh"
+  "scripts/verify-dogfood-contract-gates.sh"
   "scripts/verify-phase6-release-gates.sh"
   "scripts/verify-relocation-safety.sh"
   "scripts/verify-llm-phase1.sh"
