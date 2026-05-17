@@ -10,6 +10,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from inherent_litert_contract import ContractError, validate_artifact
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INHERENT_LITERT_DIR = Path.home() / "inherent" / "artifacts" / "model-groups" / "001" / "export" / "litert"
@@ -47,25 +49,6 @@ def manifest_entry(model_id: str, filename: str, path: Path, media_type: str) ->
     }
 
 
-def validate_inherent_metadata(metadata: dict[str, Any]) -> None:
-    if metadata.get("input_tensor") != "mel_spectrogram":
-        raise SystemExit("error: inherent metadata input_tensor must be mel_spectrogram")
-    if metadata.get("output_tensor") != "intent_output":
-        raise SystemExit("error: inherent metadata output_tensor must be intent_output")
-    head_order = metadata.get("head_order")
-    threshold_keys = metadata.get("threshold_keys_in_order")
-    default_thresholds = metadata.get("default_thresholds")
-    if not isinstance(head_order, list) or len(head_order) != 13:
-        raise SystemExit("error: inherent metadata head_order must contain 13 heads")
-    if not isinstance(threshold_keys, list) or len(threshold_keys) != 13:
-        raise SystemExit("error: inherent metadata threshold_keys_in_order must contain 13 keys")
-    if not isinstance(default_thresholds, dict):
-        raise SystemExit("error: inherent metadata default_thresholds must be an object")
-    missing = [key for key in threshold_keys if key not in default_thresholds]
-    if missing:
-        raise SystemExit(f"error: inherent metadata missing thresholds for: {', '.join(missing)}")
-
-
 def upsert_manifest_entries(model_path: Path, metadata_path: Path) -> None:
     manifest = load_json(MODEL_MANIFEST_PATH)
     new_entries = {
@@ -91,7 +74,10 @@ def main() -> None:
         raise SystemExit(f"error: source model not found: {source_model}")
     if not source_metadata.is_file():
         raise SystemExit(f"error: source metadata not found: {source_metadata}")
-    validate_inherent_metadata(load_json(source_metadata))
+    try:
+        contract = validate_artifact(source_model, source_metadata)
+    except ContractError as error:
+        raise SystemExit(f"error: {error}") from error
 
     ASSETS_MODELS_DIR.mkdir(parents=True, exist_ok=True)
     target_model = ASSETS_MODELS_DIR / MODEL_FILENAME
@@ -102,6 +88,7 @@ def main() -> None:
 
     print(f"installed inherent LiteRT model: {target_model}")
     print(f"model bytes={target_model.stat().st_size} sha256={file_sha256(target_model)}")
+    print(f"model input={contract['input_shape']} output={contract['output_shape']}")
     print(f"installed inherent metadata: {target_metadata}")
     print(f"metadata bytes={target_metadata.stat().st_size} sha256={file_sha256(target_metadata)}")
 

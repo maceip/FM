@@ -3,7 +3,9 @@ package com.google.research.air.cosmo.gatekeeping
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -313,9 +315,37 @@ class GatekeepingModelTest {
                     }
                     """.trimIndent()
                 },
-                nativeCreate = { _, useNpu ->
+                nativeCreate = { _, useNpu, expectedInputShape, expectedOutputShape ->
                     createRequests += useNpu
-                    if (createRequests.size == 1) 41L else 42L
+                    if (createRequests.size == 1) {
+                        assertArrayEquals(
+                            intArrayOf(1, InherentAudioGatekeepingModel.MAX_SAMPLES),
+                            expectedInputShape
+                        )
+                        assertArrayEquals(
+                            intArrayOf(
+                                1,
+                                InherentAudioGatekeepingModel.MAX_FRAMES,
+                                InherentAudioGatekeepingModel.MEL_BINS
+                            ),
+                            expectedOutputShape
+                        )
+                        41L
+                    } else {
+                        assertArrayEquals(
+                            intArrayOf(
+                                1,
+                                InherentAudioGatekeepingModel.MAX_FRAMES,
+                                InherentAudioGatekeepingModel.MEL_BINS
+                            ),
+                            expectedInputShape
+                        )
+                        assertArrayEquals(
+                            intArrayOf(1, InherentAudioGatekeepingModel.NUM_INTENTS),
+                            expectedOutputShape
+                        )
+                        42L
+                    }
                 },
                 nativeRun = { handle, input, output ->
                     if (handle == 41L) {
@@ -344,6 +374,32 @@ class GatekeepingModelTest {
 
         assertEquals(listOf(false, false), createRequests)
         assertEquals(mapOf("define_term" to 0.12f), result.detectedSkills)
+    }
+
+    @Test
+    fun inherentAudioGatekeeperProbeFailsClosedWhenBackendContractFails() {
+        val destroyedHandles = mutableListOf<Long>()
+        var createCount = 0
+        val model =
+            InherentAudioGatekeepingModel(
+                loadAssetBytes =
+                    fakeLoader(
+                        mapOf(
+                            GatekeeperModelIds.AUDIO_FRONTEND to byteArrayOf(6),
+                            GatekeeperModelIds.INHERENT_V0 to byteArrayOf(7)
+                        )
+                ),
+                loadMetadataText = { null },
+                nativeCreate = { _, _, _, _ ->
+                    createCount += 1
+                    if (createCount == 1) 41L else 0L
+                },
+                nativeRun = { _, _, _ -> true },
+                nativeDestroy = { handle -> destroyedHandles += handle }
+            )
+
+        assertFalse(model.isUsable())
+        assertEquals(listOf(41L), destroyedHandles)
     }
 
     private fun bertModel(

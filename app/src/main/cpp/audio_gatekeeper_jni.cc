@@ -13,6 +13,7 @@
 #include <numeric>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -36,6 +37,24 @@ std::optional<std::vector<uint8_t>> CopyByteArray(JNIEnv* env, jbyteArray array)
     return std::nullopt;
   }
   return bytes;
+}
+
+std::optional<std::vector<int32_t>> CopyIntArray(JNIEnv* env, jintArray array) {
+  if (array == nullptr) {
+    return std::vector<int32_t>{};
+  }
+  const jsize length = env->GetArrayLength(array);
+  if (length < 0) {
+    return std::nullopt;
+  }
+  std::vector<int32_t> values(static_cast<size_t>(length));
+  if (length > 0) {
+    env->GetIntArrayRegion(array, 0, length, reinterpret_cast<jint*>(values.data()));
+    if (env->ExceptionCheck()) {
+      return std::nullopt;
+    }
+  }
+  return values;
 }
 
 size_t ElementCount(const LiteRtRankedTensorType& type) {
@@ -65,11 +84,42 @@ std::string DescribeShape(const LiteRtRankedTensorType& type) {
   return out;
 }
 
+std::string DescribeShapeVector(const std::vector<int32_t>& shape) {
+  std::string out = "[";
+  for (size_t i = 0; i < shape.size(); ++i) {
+    if (i > 0) {
+      out += ",";
+    }
+    out += std::to_string(shape[i]);
+  }
+  out += "]";
+  return out;
+}
+
+bool ShapeEquals(const LiteRtRankedTensorType& actual, const std::vector<int32_t>& expected) {
+  if (expected.empty()) {
+    return true;
+  }
+  if (actual.layout.rank != expected.size()) {
+    return false;
+  }
+  for (unsigned int i = 0; i < actual.layout.rank; ++i) {
+    if (actual.layout.dimensions[i] != expected[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 class LiteRtAudioModel {
  public:
-  bool Initialize(const std::vector<uint8_t>& model_bytes, bool use_npu) {
+  bool Initialize(const std::vector<uint8_t>& model_bytes, bool use_npu,
+                  std::vector<int32_t> expected_input_shape,
+                  std::vector<int32_t> expected_output_shape) {
     model_bytes_ = model_bytes;
     use_npu_ = use_npu;
+    expected_input_shape_ = std::move(expected_input_shape);
+    expected_output_shape_ = std::move(expected_output_shape);
     if (!LoadLiteRtSymbols()) {
       return false;
     }
@@ -288,6 +338,16 @@ class LiteRtAudioModel {
     }
     input_element_count_ = ElementCount(input_type_);
     output_element_count_ = ElementCount(output_type_);
+    if (!ShapeEquals(input_type_, expected_input_shape_)) {
+      LOGE("Audio LiteRT input shape mismatch: expected %s got %s",
+           DescribeShapeVector(expected_input_shape_).c_str(), DescribeShape(input_type_).c_str());
+      return false;
+    }
+    if (!ShapeEquals(output_type_, expected_output_shape_)) {
+      LOGE("Audio LiteRT output shape mismatch: expected %s got %s",
+           DescribeShapeVector(expected_output_shape_).c_str(), DescribeShape(output_type_).c_str());
+      return false;
+    }
     LOGW("Audio LiteRT model shape input=%s output=%s accelerator=%s",
          DescribeShape(input_type_).c_str(), DescribeShape(output_type_).c_str(),
          use_npu_ ? "npu" : "cpu");
@@ -310,6 +370,8 @@ class LiteRtAudioModel {
   LiteRtCompiledModel compiled_model_ = nullptr;
   LiteRtRankedTensorType input_type_{};
   LiteRtRankedTensorType output_type_{};
+  std::vector<int32_t> expected_input_shape_;
+  std::vector<int32_t> expected_output_shape_;
   size_t input_element_count_ = 0;
   size_t output_element_count_ = 0;
   std::mutex mutex_;
@@ -319,15 +381,23 @@ class LiteRtAudioModel {
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_google_research_air_cosmo_gatekeeping_models_AudioGatekeeperLiteRtImpl_nativeCreate(
-    JNIEnv* env, jclass clazz, jbyteArray model_buffer, jboolean use_npu) {
+    JNIEnv* env, jclass clazz, jbyteArray model_buffer, jboolean use_npu,
+    jintArray expected_input_shape, jintArray expected_output_shape) {
   (void)clazz;
   auto model_bytes = CopyByteArray(env, model_buffer);
   if (!model_bytes.has_value()) {
     LOGE("nativeCreate received null or unreadable model buffer");
     return 0;
   }
+  auto input_shape = CopyIntArray(env, expected_input_shape);
+  auto output_shape = CopyIntArray(env, expected_output_shape);
+  if (!input_shape.has_value() || !output_shape.has_value()) {
+    LOGE("nativeCreate received unreadable expected tensor shape arrays");
+    return 0;
+  }
   auto model = std::make_unique<LiteRtAudioModel>();
-  if (!model->Initialize(*model_bytes, use_npu == JNI_TRUE)) {
+  if (!model->Initialize(*model_bytes, use_npu == JNI_TRUE, std::move(*input_shape),
+                         std::move(*output_shape))) {
     return 0;
   }
   return reinterpret_cast<jlong>(model.release());

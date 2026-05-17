@@ -37,7 +37,8 @@ constructor(
 
     private fun computeIsAvailable(): Boolean {
         return assetExists(checkNotNull(GatekeeperModelIds.filenameFor(GatekeeperModelIds.INHERENT_V0))) &&
-            assetExists(checkNotNull(GatekeeperModelIds.filenameFor(GatekeeperModelIds.INHERENT_V0_METADATA)))
+            assetExists(checkNotNull(GatekeeperModelIds.filenameFor(GatekeeperModelIds.INHERENT_V0_METADATA))) &&
+            model.get().isUsable()
     }
 
     override suspend fun classify(input: AudioInput): GatekeepingResult? {

@@ -14,7 +14,9 @@ class AudioGatekeeperLiteRtImpl private constructor() {
         @JvmStatic
         external fun nativeCreate(
             modelBuffer: ByteArray,
-            useNpu: Boolean
+            useNpu: Boolean,
+            expectedInputShape: IntArray,
+            expectedOutputShape: IntArray
         ): Long
 
         @JvmStatic

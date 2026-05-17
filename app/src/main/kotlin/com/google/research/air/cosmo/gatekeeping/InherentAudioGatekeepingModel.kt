@@ -22,7 +22,7 @@ private fun inherentMetadataTextLoader(context: Context): () -> String? = {
 class InherentAudioGatekeepingModel internal constructor(
     private val loadAssetBytes: (String) -> ByteArray?,
     private val loadMetadataText: () -> String?,
-    private val nativeCreate: (ByteArray, Boolean) -> Long,
+    private val nativeCreate: (ByteArray, Boolean, IntArray, IntArray) -> Long,
     private val nativeRun: (Long, FloatBuffer, FloatBuffer) -> Boolean,
     private val nativeDestroy: (Long) -> Unit
 ) : GatekeepingModel {
@@ -32,7 +32,14 @@ class InherentAudioGatekeepingModel internal constructor(
     ) : this(
         loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context),
         loadMetadataText = inherentMetadataTextLoader(context),
-        nativeCreate = { modelBuffer, useNpu -> AudioGatekeeperLiteRtImpl.nativeCreate(modelBuffer, useNpu) },
+        nativeCreate = { modelBuffer, useNpu, expectedInputShape, expectedOutputShape ->
+            AudioGatekeeperLiteRtImpl.nativeCreate(
+                modelBuffer,
+                useNpu,
+                expectedInputShape,
+                expectedOutputShape
+            )
+        },
         nativeRun = { handle, input, output -> AudioGatekeeperLiteRtImpl.nativeRun(handle, input, output) },
         nativeDestroy = { handle -> AudioGatekeeperLiteRtImpl.nativeDestroy(handle) }
     )
@@ -43,6 +50,16 @@ class InherentAudioGatekeepingModel internal constructor(
 
     override suspend fun predict(input: String): GatekeepingResult =
         throw UnsupportedOperationException("Inherent audio gatekeeper does not support text prediction")
+
+    fun isUsable(): Boolean =
+        runCatching {
+            ensureFrontend()
+            ensureBackend()
+            true
+        }.getOrElse {
+            close()
+            false
+        }
 
     override suspend fun predict(pcm: ByteArray): GatekeepingResult {
         val scores =
@@ -103,7 +120,13 @@ class InherentAudioGatekeepingModel internal constructor(
         if (frontendHandle != 0L) return frontendHandle
         val bytes = loadAssetBytes(GatekeeperModelIds.AUDIO_FRONTEND)
             ?: failUnavailable("inherent_frontend_unavailable")
-        val created = nativeCreate(bytes, false)
+        val created =
+            nativeCreate(
+                bytes,
+                false,
+                intArrayOf(1, MAX_SAMPLES),
+                intArrayOf(1, MAX_FRAMES, MEL_BINS)
+            )
         if (created == 0L) failUnavailable("inherent_frontend_cpu_create_failed")
         frontendHandle = created
         return created
@@ -113,7 +136,13 @@ class InherentAudioGatekeepingModel internal constructor(
         if (backendHandle != 0L) return backendHandle
         val bytes = loadAssetBytes(GatekeeperModelIds.INHERENT_V0)
             ?: failUnavailable("inherent_asset_unavailable")
-        val created = nativeCreate(bytes, false)
+        val created =
+            nativeCreate(
+                bytes,
+                false,
+                intArrayOf(1, MAX_FRAMES, MEL_BINS),
+                intArrayOf(1, NUM_INTENTS)
+            )
         if (created == 0L) failUnavailable("inherent_litert_cpu_create_failed")
         backendHandle = created
         return created
