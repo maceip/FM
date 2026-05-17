@@ -47,6 +47,18 @@ run_test() {
   "${ADB[@]}" shell am instrument -w -r "$@" -e class "$class_name" "$TEST_RUNNER"
 }
 
+check_instrumentation_output() {
+  local path="$1"
+  if grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS: test=initializationError' "$path"; then
+    echo "Instrumentation failed; see $path" >&2
+    return 1
+  fi
+  if grep -Eq 'Process crashed|INSTRUMENTATION_STATUS_CODE: -2|shortMsg=Process crashed' "$path"; then
+    echo "Instrumentation crashed; see $path" >&2
+    return 1
+  fi
+}
+
 if [[ "$LANE" == "pixel10" ]]; then
   run_test \
     com.google.research.air.cosmo.lib.llm.AICoreDeviceSmokeTest \
@@ -63,5 +75,8 @@ run_test \
 "${ADB[@]}" logcat -d -v time \
   | grep -E 'CosmoDeviceSmoke|AICore|LiteRT|RemoteInference|AndroidRuntime|FATAL EXCEPTION|ANR' \
   > "$ARTIFACT_DIR/logcat-filtered.txt" || true
+
+check_instrumentation_output "$ARTIFACT_DIR/aicore.txt"
+check_instrumentation_output "$ARTIFACT_DIR/model-routing.txt"
 
 echo "Artifacts: $ARTIFACT_DIR"

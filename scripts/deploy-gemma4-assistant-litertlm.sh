@@ -12,9 +12,12 @@ fi
 
 MODEL_STORAGE_ID="$(python3 "$ROOT_DIR/scripts/model-storage-id.py" "$MODEL_ID")"
 LOCAL_MODEL="${LOCAL_MODEL:-$ROOT_DIR/artifacts/models/$MODEL_STORAGE_ID/model.litertlm}"
-DEVICE_TMP="${DEVICE_TMP:-/data/local/tmp/cosmo-$MODEL_STORAGE_ID.litertlm}"
 DEVICE_DIR="files/models/$MODEL_STORAGE_ID"
 DEVICE_MODEL="$DEVICE_DIR/model.litertlm"
+ADB=(adb)
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  ADB=(adb -s "$ANDROID_SERIAL")
+fi
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "adb is required to deploy the LiteRT-LM model to a device." >&2
@@ -27,10 +30,8 @@ if [[ ! -r "$LOCAL_MODEL" ]]; then
   exit 1
 fi
 
-adb push "$LOCAL_MODEL" "$DEVICE_TMP" >/dev/null
-adb shell chmod 0644 "$DEVICE_TMP"
-adb shell run-as "$PACKAGE_NAME" mkdir -p "$DEVICE_DIR"
-adb shell run-as "$PACKAGE_NAME" cp "$DEVICE_TMP" "$DEVICE_MODEL"
-adb shell rm -f "$DEVICE_TMP"
+"${ADB[@]}" shell "run-as '$PACKAGE_NAME' mkdir -p '$DEVICE_DIR'"
+"${ADB[@]}" shell "run-as '$PACKAGE_NAME' sh -c 'cat > \"$DEVICE_MODEL\"'" < "$LOCAL_MODEL"
+"${ADB[@]}" shell "run-as '$PACKAGE_NAME' chmod 0600 '$DEVICE_MODEL'"
 
 echo "Deployed $LOCAL_MODEL to $PACKAGE_NAME:$DEVICE_MODEL"

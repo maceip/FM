@@ -46,6 +46,10 @@ REWRITE_RULES = [
     (b"j$/lang/", b"java/lang/"),
     (b"j$/io/", b"java/io/"),
     (b"j$/net/", b"java/net/"),
+    # These are synthetic helper classes from desugar_jdk_libs, not Android platform
+    # classes. Route the recovered bytecode to a tiny app-owned compatibility surface.
+    (b"java/util/DesugarCollections", b"com/google/research/air/cosmo/compat/DesugarCollections"),
+    (b"java/util/DesugarArrays", b"com/google/research/air/cosmo/compat/DesugarArrays"),
     # Protobuf-javalite 3.x had `getGeneratedRegistry()`; in 4.x it was renamed to
     # `getEmptyRegistry()` (same signature, returns the empty extension registry). Rewrite
     # the constant-pool method-name string so the MethodRef resolves at runtime.

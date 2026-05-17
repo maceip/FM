@@ -45,14 +45,19 @@ COSMO_ALLOW_MISSING_BINARIES="${COSMO_ALLOW_MISSING_BINARIES:-1}" \
   -e cosmo.coreCapabilitySmoke true \
   -e class com.google.research.air.cosmo.CoreCapabilityDeviceSmokeTest \
   "$TEST_RUNNER" | tee "$ARTIFACT_DIR/core-capability.txt"
+
+"${ADB[@]}" logcat -d -v time \
+  | grep -E 'CosmoCoreDeviceSmoke|SodaSession|JniSodaCapability|FulfillmentOrchestrator|BertGatekeeperJni|AndroidRuntime|FATAL EXCEPTION|ANR in|Application Not Responding' \
+  > "$ARTIFACT_DIR/core-logcat-filtered.txt" || true
+
 if grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS: test=initializationError' "$ARTIFACT_DIR/core-capability.txt"; then
   echo "Core capability instrumentation failed; see $ARTIFACT_DIR/core-capability.txt" >&2
   exit 1
 fi
-
-"${ADB[@]}" logcat -d -v time \
-  | grep -E 'CosmoCoreDeviceSmoke|SodaSession|JniSodaCapability|FulfillmentOrchestrator|AndroidRuntime|FATAL EXCEPTION|ANR in|Application Not Responding' \
-  > "$ARTIFACT_DIR/core-logcat-filtered.txt" || true
+if grep -Eq 'Process crashed|INSTRUMENTATION_STATUS_CODE: -2|shortMsg=Process crashed' "$ARTIFACT_DIR/core-capability.txt"; then
+  echo "Core capability instrumentation crashed; see $ARTIFACT_DIR/core-capability.txt" >&2
+  exit 1
+fi
 
 if [[ -n "$AUDIO_WAV" ]]; then
   if [[ ! -f "$AUDIO_WAV" ]]; then

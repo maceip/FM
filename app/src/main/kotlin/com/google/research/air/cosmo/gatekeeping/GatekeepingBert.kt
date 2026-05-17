@@ -40,6 +40,7 @@ class BertClassifierGatekeepingModel internal constructor(
     // GOOGLE_TENSOR/MEDIATEK/OTHER without touching `Build.SOC_MANUFACTURER`. Production passes
     // `SocClass.Companion::current`, which inlines the `Build.SOC_MANUFACTURER` read.
     private val socProvider: () -> SocClass,
+    private val nativeRuntimeSupported: () -> Boolean = { true },
     private val nativeCreate: (ByteArray, ByteArray, Boolean) -> Long,
     private val nativeRun: (Long, String, Int) -> FloatArray?,
     private val nativeDestroy: (Long) -> Unit
@@ -50,6 +51,7 @@ class BertClassifierGatekeepingModel internal constructor(
     ) : this(
         loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context),
         socProvider = SocClass.Companion::current,
+        nativeRuntimeSupported = NativeBertRuntimeGuard::isSupportedOnThisDevice,
         nativeCreate = { vocabBuffer, modelBuffer, isTpuEnabled ->
             BertEncoderImpl.nativeCreate(vocabBuffer, modelBuffer, isTpuEnabled)
         },
@@ -109,6 +111,10 @@ class BertClassifierGatekeepingModel internal constructor(
 
     private fun ensureHandle(): Long {
         if (handle != 0L || unavailableReason != null) return handle
+        if (!nativeRuntimeSupported()) {
+            unavailableReason = "bert_native_unsupported_on_emulator"
+            return 0L
+        }
         val vocabBytes = loadAssetBytes(GatekeeperModelIds.BERT_VOCAB)
         if (vocabBytes == null) {
             unavailableReason = "bert_vocab_unavailable:${GatekeeperModelIds.BERT_VOCAB}"
@@ -269,6 +275,29 @@ class BertClassifierGatekeepingModel internal constructor(
                 ThresholdProfile.AUDIO_NON_USER -> AUDIO_NON_USER
                 ThresholdProfile.DEFAULT -> DEFAULT_PROFILE
             }
+    }
+}
+
+internal object NativeBertRuntimeGuard {
+    fun isSupportedOnThisDevice(): Boolean = !isProbablyEmulator()
+
+    fun isProbablyEmulator(): Boolean {
+        val fingerprint = Build.FINGERPRINT.orEmpty().lowercase()
+        val model = Build.MODEL.orEmpty().lowercase()
+        val manufacturer = Build.MANUFACTURER.orEmpty().lowercase()
+        val brand = Build.BRAND.orEmpty().lowercase()
+        val device = Build.DEVICE.orEmpty().lowercase()
+        val product = Build.PRODUCT.orEmpty().lowercase()
+        val hardware = Build.HARDWARE.orEmpty().lowercase()
+        return fingerprint.startsWith("generic") ||
+            fingerprint.contains("sdk_gphone") ||
+            model.contains("emulator") ||
+            model.contains("android sdk built for") ||
+            manufacturer.contains("genymotion") ||
+            hardware == "goldfish" ||
+            hardware == "ranchu" ||
+            brand.startsWith("generic") && device.startsWith("generic") ||
+            product.contains("sdk")
     }
 }
 

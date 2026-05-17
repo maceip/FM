@@ -37,7 +37,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled |
+| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled; emulator core smoke passes SODA native lifecycle |
 | Magic Mic / IntendedSpeech gate | 🟨⬜⬜⬜⬜ | Not used as launch gate; recovered cosmo SODA stays transcript-first with `AMBIENT_CONTINUOUS` |
 | Endpointer / punctuation / denorm / G2P | 🟩🟩🟩🟩🟩 | Internal to SODA; transcripts arrive complete |
 | Voice Match (speaker ID) | 🟨🟨⬜⬜⬜ | JNI stub + config plumbing; enrollment UI not ported |
@@ -52,7 +52,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | BERT classifier (CPU + Tensor G4 + Tensor G5) | 🟩🟩🟩🟩🟩 | Combined BERT + regex fusion |
 | C9 selector-routed dispatch | 🟩🟩🟩🟩🟩 | Backend returns null for non-native input type — that IS the mutex |
 | Conformer EdgeTPU audio backend | 🟩🟩🟩🟩⬜ | Code path bundled; activation gated on Pixel + Darwinn proof |
-| Inherent (joint audio→intent) backend | 🟩🟩⬜⬜⬜ | Wired; real model produced by the separate `~/inherent` project |
+| Inherent (joint audio→intent) backend | 🟩🟩🟩⬜⬜ | Wired; v0.1 LiteRT artifact now matches Android tensor contract; quality + real-device proof pending |
 | MediaTek Dimensity (mt6989) BERT variant | 🟩⬜⬜⬜⬜ | Manifest slot reserved; AOT pipeline drafted; model not built yet |
 
 ### Intent + fulfillment
@@ -70,14 +70,13 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 |---|---|---|
 | Public AICore (Gemini Nano via `GenerativeModel`) | 🟩🟩🟩🟩🟩 | Pixel/Nano happy path; Pixel 10 device proof pending |
 | Simulation LLM (deterministic test) | 🟩🟩🟩🟩🟩 | Test fixture |
-| LiteRT-LM (on-device Gemma bundle) | 🟩🟩🟩⬜⬜ | Local fallback for any device, including Pixel if Nano/AICore fails |
-| Remote inference (Oak session) | 🟩🟩🟩⬜⬜ | Network fallback when local paths are unavailable; needs endpoint + cert pin + audience config |
+| LiteRT-LM (on-device Gemma bundle) | 🟩🟩🟩⬜⬜ | Local fallback path; E2B model deploys to app storage, but `liblitertlm_jni.so` SIGILLs on arm64 emulator so physical-device proof is required |
+| Remote inference (Oak session) | 🟨⬜⬜⬜⬜ | Post-launch fallback; endpoint + cert pin + audience config intentionally not provisioned for launch |
 | Network-aware fallback selector | 🟩🟩🟩🟩🟩 | Local / remote / hybrid routing |
 
 ### Memory + state
 
 | Subsystem | Progress | Notes |
-|---|---|---|
 | Per-source ephemeral buffers (23 qualifiers) | 🟩🟩🟩🟩🟩 | Timestamp-based eviction; max age tracks settings |
 | Encrypted persistent context store | 🟩🟩🟩🟩🟩 | Room + SQLCipher; Keystore-wrapped passphrase |
 | State probe (`CosmoStateSource`) | 🟩🟩🟩🟩🟩 | Cosmo-aligned 2-method interface |

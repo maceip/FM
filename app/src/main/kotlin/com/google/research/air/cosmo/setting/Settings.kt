@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.Serializer
@@ -16,10 +17,11 @@ import com.google.research.air.cosmo.setting.proto.CosmoSetting
 import com.google.research.air.cosmo.setting.proto.FulfillmentModel
 import com.google.research.air.cosmo.setting.proto.ProcessingMode
 import com.google.research.air.cosmo.setting.proto.ProcessingMode.PROCESSING_MODE_BATCH
+import dagger.hilt.EntryPoint
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.InputStream
@@ -391,16 +393,35 @@ constructor(
     }
 }
 
-@AndroidEntryPoint
 class CosmoStateUpdateReceiver : BroadcastReceiver() {
-    @Inject lateinit var cosmoStateManager: CosmoStateManager
-
     override fun onReceive(
         context: Context,
         intent: Intent
     ) {
         if (intent.action == CosmoStateManager.COSMO_STATE_UPDATE_ACTION) {
-            cosmoStateManager.updateAndScheduleCosmoState()
+            try {
+                EntryPointAccessors
+                    .fromApplication(context.applicationContext, CosmoStateUpdateReceiverEntryPoint::class.java)
+                    .cosmoStateManager()
+                    .updateAndScheduleCosmoState()
+            } catch (error: IllegalStateException) {
+                if (context.applicationContext.javaClass.name == HILT_TEST_APPLICATION_CLASS_NAME) {
+                    Log.w(TAG, "Skipping state update before Hilt test component exists.", error)
+                } else {
+                    throw error
+                }
+            }
         }
+    }
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface CosmoStateUpdateReceiverEntryPoint {
+        fun cosmoStateManager(): CosmoStateManager
+    }
+
+    companion object {
+        private const val TAG = "CosmoStateUpdateReceiver"
+        private const val HILT_TEST_APPLICATION_CLASS_NAME = "dagger.hilt.android.testing.HiltTestApplication"
     }
 }

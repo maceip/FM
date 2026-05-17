@@ -530,7 +530,7 @@ class BertModelBackend {
                    &api_.CreateTensorBufferFromHostMemory) &&
            Resolve("LiteRtDestroyTensorBuffer", &api_.DestroyTensorBuffer) &&
            Resolve("LiteRtRunCompiledModel", &api_.RunCompiledModel) &&
-           Resolve("LiteRtGetStatusString", &api_.GetStatusString);
+           ResolveOptional("LiteRtGetStatusString", &api_.GetStatusString);
   }
 
   template <typename Fn>
@@ -542,6 +542,17 @@ class BertModelBackend {
       LOGE("Failed to resolve %s from libLiteRt.so: %s", symbol,
            error == nullptr ? "symbol missing" : error);
       return false;
+    }
+    return true;
+  }
+
+  template <typename Fn>
+  bool ResolveOptional(const char* symbol, Fn* out) {
+    dlerror();
+    *out = reinterpret_cast<Fn>(dlsym(litert_lib_, symbol));
+    if (*out == nullptr) {
+      LOGW("Optional symbol %s missing from libLiteRt.so; status messages will be unavailable",
+           symbol);
     }
     return true;
   }

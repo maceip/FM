@@ -19,6 +19,7 @@ import com.google.research.air.cosmo.presence.PresenceState
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -72,7 +73,7 @@ class CoreCapabilityDeviceSmokeTest {
             delay(250)
 
             val gatekeeperResult =
-                async {
+                async(start = CoroutineStart.UNDISPATCHED) {
                     gatekeeperOutput.results.first { result ->
                         result.detectedSkills.containsKey("add_timer")
                     }

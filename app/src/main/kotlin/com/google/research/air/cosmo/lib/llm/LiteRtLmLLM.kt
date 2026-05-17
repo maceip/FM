@@ -1,6 +1,7 @@
 package com.google.research.air.cosmo.lib.llm
 
 import android.content.Context
+import android.os.Build
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Capabilities
 import com.google.ai.edge.litertlm.Content
@@ -89,6 +90,12 @@ constructor(
     private suspend fun engine(): InitializedEngine =
         engineMutex.withLock {
             initializedEngine?.let { return@withLock it }
+            if (!LiteRtLmRuntimeGuard.isSupportedOnThisDevice()) {
+                throw LlmUnavailableException(
+                    LlmFailureCause.LOCAL_MODEL_UNAVAILABLE,
+                    "LiteRT-LM native runtime is disabled on Android emulators"
+                )
+            }
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
             val modelFile = resolveModelFile()
             ExperimentalFlags.enableSpeculativeDecoding = modelSupportsSpeculativeDecoding(modelFile)
@@ -270,6 +277,29 @@ constructor(
         private const val MIN_CPU_THREADS = 2
         private const val MAX_CPU_THREADS = 6
         private const val SYSTEM_INSTRUCTION = "You are Cosmo's on-device assistant. Answer concisely and follow the user request."
+    }
+}
+
+internal object LiteRtLmRuntimeGuard {
+    fun isSupportedOnThisDevice(): Boolean = !isProbablyEmulator()
+
+    private fun isProbablyEmulator(): Boolean {
+        val fingerprint = Build.FINGERPRINT.orEmpty().lowercase(Locale.US)
+        val model = Build.MODEL.orEmpty().lowercase(Locale.US)
+        val manufacturer = Build.MANUFACTURER.orEmpty().lowercase(Locale.US)
+        val brand = Build.BRAND.orEmpty().lowercase(Locale.US)
+        val device = Build.DEVICE.orEmpty().lowercase(Locale.US)
+        val product = Build.PRODUCT.orEmpty().lowercase(Locale.US)
+        val hardware = Build.HARDWARE.orEmpty().lowercase(Locale.US)
+        return fingerprint.startsWith("generic") ||
+            fingerprint.contains("sdk_gphone") ||
+            model.contains("emulator") ||
+            model.contains("android sdk built for") ||
+            manufacturer.contains("genymotion") ||
+            hardware == "goldfish" ||
+            hardware == "ranchu" ||
+            brand.startsWith("generic") && device.startsWith("generic") ||
+            product.contains("sdk")
     }
 }
 

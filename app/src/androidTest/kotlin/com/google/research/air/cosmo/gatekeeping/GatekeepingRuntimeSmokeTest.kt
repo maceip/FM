@@ -5,11 +5,16 @@ import com.google.research.air.cosmo.gatekeeping.models.BertEncoderImpl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
 import org.junit.Test
 
 class GatekeepingRuntimeSmokeTest {
     @Test
     fun bertCpuModelReturnsFiniteNineteenFloatVector() {
+        assumeFalse(
+            "LiteRT BERT JNI crashes inside libLiteRt.so on the arm64 emulator; run this smoke on physical devices.",
+            NativeBertRuntimeGuard.isProbablyEmulator()
+        )
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context)
         val vocab = loadAssetBytes.required(GatekeeperModelIds.BERT_VOCAB)
