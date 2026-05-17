@@ -192,7 +192,7 @@ if [[ "${VERIFY_ONLY}" -eq 0 && "${downloaded}" -eq 0 && "${verified}" -eq 0 && 
   exit 65
 fi
 
-if [[ "${verified}" -gt 0 ]]; then
+if [[ "${VERIFY_ONLY}" -eq 0 && "${verified}" -gt 0 ]]; then
   checksums_tmp="$(mktemp)"
   (
     cd "${MODELS_DIR}"
