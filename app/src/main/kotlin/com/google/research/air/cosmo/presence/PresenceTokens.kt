@@ -12,21 +12,21 @@ import androidx.compose.ui.unit.dp
 object PresenceTokens {
 
     object Palette {
-        val Background = Color(0xFF0A0C10)
-        val SurfaceGlass = Color(0x08FFFFFF)
-        val SurfaceGlassMedium = Color(0x0DFFFFFF)
-        val SurfaceGlassHigh = Color(0x14FFFFFF)
+        val Background = Color(0xFF050914)
+        val SurfaceGlass = Color(0xAA0D1117)
+        val SurfaceGlassMedium = Color(0xC0101520)
+        val SurfaceGlassHigh = Color(0xD0141A26)
         val SurfaceDark = Color(0xFF111318)
         val SurfaceContainer = Color(0xFF1E2024)
         val SurfaceContainerHigh = Color(0xFF282A2E)
 
         val OnSurface = Color(0xFFE2E2E8)
-        val OnSurfaceDim = Color(0xFF6A7C92)
+        val OnSurfaceDim = Color(0xFF7C8798)
         val OnSurfaceVariant = Color(0xFFBAC9CC)
 
-        val BorderDefault = Color(0x26FFFFFF)
-        val BorderBright = Color(0x33FFFFFF)
-        val BorderDim = Color(0x1AFFFFFF)
+        val BorderDefault = Color(0x33B8C7E0)
+        val BorderBright = Color(0x80CFE3FF)
+        val BorderDim = Color(0x1FB8C7E0)
 
         val Cyan = Color(0xFF00E5FF)
         val CyanDim = Color(0xFF38BDF8)
@@ -40,22 +40,23 @@ object PresenceTokens {
         val Magenta = Color(0xFFFF00E5)
         val AlertRed = Color(0xFFFF3D00)
 
-        val GlassInnerGlow = Color(0x0DFFFFFF)
+        val GlassInnerGlow = Color(0x1ACFE3FF)
     }
 
     object Size {
         val orbMin: Dp = 36.dp
         val orbMax: Dp = 48.dp
-        val orbDefault: Dp = 44.dp
-        val orbCorner: Dp = 16.dp
+        val orbDefault: Dp = 48.dp
+        val orbCorner: Dp = 14.dp
 
-        val tabIdleWidth: Dp = 10.dp
+        val tabIdleWidth: Dp = 12.dp
         val tabIdleHeight: Dp = 180.dp
-        val tabExpandedWidth: Dp = 320.dp
+        val tabExpandedWidth: Dp = 350.dp
         val tabExpandedHeight: Dp = 160.dp
-        val tabCorner: Dp = 40.dp
+        val tabCorner: Dp = 80.dp
 
         val cardCorner: Dp = 16.dp
+        val cardStackMaxWidth: Dp = 360.dp
         val cardGlowStripWidth: Dp = 2.dp
         val cardInnerCorner: Dp = 8.dp
         val cardIconSize: Dp = 32.dp

@@ -20,8 +20,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -93,9 +96,39 @@ fun OrbSurface(
         modifier = modifier
             .size(orbSize)
             .graphicsLayer { this.alpha = alpha }
+            .shadow(
+                elevation = 18.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = 0.65f),
+                spotColor = state.accent.copy(alpha = 0.18f)
+            )
             .clip(shape)
-            .background(PresenceTokens.Palette.SurfaceGlass, shape)
-            .border(1.dp, PresenceTokens.Palette.BorderDefault, shape),
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.10f),
+                        PresenceTokens.Palette.SurfaceGlassHigh,
+                        PresenceTokens.Palette.SurfaceGlass
+                    )
+                ),
+                shape
+            )
+            .drawBehind {
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.30f), Color.Transparent)
+                    ),
+                    size = Size(size.width, size.height * 0.45f)
+                )
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Transparent, state.accent.copy(alpha = 0.72f), Color.Transparent)
+                    ),
+                    topLeft = Offset(size.width * 0.18f, size.height - 1.5.dp.toPx()),
+                    size = Size(size.width * 0.64f, 1.5.dp.toPx())
+                )
+            }
+            .border(1.dp, PresenceTokens.Palette.BorderBright, shape),
         contentAlignment = Alignment.Center
     ) {
         if (state != OrbVisualState.IDLE) {
@@ -110,6 +143,15 @@ fun OrbSurface(
 }
 
 private enum class OrbVisualState { IDLE, LISTENING, WORKING, NEEDS_INPUT }
+
+private val OrbVisualState.accent: Color
+    get() =
+        when (this) {
+            OrbVisualState.IDLE -> PresenceTokens.Palette.CyanDim
+            OrbVisualState.LISTENING -> PresenceTokens.Palette.AcidGreen
+            OrbVisualState.WORKING -> PresenceTokens.Palette.Cyan
+            OrbVisualState.NEEDS_INPUT -> PresenceTokens.Palette.AcidYellow
+        }
 
 @Composable
 private fun OrbCenterIndicator(state: OrbVisualState, pulseAlpha: Float) {
@@ -128,6 +170,7 @@ private fun OrbCenterIndicator(state: OrbVisualState, pulseAlpha: Float) {
                     .size(6.dp)
                     .clip(RoundedCornerShape(50))
                     .background(PresenceTokens.Palette.AcidGreen.copy(alpha = pulseAlpha))
+                    .shadow(10.dp, RoundedCornerShape(50), ambientColor = PresenceTokens.Palette.AcidGreen)
             )
         }
         OrbVisualState.WORKING -> {
@@ -170,6 +213,28 @@ private fun DrawScope.drawStateRings(
         else -> return
     }
 
+    // Dim instrument rings sit under every active state, matching the dense HUD dial in the comps.
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.36f),
+        radius = outerRadius * 1.22f,
+        center = Offset(cx, cy)
+    )
+    drawCircle(
+        color = PresenceTokens.Palette.BorderDim,
+        radius = outerRadius * 1.14f,
+        center = Offset(cx, cy),
+        style = Stroke(width = 1f)
+    )
+    drawCircle(
+        color = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = 0.32f),
+        radius = outerRadius * 1.02f,
+        center = Offset(cx, cy),
+        style = Stroke(
+            width = 2f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(1.5f, 4.5f))
+        )
+    )
+
     // inner solid ring
     drawCircle(
         color = color.copy(alpha = 0.3f),
@@ -188,10 +253,27 @@ private fun DrawScope.drawStateRings(
         )
     }
 
+    val arcSize = outerRadius * 2
+    rotate(degrees = angle - 90f, pivot = Offset(cx, cy)) {
+        drawArc(
+            color = color.copy(alpha = pulseAlpha),
+            startAngle = 0f,
+            sweepAngle = when (state) {
+                OrbVisualState.LISTENING -> 145f
+                OrbVisualState.WORKING -> 220f
+                OrbVisualState.NEEDS_INPUT -> 260f
+                else -> 0f
+            },
+            useCenter = false,
+            topLeft = Offset(cx - outerRadius, cy - outerRadius),
+            size = Size(arcSize, arcSize),
+            style = Stroke(width = PresenceTokens.Ring.strokeWidthHeavy)
+        )
+    }
+
     // needs-input magenta highlight segment
     if (state == OrbVisualState.NEEDS_INPUT) {
         rotate(degrees = angle + 120f, pivot = Offset(cx, cy)) {
-            val arcSize = outerRadius * 2
             drawArc(
                 color = PresenceTokens.Palette.Magenta.copy(alpha = 0.8f),
                 startAngle = 0f,

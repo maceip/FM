@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -48,7 +49,18 @@ internal fun CardHeader(categoryLabel: String, title: String) {
         }
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.size(PresenceTokens.Size.cardDotSize).clip(CircleShape).background(PresenceTokens.Palette.CyanDim))
+                Box(
+                    Modifier
+                        .size(PresenceTokens.Size.cardDotSize)
+                        .clip(CircleShape)
+                        .background(PresenceTokens.Palette.CyanDim)
+                        .drawBehind {
+                            drawCircle(
+                                color = PresenceTokens.Palette.CyanDim.copy(alpha = 0.35f),
+                                radius = size.minDimension
+                            )
+                        }
+                )
                 Text(categoryLabel, color = PresenceTokens.Palette.CyanDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             }
             Spacer(Modifier.height(4.dp))
@@ -64,15 +76,22 @@ internal fun MonoLabel(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun ActionButtonGrid(cardId: String, actions: List<CardAction>, onAction: (String, String) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PresenceTokens.Spacing.actionGridGap)) {
         actions.take(3).forEach { action ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onAction(cardId, action.id) }.padding(vertical = 4.dp).testTag("action_${action.id}")
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.18f))
+                    .border(1.dp, PresenceTokens.Palette.BorderDim, RoundedCornerShape(8.dp))
+                    .clickable { onAction(cardId, action.id) }
+                    .padding(vertical = 8.dp, horizontal = 6.dp)
+                    .testTag("action_${action.id}")
             ) {
-                Text(action.label.uppercase(), color = PresenceTokens.Palette.OnSurfaceDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(action.label.uppercase(), color = PresenceTokens.Palette.OnSurfaceVariant, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 action.sublabel?.let {
-                    Text(it.uppercase(), color = PresenceTokens.Palette.OnSurfaceDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text(it.uppercase(), color = PresenceTokens.Palette.OnSurfaceDim, fontSize = 8.sp, fontFamily = FontFamily.Monospace)
                 }
             }
         }

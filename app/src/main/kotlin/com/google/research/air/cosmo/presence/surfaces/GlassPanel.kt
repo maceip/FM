@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -14,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -41,17 +41,30 @@ fun GlassPanel(
 ) {
     Box(
         modifier = modifier
+            .shadow(
+                elevation = 18.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = 0.55f),
+                spotColor = glowColor.copy(alpha = if (showGlowEdge) 0.22f else 0.08f)
+            )
             .clip(shape)
             .background(fill, shape)
             .border(1.dp, borderColor, shape)
             .drawBehind {
-                // top-edge gradient highlight ("laser" line)
+                // Top and bottom edge highlights create the machined glass outline from the comps.
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Color.Transparent, PresenceTokens.Palette.CyanDim.copy(alpha = 0.5f), Color.Transparent)
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.48f), Color.Transparent)
                     ),
                     topLeft = Offset.Zero,
                     size = Size(size.width, 1.dp.toPx())
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent)
+                    ),
+                    topLeft = Offset.Zero,
+                    size = Size(1.dp.toPx(), size.height)
                 )
                 // bottom-edge subtle line
                 drawRect(
@@ -99,7 +112,6 @@ private fun GlowEdgeStrip(
     Box(
         modifier = modifier
             .width(PresenceTokens.Glow.cardEdgeGlowWidth)
-            .fillMaxWidth()
             .height(60.dp) // ~60% of card height
             .drawBehind {
                 drawRoundRect(

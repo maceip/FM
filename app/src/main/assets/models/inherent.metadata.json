@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "backend": "litert",
   "artifact_format": "tflite",
-  "training_hash": "nogit:c344b1c7d0cdfe10",
+  "training_hash": "nogit:fa7f5f7330edb124",
   "input_tensor": "mel_spectrogram",
   "output_tensor": "intent_output",
   "head_order": [
@@ -50,53 +50,57 @@
     "has_calling_agent_intent": 0.9,
     "has_start_timer_intent": 0.9
   },
-  "artifact_size_bytes": 27960,
+  "artifact_size_bytes": 10365584,
   "reports": {
-    "onnx_parity": "artifacts/model-groups/001/export/litert/reports/onnx_parity.json",
-    "delegate_cpu": "artifacts/model-groups/001/export/litert/delegates/cpu.json"
+    "onnx_parity": "artifacts/model-groups/v0/export/litert/reports/onnx_parity.json",
+    "delegate_cpu": "artifacts/model-groups/v0/export/litert/delegates/cpu.json",
+    "delegate_gpu": "artifacts/model-groups/v0/export/litert/delegates/gpu.json",
+    "delegate_tpu": "artifacts/model-groups/v0/export/litert/delegates/tpu.json"
   },
   "config": {
     "model": {
       "backbone": "small_conformer",
       "num_heads": 13,
-      "hidden_size": 32,
-      "num_layers": 0,
+      "hidden_size": 256,
+      "num_layers": 6,
       "num_attention_heads": 4,
-      "conv_kernel_size": 7,
+      "conv_kernel_size": 31,
       "mel_bins": 128,
       "max_frames": 3000
     },
     "training": {
-      "batch_size": 2,
+      "batch_size": 32,
       "learning_rate": 0.0003,
       "weight_decay": 0.01,
-      "warmup_steps": 0,
-      "max_steps": 4,
-      "eval_every_steps": 2,
-      "save_every_steps": 2,
+      "warmup_steps": 1000,
+      "max_steps": 100000,
+      "eval_every_steps": 2000,
+      "save_every_steps": 2000,
       "loss": "focal_bce",
       "focal_gamma": 2.0,
       "class_weights": "balanced",
-      "train_manifest": "artifacts/model-groups/001/work/mels/train_manifest.csv",
-      "eval_manifest": "artifacts/model-groups/001/work/mels/eval_manifest.csv",
+      "train_manifest": "data/train_manifest.csv",
+      "eval_manifest": "data/eval_manifest.csv",
       "num_workers": 0,
-      "device": "mps",
+      "device": "cuda",
       "seed": 1337
     },
     "export": {
-      "backend": "tflite",
+      "backend": "all",
       "delegates": [
-        "cpu"
+        "cpu",
+        "gpu",
+        "tpu"
       ],
       "quantization": "int8",
-      "representative_dataset_size": 4,
+      "representative_dataset_size": 500,
       "target_size_mb": 50,
-      "output_path": "artifacts/smoke/inherent.tflite",
-      "metadata_path": "artifacts/smoke/inherent.metadata.json",
-      "onnx_path": "artifacts/smoke/inherent.onnx",
-      "onnx_metadata_path": "artifacts/smoke/inherent.onnx.metadata.json",
-      "mlx_dir": "artifacts/smoke/mlx",
-      "litertlm_path": "artifacts/smoke/inherent.litertlm",
+      "output_path": "artifacts/production/inherent.tflite",
+      "metadata_path": "artifacts/production/inherent.metadata.json",
+      "onnx_path": "artifacts/production/inherent.onnx",
+      "onnx_metadata_path": "artifacts/production/inherent.onnx.metadata.json",
+      "mlx_dir": "artifacts/production/mlx",
+      "litertlm_path": "artifacts/production/inherent.litertlm",
       "onnx_opset": 17,
       "onnx_sample_frames": 50,
       "onnx_static_frames": 50,
@@ -104,8 +108,10 @@
       "parity_atol": 0.0001
     }
   },
-  "tflite_size_bytes": 27960,
+  "tflite_size_bytes": 10365584,
   "delegates": [
-    "cpu"
+    "cpu",
+    "gpu",
+    "tpu"
   ]
 }

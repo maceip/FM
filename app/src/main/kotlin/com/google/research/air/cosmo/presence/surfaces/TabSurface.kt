@@ -34,7 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -62,6 +64,7 @@ fun TabSurface(
     modifier: Modifier = Modifier,
     readouts: List<Pair<String, String>> = defaultReadouts,
     statusLabel: String = "SYNCING",
+    edgeDocked: Boolean = true,
     onTap: () -> Unit = {}
 ) {
     AnimatedContent(
@@ -75,7 +78,7 @@ fun TabSurface(
         label = "tabExpand"
     ) { isExpanded ->
         if (isExpanded) {
-            ExpandedPill(readouts = readouts, statusLabel = statusLabel, onTap = onTap)
+            ExpandedPill(readouts = readouts, statusLabel = statusLabel, edgeDocked = edgeDocked, onTap = onTap)
         } else {
             IdleSliver(onTap = onTap)
         }
@@ -89,17 +92,39 @@ private fun IdleSliver(onTap: () -> Unit) {
         modifier = Modifier
             .width(PresenceTokens.Size.tabIdleWidth)
             .height(PresenceTokens.Size.tabIdleHeight)
+            .shadow(
+                elevation = 20.dp,
+                shape = sliverShape,
+                ambientColor = Color.Black.copy(alpha = 0.6f),
+                spotColor = PresenceTokens.Palette.CyanDim.copy(alpha = 0.35f)
+            )
             .clip(sliverShape)
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.05f),
-                        Color.White.copy(alpha = 0.15f),
-                        Color.White.copy(alpha = 0.05f)
+                        PresenceTokens.Palette.SurfaceGlass,
+                        PresenceTokens.Palette.SurfaceGlassHigh,
+                        PresenceTokens.Palette.SurfaceGlass
                     )
                 ),
                 sliverShape
             )
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.62f), Color.Transparent)
+                    ),
+                    topLeft = Offset.Zero,
+                    size = Size(1.dp.toPx(), size.height)
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, PresenceTokens.Palette.CyanDim.copy(alpha = 0.38f), Color.Transparent)
+                    ),
+                    topLeft = Offset(size.width - 1.dp.toPx(), 0f),
+                    size = Size(1.dp.toPx(), size.height)
+                )
+            }
             .border(1.dp, PresenceTokens.Palette.BorderBright, sliverShape)
             .clickable(onClick = onTap),
         contentAlignment = Alignment.Center
@@ -119,6 +144,13 @@ private fun IdleSliver(onTap: () -> Unit) {
                         topLeft = Offset(-30.dp.toPx(), size.height / 2 - 0.5.dp.toPx()),
                         size = androidx.compose.ui.geometry.Size(60.dp.toPx(), 1.dp.toPx())
                     )
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.72f), Color.Transparent)
+                        ),
+                        topLeft = Offset(size.width / 2 - 0.5.dp.toPx(), -36.dp.toPx()),
+                        size = androidx.compose.ui.geometry.Size(1.dp.toPx(), 84.dp.toPx())
+                    )
                 }
         )
     }
@@ -128,22 +160,34 @@ private fun IdleSliver(onTap: () -> Unit) {
 private fun ExpandedPill(
     readouts: List<Pair<String, String>>,
     statusLabel: String,
+    edgeDocked: Boolean,
     onTap: () -> Unit
 ) {
-    val pillShape = RoundedCornerShape(PresenceTokens.Size.tabCorner)
+    val pillShape =
+        if (edgeDocked) {
+            RoundedCornerShape(
+                topStart = PresenceTokens.Size.tabCorner,
+                bottomStart = PresenceTokens.Size.tabCorner,
+                topEnd = 0.dp,
+                bottomEnd = 0.dp
+            )
+        } else {
+            RoundedCornerShape(PresenceTokens.Size.tabCorner)
+        }
     GlassPanel(
         modifier = Modifier
             .width(PresenceTokens.Size.tabExpandedWidth)
             .height(PresenceTokens.Size.tabExpandedHeight)
             .clickable(onClick = onTap),
         shape = pillShape,
-        fill = PresenceTokens.Palette.SurfaceGlassMedium
+        fill = PresenceTokens.Palette.SurfaceGlassMedium,
+        showGlowEdge = edgeDocked
     ) {
         Row(
-            Modifier.padding(16.dp),
+            Modifier.padding(start = 28.dp, top = 18.dp, end = 30.dp, bottom = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RadarGauge(Modifier.size(120.dp))
+            RadarGauge(Modifier.size(112.dp))
             Spacer(Modifier.width(24.dp))
             Column(
                 Modifier
@@ -180,6 +224,27 @@ private fun ExpandedPill(
                     Spacer(Modifier.height(8.dp))
                 }
             }
+        }
+        if (edgeDocked) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(4.dp)
+                    .height(52.dp)
+                    .drawBehind {
+                        drawRoundRect(
+                            color = Color.White.copy(alpha = 0.9f),
+                            size = Size(size.width, size.height)
+                        )
+                        drawRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(PresenceTokens.Palette.CyanDim.copy(alpha = 0.35f), Color.White.copy(alpha = 0.85f))
+                            ),
+                            topLeft = Offset(-32.dp.toPx(), 0f),
+                            size = Size(36.dp.toPx(), size.height)
+                        )
+                    }
+            )
         }
     }
 }

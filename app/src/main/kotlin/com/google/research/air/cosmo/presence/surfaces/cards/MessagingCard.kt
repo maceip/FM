@@ -3,6 +3,7 @@ package com.google.research.air.cosmo.presence.surfaces.cards
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +27,11 @@ internal fun MessagingContent(data: CardPayload.Messaging) {
         if (data.recipients.isNotEmpty()) {
             MonoLabel("SEND OPTIONS")
             Spacer(Modifier.height(4.dp))
-            data.recipients.forEach { r -> ContactRow(name = r.name, initials = r.initials, detail = r.address) }
+            InnerPanel(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    data.recipients.forEach { r -> ContactRow(name = r.name, initials = r.initials, detail = r.address) }
+                }
+            }
         }
     }
 }

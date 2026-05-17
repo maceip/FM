@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -34,12 +35,16 @@ fun CardStackSurface(
     onAction: (cardId: String, actionId: String) -> Unit = { _, _ -> }
 ) {
     Column(
-        modifier = modifier.padding(horizontal = PresenceTokens.Spacing.cardPadding).testTag("cardStack"),
+        modifier = modifier
+            .padding(horizontal = PresenceTokens.Spacing.cardPadding)
+            .widthIn(max = PresenceTokens.Size.cardStackMaxWidth)
+            .testTag("cardStack"),
         verticalArrangement = Arrangement.spacedBy(PresenceTokens.Spacing.cardGap)
     ) {
         cards.forEach { card ->
             GlassPanel(
                 showGlowEdge = true,
+                fill = PresenceTokens.Palette.SurfaceGlassMedium,
                 modifier = Modifier.fillMaxWidth().testTag("card_${card.id}")
             ) {
                 Column(Modifier.padding(PresenceTokens.Spacing.cardPadding)) {
