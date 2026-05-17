@@ -64,8 +64,8 @@ if rg -n "FirebaseAnalytics|\\.logEvent\\(" app/src/main/kotlin --glob '*.kt' \
   fail "Firebase Analytics must only be used behind the logging boundary"
 fi
 
-if grep -Fq "models/gemma-4-E4B-it/model.litertlm" \
-  "app/src/main/kotlin/com/google/research/air/cosmo/lib/llm/LocalLlmModelDelivery.kt"; then
+if rg -Fq "models/gemma-4-E4B-it/model.litertlm" \
+  "app/src/main/kotlin/com/google/research/air/cosmo/lib/llm"; then
   fail "LiteRT-LM delivery still hardcodes an E4B runtime model path"
 fi
 
