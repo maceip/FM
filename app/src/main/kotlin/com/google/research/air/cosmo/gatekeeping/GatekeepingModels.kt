@@ -158,7 +158,7 @@ constructor() : GatekeepingModel {
                 IntentRule(
                     skillId = "define_term",
                     positive = re(
-                        "what is\\s.*\\?|define\\s.*|what'?s the meaning of|what exactly are|let'?s first check|" +
+                        "what is\\s.*\\?|define(?:d)?\\s.*|what'?s the meaning of|what exactly are|let'?s first check|" +
                             "what does that|what does that even mean|that even mean|mean"
                     )
                 ),

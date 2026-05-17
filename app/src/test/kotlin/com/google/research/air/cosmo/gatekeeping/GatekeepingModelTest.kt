@@ -24,6 +24,7 @@ class GatekeepingModelTest {
                 "create_doc" to "Screen: create a doc from these notes",
                 "deep_research" to "Screen: research the market trends",
                 "define_term" to "Screen: define polymorphism",
+                "define_term_asr_variant" to "Ambient audio: defined polymorphism",
                 "provide_event_context" to "Screen: the meeting about q3 roadmap",
                 "provide_insight" to "Screen: pros and cons of this approach",
                 "provide_person_context" to "Notification: she said the deadline moved",
@@ -37,8 +38,9 @@ class GatekeepingModelTest {
             )
 
         samples.forEach { (skill, input) ->
+            val expectedSkill = skill.removeSuffix("_asr_variant")
             val result = model.predict(input)
-            assertTrue("$skill should be detected for $input", result.detectedSkills.containsKey(skill))
+            assertTrue("$expectedSkill should be detected for $input", result.detectedSkills.containsKey(expectedSkill))
         }
     }
 
