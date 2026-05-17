@@ -35,6 +35,7 @@ internal object SodaConfigBuilder {
      *   - `cacheDirectory` → `<filesDir>/soda`
      *   - `onDeviceAsrConfig.languagePackDirectory` → caller-supplied (the extracted `lp_cpu` dir)
      *   - `onDeviceAsrConfig.applicationDomain` → `AMBIENT_ONESHOT`
+     *   - `onDeviceAsrConfig.attachHotwordEvent` → true for diagnostic event visibility
      *   - `intendedSpeechConfig` → open-mic intended-query scores attached to final results
      *   - `audioInputConfig.micsAudioFormat` → 16 kHz mono PCM (INT16)
      *   - `audioProcessingConfig.cachedAudioConfig.maxAudioMs` → 60 s
@@ -62,6 +63,7 @@ internal object SodaConfigBuilder {
                 // intended-query scores on FinalRecognitionResult. It still emits transcripts;
                 // Gatekeeper decides whether ambient text proceeds to BERT.
                 .setApplicationDomain(ApplicationDomainProto.ApplicationDomain.AMBIENT_ONESHOT)
+                .setAttachHotwordEvent(true)
                 .build()
         val intendedSpeechConfig =
             IntendedSpeechConfigProto.IntendedSpeechConfig

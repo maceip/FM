@@ -24,6 +24,7 @@ class SodaConfigBuilderTest {
             ApplicationDomainProto.ApplicationDomain.AMBIENT_ONESHOT,
             config.onDeviceAsrConfig.applicationDomain
         )
+        assertTrue(config.onDeviceAsrConfig.attachHotwordEvent)
         assertTrue(config.hasIntendedSpeechConfig())
         assertTrue(config.intendedSpeechConfig.enabled)
         assertEquals(

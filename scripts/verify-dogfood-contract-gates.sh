@@ -41,6 +41,7 @@ fulfillment_test="app/src/test/kotlin/com/google/research/air/cosmo/fulfillment/
 logging="app/src/main/kotlin/com/google/research/air/cosmo/logging/Logging.kt"
 
 require "AMBIENT_ONESHOT" "${soda_builder}" "SODA oneshot app domain"
+require "setAttachHotwordEvent(true)" "${soda_builder}" "SODA hotword-event attachment"
 require "setIntendedSpeechConfig" "${soda_builder}" "SODA intended speech config"
 require "INTENT_DETECTION_MODE_OPEN_MIC" "${soda_builder}" "open-mic intended speech mode"
 require "setAttachOpenMicResult(true)" "${soda_builder}" "open-mic result attachment"
