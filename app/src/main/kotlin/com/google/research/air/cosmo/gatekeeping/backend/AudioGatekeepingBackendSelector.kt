@@ -44,7 +44,7 @@ class AudioGatekeepingBackendSelector @Inject constructor(
                 inherent
             }
             else -> {
-                Log.i(TAG, "Selected CpuRecoveryBackend (Magic Mic + BERT/Pumpkin)")
+                Log.i(TAG, "Selected CpuRecoveryBackend (Magic Mic + BERT)")
                 cpuRecovery
             }
         }

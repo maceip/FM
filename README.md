@@ -202,7 +202,7 @@ relocation safety).
 - [`docs/camel-port-notes.md`](docs/camel-port-notes.md) — per-AST-node CaMeL port-fidelity reference (read when the implementing workstream picks up §12)
 - [`docs/fallback-paths.md`](docs/fallback-paths.md) — 3-tier fallback for each deferred subsystem (cosmo-recovered → commercial/OSS → build-it), with effort estimates + triage
 - [`reference/`](reference/) — read-only mirrors of cosmo-recovery stack maps + workstream interface contracts + inherent contracts
-- [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers (oldest first)
+- [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers sorted by release impact
 - [`docs/aicore-api-gap.md`](docs/aicore-api-gap.md) — public AICore feature-selection limits
 - [`docs/remote-inference-contract.md`](docs/remote-inference-contract.md) — issuer + inference HTTP contract
 - [`docs/release-signing-policy.md`](docs/release-signing-policy.md) — production signing inputs

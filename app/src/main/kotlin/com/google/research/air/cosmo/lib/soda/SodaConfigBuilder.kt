@@ -6,6 +6,7 @@ import com.google.speech.soda.AudioProto
 import com.google.speech.soda.ApplicationDomainProto
 import com.google.speech.soda.ClientInfoProto
 import com.google.speech.soda.HybridAsrConfigProto
+import com.google.speech.soda.IntendedSpeechConfigProto
 import com.google.speech.soda.LoggingProto
 import com.google.speech.soda.SodaCoreConfigProto
 import com.google.speech.soda.client.SodaClientConfigProto
@@ -33,7 +34,8 @@ internal object SodaConfigBuilder {
      * Fields populated:
      *   - `cacheDirectory` → `<filesDir>/soda`
      *   - `onDeviceAsrConfig.languagePackDirectory` → caller-supplied (the extracted `lp_cpu` dir)
-     *   - `onDeviceAsrConfig.applicationDomain` → `AMBIENT_CONTINUOUS`
+     *   - `onDeviceAsrConfig.applicationDomain` → `AMBIENT_ONESHOT`
+     *   - `intendedSpeechConfig` → open-mic intended-query scores attached to final results
      *   - `audioInputConfig.micsAudioFormat` → 16 kHz mono PCM (INT16)
      *   - `audioProcessingConfig.cachedAudioConfig.maxAudioMs` → 60 s
      *   - `audioLoggingPolicy.policyType` → `AUDIO_LOGGING_POLICY_TYPE_NONE`
@@ -56,9 +58,20 @@ internal object SodaConfigBuilder {
             SodaCoreConfigProto.OnDeviceAsrConfig
                 .newBuilder()
                 .setLanguagePackDirectory(languagePackDirectory.absolutePath)
-                // Match recovered cosmo exactly: SODA is the transcript source. Directedness
-                // comes from the audio gatekeeper backend, not from SODA suppressing transcripts.
-                .setApplicationDomain(ApplicationDomainProto.ApplicationDomain.AMBIENT_CONTINUOUS)
+                // AMBIENT_ONESHOT is the recovered-compatible per-utterance path that surfaces
+                // intended-query scores on FinalRecognitionResult. It still emits transcripts;
+                // Gatekeeper decides whether ambient text proceeds to BERT.
+                .setApplicationDomain(ApplicationDomainProto.ApplicationDomain.AMBIENT_ONESHOT)
+                .build()
+        val intendedSpeechConfig =
+            IntendedSpeechConfigProto.IntendedSpeechConfig
+                .newBuilder()
+                .setEnabled(true)
+                .setIntentDetectionMode(
+                    IntendedSpeechConfigProto.IntendedSpeechConfig.IntentDetectionMode
+                        .INTENT_DETECTION_MODE_OPEN_MIC
+                )
+                .setAttachOpenMicResult(true)
                 .build()
         val audioInputConfig =
             SodaCoreConfigProto.AudioInputConfig
@@ -94,6 +107,7 @@ internal object SodaConfigBuilder {
             .newBuilder()
             .setCacheDirectory(cacheDir.absolutePath)
             .setOnDeviceAsrConfig(asrConfig)
+            .setIntendedSpeechConfig(intendedSpeechConfig)
             .setAudioInputConfig(audioInputConfig)
             .setAudioProcessingConfig(audioProcessingConfig)
             .setAudioLoggingPolicy(audioLoggingPolicy)

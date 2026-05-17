@@ -338,7 +338,7 @@ layouts.
 | Component | File | Status | Notes |
 |---|---|---|---|
 | Main activity | `ui/mainscreen/MainActivity.kt` | ✅ | Nav3 destinations: Actions, Capture, Camera, Settings, Debug, action-detail, task-monitor |
-| Debug panels | `ui/mainscreen/DebugPanels.kt` | ✅ | 24 Hilt-multibound panels for controller jobs, settings, permissions, LLM stats, action repo, fulfillment history, gatekeeper output, buffer sizes, model manifest, skill registry, observability schema |
+| Debug panels | `ui/mainscreen/DebugPanels.kt` | ✅ | 25 Hilt-multibound panels for controller jobs, settings, permissions, LLM stats, action repo, fulfillment history, gatekeeper output, buffer sizes, model manifest, skill registry, observability schema, presence overlay |
 | Glass surface | `glasses/CosmoGlass.kt` | ✅ | Glass permission state + connection/bind state + buffer-clear action via `CosmoGlassViewModel` |
 | Route state persistence | `MainNavigationStateTest.kt` covers | ✅ | TaskMonitor token round-trip, corrupted route rejection, JSON `SavedNavigationBundle` |
 | Task monitor | `fulfillment/actions/mariner/TaskMonitorActivity.kt` | ✅ | Browsing-agent surface |
@@ -1276,5 +1276,5 @@ implementation)**.
 The architecture is **substrate-complete for the parity demo**: every cosmo
 capture and classification path that genesis intends to ship has working code.
 The work ahead is filling partial wirings (EdgeTPU on Pixel, Inherent model
-delivery, AOC transport), the CaMeL trust layer, and the action-handler
-split for fulfillment ergonomics.
+delivery, AOC callback activation), the CaMeL trust layer, and richer
+execution-error UI for fulfillment.
