@@ -1,3 +1,5 @@
+@file:Suppress("UnusedPrivateMember")
+
 package com.google.research.air.cosmo.presence.surfaces
 
 import androidx.compose.foundation.background
@@ -47,11 +49,12 @@ private fun FmUiCanvas(
     showBackground = false
 )
 @Composable
-private fun FmUiOrbListeningPreview() {
+internal fun FmUiOrbListeningPreview() {
     FmUiCanvas(widthDp = 230, heightDp = 658, contentAlignment = Alignment.TopCenter) {
         OrbSurface(
             activity = OrbActivity.LISTENING,
             orbSize = 220.dp,
+            animationPhase = 0f,
             modifier = Modifier.offset(y = 8.dp)
         )
     }
@@ -64,12 +67,13 @@ private fun FmUiOrbListeningPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiOrbWorkingPreview() {
+internal fun FmUiOrbWorkingPreview() {
     FmUiCanvas(widthDp = 230, heightDp = 658, contentAlignment = Alignment.TopCenter) {
         OrbSurface(
             activity = OrbActivity.IDLE,
             isWorking = true,
             orbSize = 220.dp,
+            animationPhase = 0f,
             modifier = Modifier.offset(y = 230.dp)
         )
     }
@@ -82,12 +86,13 @@ private fun FmUiOrbWorkingPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiOrbNeedsInputPreview() {
+internal fun FmUiOrbNeedsInputPreview() {
     FmUiCanvas(widthDp = 230, heightDp = 658, contentAlignment = Alignment.TopCenter) {
         OrbSurface(
             activity = OrbActivity.IDLE,
             needsInput = true,
             orbSize = 220.dp,
+            animationPhase = 0f,
             modifier = Modifier.offset(y = 430.dp)
         )
     }
@@ -100,10 +105,11 @@ private fun FmUiOrbNeedsInputPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiTabMinimizedPreview() {
+internal fun FmUiTabMinimizedPreview() {
     FmUiCanvas(widthDp = 30, heightDp = 300, contentAlignment = Alignment.Center) {
         TabSurface(
             expanded = false,
+            animationPhase = 0.52f,
             modifier = Modifier.scale(scaleX = 1.65f, scaleY = 1.55f)
         )
     }
@@ -116,11 +122,12 @@ private fun FmUiTabMinimizedPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiTabExpandedPreview() {
+internal fun FmUiTabExpandedPreview() {
     FmUiCanvas(widthDp = 528, heightDp = 280, contentAlignment = Alignment.Center) {
         TabSurface(
             expanded = true,
             edgeDocked = false,
+            animationPhase = 0f,
             modifier = Modifier.scale(scaleX = 1.5f, scaleY = 1.55f)
         )
     }
@@ -133,7 +140,7 @@ private fun FmUiTabExpandedPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiStackBrowserPreview() {
+internal fun FmUiStackBrowserPreview() {
     FmUiCanvas(widthDp = 1122, heightDp = 1402) {
         CardStackSurface(
             cards = listOf(browserCard),
@@ -149,7 +156,7 @@ private fun FmUiStackBrowserPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiStackMessagingPreview() {
+internal fun FmUiStackMessagingPreview() {
     FmUiCanvas(widthDp = 1122, heightDp = 1402) {
         CardStackSurface(
             cards = listOf(messagingCard),
@@ -165,7 +172,7 @@ private fun FmUiStackMessagingPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiStackCalendarPreview() {
+internal fun FmUiStackCalendarPreview() {
     FmUiCanvas(widthDp = 1122, heightDp = 1402) {
         CardStackSurface(
             cards = listOf(calendarCard),
@@ -181,7 +188,7 @@ private fun FmUiStackCalendarPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiStackMobileContextPreview() {
+internal fun FmUiStackMobileContextPreview() {
     FmUiCanvas(widthDp = 1122, heightDp = 1402) {
         CardStackSurface(
             cards = previewStack,
@@ -197,7 +204,7 @@ private fun FmUiStackMobileContextPreview() {
     showBackground = false
 )
 @Composable
-private fun FmUiStackFoldableContextPreview() {
+internal fun FmUiStackFoldableContextPreview() {
     FmUiCanvas(widthDp = 1448, heightDp = 1086) {
         CardStackSurface(
             cards = previewStack,

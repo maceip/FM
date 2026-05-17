@@ -1,7 +1,9 @@
 package com.google.research.air.cosmo.presence.surfaces.cards
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,9 +29,33 @@ internal fun MessagingContent(data: CardPayload.Messaging) {
         if (data.recipients.isNotEmpty()) {
             MonoLabel("SEND OPTIONS")
             Spacer(Modifier.height(4.dp))
-            InnerPanel(Modifier.fillMaxWidth()) {
+            InnerPanel(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { }
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     data.recipients.forEach { r -> ContactRow(name = r.name, initials = r.initials, detail = r.address) }
+                }
+            }
+            InnerPanel(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { }
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = "PASTE INTO CURRENT APP",
+                        color = Color.White.copy(alpha = 0.66f),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = ">",
+                        color = Color.White.copy(alpha = 0.44f),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
                 }
             }
         }

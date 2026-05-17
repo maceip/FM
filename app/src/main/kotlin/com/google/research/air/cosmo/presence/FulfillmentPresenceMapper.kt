@@ -54,9 +54,9 @@ internal fun FulfillmentAction.toPresenceCard(): PresenceCard =
                 is FulfillmentAction.InvokeAgentQ ->
                     CardPayload.Browser(query = prompt, activeTab = BrowserTab.BROWSING_AGENT)
                 is FulfillmentAction.Navigation ->
-                    CardPayload.Browser(query = "Directions to $destination")
+                    CardPayload.Navigation(destination = destination, routeSummary = "Directions to $destination")
                 is FulfillmentAction.PlayMusic ->
-                    CardPayload.MediaImage(caption = query)
+                    CardPayload.MediaPlayback(query = query)
                 is FulfillmentAction.ProvideEventContext ->
                     CardPayload.Document(title = title, docType = DocumentType.SUMMARY, preview = answer)
                 is FulfillmentAction.ProvideInsight ->

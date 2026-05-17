@@ -20,7 +20,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| Ambient microphone | 🟩🟩🟩🟩🟩 | Per-source `SodaSession`; recovered SODA blend; AMBIENT_ONESHOT + OPEN_MIC |
+| Ambient microphone | 🟩🟩🟩🟩🟩 | Per-source `SodaSession`; recovered SODA blend; transcript-first `AMBIENT_CONTINUOUS` |
 | Pixel Buds (Bluetooth SBC) | 🟩🟩🟩🟩🟩 | `MediaCodec`-based decoder; no vendored `libsbcdecoder_jni.so` needed |
 | Device / media audio | 🟩🟩🟩🟩🟩 | `AudioSource = REMOTE_SUBMIX` |
 | Call audio | 🟩🟩🟩🟩🟩 | `AudioSource = VOICE_CALL` |

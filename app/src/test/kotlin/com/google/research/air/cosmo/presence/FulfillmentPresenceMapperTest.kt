@@ -28,6 +28,8 @@ class FulfillmentPresenceMapperTest {
         assertTrue(cards.map { it.payload }.any { it is CardPayload.Document })
         assertTrue(cards.map { it.payload }.any { it is CardPayload.ListTasks })
         assertTrue(cards.map { it.payload }.any { it is CardPayload.Messaging })
+        assertTrue(cards.map { it.payload }.any { it is CardPayload.Navigation })
+        assertTrue(cards.map { it.payload }.any { it is CardPayload.MediaPlayback })
         assertTrue(cards.map { it.payload }.any { it is CardPayload.MediaImage })
         assertTrue(cards.map { it.payload }.any { it is CardPayload.PeopleContext })
         assertTrue(cards.map { it.payload }.any { it is CardPayload.PermissionConfirmation })

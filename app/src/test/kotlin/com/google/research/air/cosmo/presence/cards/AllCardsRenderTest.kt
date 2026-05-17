@@ -42,6 +42,8 @@ class AllCardsRenderTest {
         "calendarTime" to CardPayload.CalendarTime(
             reminders = listOf(Reminder("09:00", "Stand Up"))
         ),
+        "navigation" to CardPayload.Navigation(destination = "Home", routeSummary = "Directions to Home"),
+        "mediaPlayback" to CardPayload.MediaPlayback(query = "lofi beats", queue = listOf("Track A")),
         "peopleContext" to CardPayload.PeopleContext(name = "Carol", initials = "CC", detail = "PM"),
         "mediaImage" to CardPayload.MediaImage(
             thumbnails = listOf(Thumbnail("img1"), Thumbnail("img2")),
@@ -54,7 +56,7 @@ class AllCardsRenderTest {
     )
 
     @Test
-    fun `all 10 card types render without crash`() {
+    fun `all 12 card types render without crash`() {
         val cards = samplePayloads.mapIndexed { i, (id, payload) ->
             PresenceCard(id = id, payload = payload, actions = listOf(CardAction("act", "Action")))
         }

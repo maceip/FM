@@ -39,6 +39,44 @@ The fixtures intentionally use:
 
 These previews are not acceptance by themselves. They are the render targets that screenshot validation should consume.
 
+## 2a. Non-Negotiable Component Behavior
+
+### Orb Tick Rings
+
+The orb state rings must be built from individually addressable rectangular ticks, not generic dashed arcs. "Listening", "working", and "needs input" each need per-tick color state so animation can fill, sweep, or rotate through the ring tick-by-tick. Measure the baseline tick count from the target images before implementation; do not guess from the current Compose approximation.
+
+The implementation should support:
+
+- inactive ticks with dim blue/gray glass color;
+- active ticks with the state color: green, cyan, yellow, and magenta accent;
+- per-state and per-variant tick palettes, including mixed-color rings rather than a single accent-only ring;
+- per-state center glyphs/shapes such as dot, square, exclamation, and future custom glyphs;
+- deterministic animation phase for screenshot tests;
+- runtime animation where color advances through the tick set during spinning.
+
+### Tab Minimized Rail
+
+The minimized tab is a narrow edge rail, not a static rounded rectangle. It needs the baseline color treatment from `artifacts/fm_ui/tab/minimized.png`, plus an animated shining light element that feels polished in motion. The shimmer/glint may be subjective, but it must be an explicit animation primitive rather than a static flare.
+
+The implementation should support:
+
+- vertical glass rail body with measured width, height, radius, and border;
+- cyan/blue internal rail color matching the target;
+- animated light glint traveling along or blooming from the rail center;
+- deterministic animation phase for screenshot tests.
+
+### Card Stack Interactivity
+
+The card stack is an interactive overlay surface, not a static poster. The pixel fixtures freeze the visual state, but the component architecture must still allow cards to contain richer controls and embedded surfaces.
+
+The implementation should preserve room for:
+
+- independent per-card actions, hover/press/selection states, and collapse-to-edge controls;
+- complex card bodies such as mini browser/source review, messaging target picker, timers, and future embedded web/content surfaces;
+- twelve first-class card payload families today: browser/source review, calling, messaging, document, list/tasks, calendar/timer, navigation, media playback, people context, media/image, source citation, and permission confirmation;
+- multiple stacked cards with clear depth, focus, and ordering rules;
+- gesture and lifecycle handling in the later overlay pass without rewriting the card visuals.
+
 ## 3. Screenshot Validation Path
 
 Use the first-party Android Compose Preview Screenshot Testing plugin rather than a third-party screenshot library. The repo already satisfies the important version constraints: AGP `9.1.1`, Kotlin `2.3.20`, JDK 17, and Compose enabled.
@@ -59,7 +97,8 @@ Before implementation, extract measurements from the frozen PNGs once and add th
 
 - outer component bounds and canvas offset;
 - corner radii and stroke widths;
-- primary ring radii, tick counts, active arc spans, and center glyph sizes;
+- primary ring radii, exact tick counts, tick sizes, tick rotations, per-tick active color spans, and center glyph sizes;
+- minimized tab rail dimensions, internal color bands, glint size, and glint path;
 - card widths, heights, padding, line heights, and button grid dimensions;
 - minimized/expanded tab dimensions and flare positions;
 - mobile/foldable stack offsets and maximum footprint.

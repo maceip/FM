@@ -7,7 +7,7 @@ import org.junit.Test
 class CardPayloadModelTest {
 
     @Test
-    fun `all 10 sealed subtypes are instantiable with defaults`() {
+    fun `all 12 sealed subtypes are instantiable with defaults`() {
         val payloads: List<CardPayload> = listOf(
             CardPayload.Browser(query = "quantum computing"),
             CardPayload.Calling(contactName = "Alice", contactInitials = "AL"),
@@ -15,12 +15,14 @@ class CardPayloadModelTest {
             CardPayload.Document(title = "Notes"),
             CardPayload.ListTasks(title = "Groceries"),
             CardPayload.CalendarTime(),
+            CardPayload.Navigation(destination = "Home"),
+            CardPayload.MediaPlayback(query = "lofi"),
             CardPayload.PeopleContext(name = "Bob", initials = "BB", detail = "Engineer"),
             CardPayload.MediaImage(),
             CardPayload.SourceCitation(),
             CardPayload.PermissionConfirmation(prompt = "Send?", actionLabel = "Send")
         )
-        assertEquals(10, payloads.size)
+        assertEquals(12, payloads.size)
         payloads.forEach { assertNotNull(it) }
     }
 
@@ -33,6 +35,8 @@ class CardPayloadModelTest {
             CardPayload.Document(title = "t"),
             CardPayload.ListTasks(title = "l"),
             CardPayload.CalendarTime(),
+            CardPayload.Navigation(destination = "d"),
+            CardPayload.MediaPlayback(query = "q"),
             CardPayload.PeopleContext(name = "n", initials = "n", detail = "d"),
             CardPayload.MediaImage(),
             CardPayload.SourceCitation(),
@@ -46,6 +50,8 @@ class CardPayloadModelTest {
                 is CardPayload.Document -> "document"
                 is CardPayload.ListTasks -> "list"
                 is CardPayload.CalendarTime -> "calendar"
+                is CardPayload.Navigation -> "navigation"
+                is CardPayload.MediaPlayback -> "mediaPlayback"
                 is CardPayload.PeopleContext -> "people"
                 is CardPayload.MediaImage -> "media"
                 is CardPayload.SourceCitation -> "citation"

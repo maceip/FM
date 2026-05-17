@@ -38,7 +38,7 @@ enum class CardActionType { DEFAULT, PRIMARY, DESTRUCTIVE, COLLAPSE }
 
 // endregion
 
-// region Card capability payloads (10 sealed subtypes)
+// region Card capability payloads (12 sealed subtypes)
 
 sealed interface CardPayload {
 
@@ -78,6 +78,18 @@ sealed interface CardPayload {
         val focusSeconds: Int = 0,
         val reminders: List<Reminder> = emptyList(),
         val eventTitle: String? = null
+    ) : CardPayload
+
+    data class Navigation(
+        val destination: String,
+        val routeSummary: String? = null,
+        val eta: String? = null
+    ) : CardPayload
+
+    data class MediaPlayback(
+        val query: String,
+        val provider: String? = null,
+        val queue: List<String> = emptyList()
     ) : CardPayload
 
     data class PeopleContext(

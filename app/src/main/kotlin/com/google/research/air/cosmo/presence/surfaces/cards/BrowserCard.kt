@@ -1,6 +1,7 @@
 package com.google.research.air.cosmo.presence.surfaces.cards
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.google.research.air.cosmo.presence.BrowserTab
 import com.google.research.air.cosmo.presence.CardPayload
 import com.google.research.air.cosmo.presence.PresenceTokens
+import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 
 @Composable
 internal fun BrowserContent(data: CardPayload.Browser) {
@@ -47,21 +49,33 @@ internal fun BrowserContent(data: CardPayload.Browser) {
                 }
             }
         }
-        if (data.query.isNotBlank()) {
-            MonoLabel("ANSWER SNAPSHOT")
-            Text(
-                text = data.query,
-                color = PresenceTokens.Palette.OnSurfaceVariant,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                lineHeight = 15.sp
-            )
-        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             MonoLabel("TOP SOURCES")
             MonoLabel("CONFIDENCE")
         }
         data.sources.forEach { SourceRow(it) }
+        InnerPanel(
+            Modifier
+                .fillMaxWidth()
+                .clickable { }
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "WHY THIS RESULT?",
+                    color = PresenceTokens.Palette.OnSurfaceDim,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = ">",
+                    color = PresenceTokens.Palette.OnSurfaceDim,
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
     }
 }
 

@@ -324,8 +324,6 @@ class GatekeeperDispatchInvariantTest {
         }
     }
 
-    private fun fakeLoader(assets: Map<String, ByteArray>): (String) -> ByteArray? = { id -> assets[id] }
-
     private fun fakeBufferLoader(assets: Map<String, ByteArray>): (String) -> ByteBuffer? = { id ->
         assets[id]?.let { ByteBuffer.wrap(it) }
     }

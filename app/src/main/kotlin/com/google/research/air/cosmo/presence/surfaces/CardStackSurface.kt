@@ -23,6 +23,8 @@ import com.google.research.air.cosmo.presence.surfaces.cards.CallingContent
 import com.google.research.air.cosmo.presence.surfaces.cards.DocumentContent
 import com.google.research.air.cosmo.presence.surfaces.cards.ListTasksContent
 import com.google.research.air.cosmo.presence.surfaces.cards.MediaImageContent
+import com.google.research.air.cosmo.presence.surfaces.cards.MediaPlaybackContent
+import com.google.research.air.cosmo.presence.surfaces.cards.NavigationContent
 import com.google.research.air.cosmo.presence.surfaces.cards.MessagingContent
 import com.google.research.air.cosmo.presence.surfaces.cards.PeopleContextContent
 import com.google.research.air.cosmo.presence.surfaces.cards.PermissionConfirmationContent
@@ -70,6 +72,8 @@ private fun CardContent(payload: CardPayload) {
         is CardPayload.Document -> DocumentContent(payload)
         is CardPayload.ListTasks -> ListTasksContent(payload)
         is CardPayload.CalendarTime -> CalendarTimeContent(payload)
+        is CardPayload.Navigation -> NavigationContent(payload)
+        is CardPayload.MediaPlayback -> MediaPlaybackContent(payload)
         is CardPayload.PeopleContext -> PeopleContextContent(payload)
         is CardPayload.MediaImage -> MediaImageContent(payload)
         is CardPayload.SourceCitation -> SourceCitationContent(payload)

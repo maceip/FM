@@ -8,7 +8,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -26,10 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -55,7 +50,8 @@ fun OrbSurface(
     modifier: Modifier = Modifier,
     orbSize: Dp = PresenceTokens.Size.orbDefault,
     isWorking: Boolean = false,
-    needsInput: Boolean = false
+    needsInput: Boolean = false,
+    animationPhase: Float? = null
 ) {
     val state = when {
         needsInput -> OrbVisualState.NEEDS_INPUT
@@ -65,32 +61,43 @@ fun OrbSurface(
     }
 
     val shape = RoundedCornerShape(PresenceTokens.Size.orbCorner)
-    val alpha by animateFloatAsState(
-        targetValue = if (state == OrbVisualState.IDLE) 0.4f else 1f,
-        animationSpec = spring(),
-        label = "orbAlpha"
-    )
+    val alpha =
+        if (animationPhase == null) {
+            val animatedAlpha by animateFloatAsState(
+                targetValue = if (state == OrbVisualState.IDLE) 0.4f else 1f,
+                animationSpec = spring(),
+                label = "orbAlpha"
+            )
+            animatedAlpha
+        } else {
+            if (state == OrbVisualState.IDLE) 0.4f else 1f
+        }
 
-    val inf = rememberInfiniteTransition(label = "orbSpin")
-    val spinAngle by inf.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(PresenceTokens.Ring.spinDurationMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "spinAngle"
-    )
-
-    val pulseAlpha by inf.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
+    val (tickPhase, pulseAlpha) =
+        if (animationPhase == null) {
+            val inf = rememberInfiniteTransition(label = "orbSpin")
+            val animatedPhase by inf.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(PresenceTokens.RotationSpeed.mediumFast, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "orbTickPhase"
+            )
+            val animatedPulseAlpha by inf.animateFloat(
+                initialValue = 0.5f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseAlpha"
+            )
+            animatedPhase to animatedPulseAlpha
+        } else {
+            animationPhase to 1f
+        }
 
     Box(
         modifier = modifier
@@ -131,14 +138,18 @@ fun OrbSurface(
             .border(1.dp, PresenceTokens.Palette.BorderBright, shape),
         contentAlignment = Alignment.Center
     ) {
-        if (state != OrbVisualState.IDLE) {
-            Canvas(Modifier.size(orbSize)) {
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-                drawStateRings(state, cx, cy, spinAngle, pulseAlpha, size)
-            }
+        if (state == OrbVisualState.IDLE) {
+            OrbCenterIndicator(state, pulseAlpha)
+        } else {
+            TacticalTickRing(
+                spec = state.tickSpec,
+                glyph = state.glyph,
+                glyphColor = state.accent.copy(alpha = pulseAlpha),
+                modifier = Modifier.size(orbSize * 0.86f),
+                animationPhase = tickPhase,
+                glyphSize = orbSize * 0.07f
+            )
         }
-        OrbCenterIndicator(state, pulseAlpha)
     }
 }
 
@@ -151,6 +162,69 @@ private val OrbVisualState.accent: Color
             OrbVisualState.LISTENING -> PresenceTokens.Palette.AcidGreen
             OrbVisualState.WORKING -> PresenceTokens.Palette.Cyan
             OrbVisualState.NEEDS_INPUT -> PresenceTokens.Palette.AcidYellow
+        }
+
+private val OrbVisualState.tickSpec: TacticalTickRingSpec
+    get() =
+        when (this) {
+            OrbVisualState.IDLE ->
+                TacticalTickRingSpec(
+                    tickCount = 64,
+                    radiusFraction = 0.36f,
+                    tickLengthFraction = 0.08f,
+                    tickWidthFraction = 0.022f,
+                    baseColor = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = 0.22f),
+                    segments = emptyList()
+                )
+            OrbVisualState.LISTENING ->
+                TacticalTickRingSpec(
+                    tickCount = 64,
+                    radiusFraction = 0.38f,
+                    tickLengthFraction = 0.09f,
+                    tickWidthFraction = 0.024f,
+                    baseColor = Color(0xFF2C3443).copy(alpha = 0.72f),
+                    segments =
+                        listOf(
+                            TacticalTickSegment(3, 24, PresenceTokens.Palette.AcidGreen),
+                            TacticalTickSegment(39, 8, PresenceTokens.Palette.CyanDim.copy(alpha = 0.62f))
+                        )
+                )
+            OrbVisualState.WORKING ->
+                TacticalTickRingSpec(
+                    tickCount = 64,
+                    radiusFraction = 0.38f,
+                    tickLengthFraction = 0.086f,
+                    tickWidthFraction = 0.024f,
+                    baseColor = Color(0xFF193545).copy(alpha = 0.72f),
+                    segments =
+                        listOf(
+                            TacticalTickSegment(0, 46, PresenceTokens.Palette.Cyan),
+                            TacticalTickSegment(49, 6, PresenceTokens.Palette.CyanDim.copy(alpha = 0.50f))
+                        )
+                )
+            OrbVisualState.NEEDS_INPUT ->
+                TacticalTickRingSpec(
+                    tickCount = 64,
+                    radiusFraction = 0.38f,
+                    tickLengthFraction = 0.09f,
+                    tickWidthFraction = 0.024f,
+                    baseColor = Color(0xFF2E3240).copy(alpha = 0.72f),
+                    segments =
+                        listOf(
+                            TacticalTickSegment(0, 33, PresenceTokens.Palette.AcidYellow),
+                            TacticalTickSegment(38, 8, PresenceTokens.Palette.Magenta),
+                            TacticalTickSegment(51, 5, PresenceTokens.Palette.CyanDim.copy(alpha = 0.44f))
+                        )
+                )
+        }
+
+private val OrbVisualState.glyph: TacticalCenterGlyph
+    get() =
+        when (this) {
+            OrbVisualState.IDLE -> TacticalCenterGlyph.Lens
+            OrbVisualState.LISTENING -> TacticalCenterGlyph.Dot
+            OrbVisualState.WORKING -> TacticalCenterGlyph.Square
+            OrbVisualState.NEEDS_INPUT -> TacticalCenterGlyph.Exclamation
         }
 
 @Composable
@@ -187,101 +261,6 @@ private fun OrbCenterIndicator(state: OrbVisualState, pulseAlpha: Float) {
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
-            )
-        }
-    }
-}
-
-private fun DrawScope.drawStateRings(
-    state: OrbVisualState,
-    cx: Float,
-    cy: Float,
-    angle: Float,
-    pulseAlpha: Float,
-    canvasSize: Size
-) {
-    val outerRadius = minOf(canvasSize.width, canvasSize.height) * 0.38f
-    val innerRadius = outerRadius * 0.6f
-
-    val (color, dashEffect) = when (state) {
-        OrbVisualState.LISTENING -> PresenceTokens.Palette.AcidGreen to
-                PathEffect.dashPathEffect(floatArrayOf(PresenceTokens.Ring.dashOn, PresenceTokens.Ring.dashOff))
-        OrbVisualState.WORKING -> PresenceTokens.Palette.Cyan to
-                PathEffect.dashPathEffect(floatArrayOf(PresenceTokens.Ring.dotOn, PresenceTokens.Ring.dotOff))
-        OrbVisualState.NEEDS_INPUT -> PresenceTokens.Palette.AcidYellow to
-                PathEffect.dashPathEffect(floatArrayOf(PresenceTokens.Ring.dashOn * 2, PresenceTokens.Ring.dashOff))
-        else -> return
-    }
-
-    // Dim instrument rings sit under every active state, matching the dense HUD dial in the comps.
-    drawCircle(
-        color = Color.Black.copy(alpha = 0.36f),
-        radius = outerRadius * 1.22f,
-        center = Offset(cx, cy)
-    )
-    drawCircle(
-        color = PresenceTokens.Palette.BorderDim,
-        radius = outerRadius * 1.14f,
-        center = Offset(cx, cy),
-        style = Stroke(width = 1f)
-    )
-    drawCircle(
-        color = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = 0.32f),
-        radius = outerRadius * 1.02f,
-        center = Offset(cx, cy),
-        style = Stroke(
-            width = 2f,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(1.5f, 4.5f))
-        )
-    )
-
-    // inner solid ring
-    drawCircle(
-        color = color.copy(alpha = 0.3f),
-        radius = innerRadius,
-        center = Offset(cx, cy),
-        style = Stroke(width = 1f)
-    )
-
-    // outer dashed/dotted ring (spinning)
-    rotate(degrees = angle, pivot = Offset(cx, cy)) {
-        drawCircle(
-            color = color.copy(alpha = 0.8f * pulseAlpha),
-            radius = outerRadius,
-            center = Offset(cx, cy),
-            style = Stroke(width = PresenceTokens.Ring.strokeWidth, pathEffect = dashEffect)
-        )
-    }
-
-    val arcSize = outerRadius * 2
-    rotate(degrees = angle - 90f, pivot = Offset(cx, cy)) {
-        drawArc(
-            color = color.copy(alpha = pulseAlpha),
-            startAngle = 0f,
-            sweepAngle = when (state) {
-                OrbVisualState.LISTENING -> 145f
-                OrbVisualState.WORKING -> 220f
-                OrbVisualState.NEEDS_INPUT -> 260f
-                else -> 0f
-            },
-            useCenter = false,
-            topLeft = Offset(cx - outerRadius, cy - outerRadius),
-            size = Size(arcSize, arcSize),
-            style = Stroke(width = PresenceTokens.Ring.strokeWidthHeavy)
-        )
-    }
-
-    // needs-input magenta highlight segment
-    if (state == OrbVisualState.NEEDS_INPUT) {
-        rotate(degrees = angle + 120f, pivot = Offset(cx, cy)) {
-            drawArc(
-                color = PresenceTokens.Palette.Magenta.copy(alpha = 0.8f),
-                startAngle = 0f,
-                sweepAngle = 30f,
-                useCenter = false,
-                topLeft = Offset(cx - outerRadius, cy - outerRadius),
-                size = Size(arcSize, arcSize),
-                style = Stroke(width = PresenceTokens.Ring.strokeWidthHeavy)
             )
         }
     }

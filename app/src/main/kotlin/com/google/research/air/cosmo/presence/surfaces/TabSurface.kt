@@ -12,7 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,9 +38,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,8 +61,26 @@ fun TabSurface(
     readouts: List<Pair<String, String>> = defaultReadouts,
     statusLabel: String = "SYNCING",
     edgeDocked: Boolean = true,
+    animationPhase: Float? = null,
     onTap: () -> Unit = {}
 ) {
+    val phase =
+        if (animationPhase == null) {
+            val inf = rememberInfiniteTransition(label = "tabMotion")
+            val animatedPhase by inf.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(PresenceTokens.RotationSpeed.mediumFast, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "tabTickPhase"
+            )
+            animatedPhase
+        } else {
+            animationPhase
+        }
+
     AnimatedContent(
         targetState = expanded,
         modifier = modifier,
@@ -78,15 +92,15 @@ fun TabSurface(
         label = "tabExpand"
     ) { isExpanded ->
         if (isExpanded) {
-            ExpandedPill(readouts = readouts, statusLabel = statusLabel, edgeDocked = edgeDocked, onTap = onTap)
+            ExpandedPill(readouts = readouts, statusLabel = statusLabel, edgeDocked = edgeDocked, animationPhase = phase, onTap = onTap)
         } else {
-            IdleSliver(onTap = onTap)
+            IdleSliver(animationPhase = phase, onTap = onTap)
         }
     }
 }
 
 @Composable
-private fun IdleSliver(onTap: () -> Unit) {
+private fun IdleSliver(animationPhase: Float, onTap: () -> Unit) {
     val sliverShape = RoundedCornerShape(topStart = 999.dp, bottomStart = 999.dp)
     Box(
         modifier = Modifier
@@ -123,6 +137,26 @@ private fun IdleSliver(onTap: () -> Unit) {
                     ),
                     topLeft = Offset(size.width - 1.dp.toPx(), 0f),
                     size = Size(1.dp.toPx(), size.height)
+                )
+                val glintY = size.height * (0.18f + 0.64f * animationPhase)
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.92f), Color.Transparent)
+                    ),
+                    topLeft = Offset(0f, glintY - 24.dp.toPx()),
+                    size = Size(size.width, 48.dp.toPx())
+                )
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Transparent, PresenceTokens.Palette.CyanDim.copy(alpha = 0.92f), Color.Transparent)
+                    ),
+                    topLeft = Offset(-28.dp.toPx(), glintY - 0.5.dp.toPx()),
+                    size = Size(68.dp.toPx(), 1.dp.toPx())
+                )
+                drawRect(
+                    color = PresenceTokens.Palette.Magenta.copy(alpha = 0.75f),
+                    topLeft = Offset(0f, size.height - 7.dp.toPx()),
+                    size = Size(1.5.dp.toPx(), 5.dp.toPx())
                 )
             }
             .border(1.dp, PresenceTokens.Palette.BorderBright, sliverShape)
@@ -161,6 +195,7 @@ private fun ExpandedPill(
     readouts: List<Pair<String, String>>,
     statusLabel: String,
     edgeDocked: Boolean,
+    animationPhase: Float,
     onTap: () -> Unit
 ) {
     val pillShape =
@@ -187,7 +222,7 @@ private fun ExpandedPill(
             Modifier.padding(start = 28.dp, top = 18.dp, end = 30.dp, bottom = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RadarGauge(Modifier.size(112.dp))
+            RadarGauge(modifier = Modifier.size(112.dp), animationPhase = animationPhase)
             Spacer(Modifier.width(24.dp))
             Column(
                 Modifier
@@ -272,101 +307,31 @@ private fun ReadoutRow(label: String, value: String) {
 }
 
 @Composable
-private fun RadarGauge(modifier: Modifier = Modifier) {
-    val inf = rememberInfiniteTransition(label = "radarSpin")
-    val angle by inf.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(PresenceTokens.Ring.spinDurationMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "radarAngle"
+private fun RadarGauge(modifier: Modifier = Modifier, animationPhase: Float) {
+    TacticalTickRing(
+        spec = tabGaugeSpec,
+        glyph = TacticalCenterGlyph.Lens,
+        glyphColor = Color(0xFFB9D7FF),
+        modifier = modifier,
+        animationPhase = animationPhase,
+        glyphSize = 13.dp
     )
-    val reverseAngle by inf.animateFloat(
-        initialValue = 360f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(PresenceTokens.Ring.spinDurationSlowMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "radarReverseAngle"
-    )
-
-    Canvas(modifier) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val outerR = minOf(size.width, size.height) / 2f * 0.9f
-        val middleR = outerR * 0.7f
-        val innerR = outerR * 0.5f
-
-        // outer dashed ring (spinning)
-        rotate(degrees = angle, pivot = Offset(cx, cy)) {
-            drawCircle(
-                color = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = 0.4f),
-                radius = outerR,
-                center = Offset(cx, cy),
-                style = Stroke(
-                    width = 1f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 6f))
-                )
-            )
-        }
-
-        // middle segmented ring (reverse spinning, blue)
-        rotate(degrees = reverseAngle, pivot = Offset(cx, cy)) {
-            drawCircle(
-                color = PresenceTokens.Palette.CyanDim.copy(alpha = 0.8f),
-                radius = middleR,
-                center = Offset(cx, cy),
-                style = Stroke(
-                    width = 8f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(2f, 4f))
-                )
-            )
-        }
-
-        // dim outer tick ring
-        drawCircle(
-            color = Color.White.copy(alpha = 0.2f),
-            radius = outerR,
-            center = Offset(cx, cy),
-            style = Stroke(
-                width = 2f,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(1f, 6f))
-            )
-        )
-
-        // inner circle border
-        drawCircle(
-            color = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = 0.3f),
-            radius = innerR,
-            center = Offset(cx, cy),
-            style = Stroke(width = 1f)
-        )
-
-        // center dot
-        drawCircle(
-            color = PresenceTokens.Palette.CyanDim,
-            radius = 3f,
-            center = Offset(cx, cy)
-        )
-
-        // crosshairs
-        drawLine(
-            color = PresenceTokens.Palette.CyanDim.copy(alpha = 0.5f),
-            start = Offset(cx, cy - innerR),
-            end = Offset(cx, cy + innerR),
-            strokeWidth = 1f
-        )
-        drawLine(
-            color = PresenceTokens.Palette.CyanDim.copy(alpha = 0.5f),
-            start = Offset(cx - innerR, cy),
-            end = Offset(cx + innerR, cy),
-            strokeWidth = 1f
-        )
-    }
 }
+
+private val tabGaugeSpec =
+    TacticalTickRingSpec(
+        tickCount = 72,
+        radiusFraction = 0.38f,
+        tickLengthFraction = 0.09f,
+        tickWidthFraction = 0.018f,
+        baseColor = Color(0xFF323947).copy(alpha = 0.78f),
+        segments =
+            listOf(
+                TacticalTickSegment(2, 34, Color(0xFFCFEAFF)),
+                TacticalTickSegment(38, 8, Color(0xFF7BA7E6).copy(alpha = 0.68f))
+            ),
+        innerRingFractions = listOf(0.24f, 0.38f, 0.55f)
+    )
 
 private val defaultReadouts = listOf(
     "Latency" to "04ms",
