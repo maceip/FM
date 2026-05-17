@@ -239,6 +239,7 @@ constructor(
      *   - the platform has no `ContextHubManager`,
      *   - no Context Hub is present on the device,
      *   - the AOC ambient-audio nanoapp is not loaded on that hub, or
+     *   - `ContextHubClientCallback` cannot be constructed from the current public-SDK build, or
      *   - `sendMessageToNanoApp` returns a non-OK status.
      * Callers MUST honor the false return and fall back to mic recording.
      */

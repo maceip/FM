@@ -8,9 +8,6 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
@@ -164,18 +161,12 @@ constructor(
     }
 
     /**
-     * Build a `ContextHubClientCallback` subclass instance via [Proxy]. We can't subclass the
-     * `@SystemApi` abstract class directly at compile time, so we proxy its interface methods
-     * (`onMessageFromNanoApp`, `onHubReset`, `onNanoAppAborted`, `onNanoAppLoaded`) reflectively.
+     * Build a `ContextHubClientCallback` subclass instance.
      *
-     * NOTE: `ContextHubClientCallback` is a class, not an interface. `Proxy.newProxyInstance`
-     * cannot wrap an abstract class. On a real platform-signed build, this method should be
-     * replaced with a compile-time subclass. For genesis's current public-SDK build we instead
-     * generate a same-named anonymous subclass via [java.lang.reflect.Proxy] over the
-     * `InvocationHandler` interface, which silently fails on platforms where the class isn't
-     * loadable (i.e., the vast majority of stock devices). When that proxy creation fails the
-     * call returns null and the AOC path is permanently disabled for the session — caller falls
-     * back to mic.
+     * `ContextHubClientCallback` is a class, not an interface. Java reflection can call methods on
+     * a provided instance, but it cannot synthesize the subclass instance that `createClient`
+     * requires. The current public-SDK build therefore returns null and leaves the AOC path
+     * disabled for the session so callers fall back to mic.
      *
      * If you have access to a platform-signed build, replace this method with:
      * ```kotlin
@@ -191,10 +182,8 @@ constructor(
         val callbackClass = runCatching { ContextHubClientUtil.contextHubClientCallbackClass() }
             .onFailure { Log.i(TAG, "ContextHubClientCallback not loadable; AOC disabled") }
             .getOrNull() ?: return null
-        // Java reflection can only proxy interfaces. ContextHubClientCallback is a class, so we
-        // can't synthesize a subclass without bytecode generation (ASM / Javassist) — which
-        // would be ~30+ KB of dependency for a code path that won't run on stock devices anyway.
-        // Document the limitation; return null so [startRecording] returns false at runtime.
+        // This must be a real subclass, not a proxy. Keeping the public build fail-closed avoids
+        // pretending the AOC path ran when stock devices should use the mic fallback.
         Log.i(TAG, "ContextHubClientCallback is a class (${callbackClass.name}); cannot subclass " +
             "without bytecode gen. AOC requires a platform-signed build with a compile-time subclass.")
         return null
@@ -253,27 +242,3 @@ object NanoAppClientModule {
     @Singleton
     fun provideAocScheduler(): ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 }
-
-@Suppress("unused")
-private class NanoAppCallbackHandler(
-    private val onMessage: (Any) -> Unit,
-    private val onReset: () -> Unit,
-    private val onAborted: (Long, Int) -> Unit,
-) : InvocationHandler {
-    override fun invoke(proxy: Any?, method: Method, args: Array<out Any?>?): Any? {
-        when (method.name) {
-            "onMessageFromNanoApp" -> args?.getOrNull(1)?.let(onMessage)
-            "onHubReset" -> onReset()
-            "onNanoAppAborted" -> {
-                val nanoAppId = args?.getOrNull(1) as? Long ?: return null
-                val abortCode = args.getOrNull(2) as? Int ?: return null
-                onAborted(nanoAppId, abortCode)
-            }
-        }
-        return null
-    }
-}
-
-@Suppress("unused")
-private fun newProxyForCallback(handler: NanoAppCallbackHandler, callbackInterface: Class<*>): Any =
-    Proxy.newProxyInstance(callbackInterface.classLoader, arrayOf(callbackInterface), handler)

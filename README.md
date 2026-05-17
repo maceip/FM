@@ -20,7 +20,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| Ambient microphone | 🟩🟩🟩🟩🟩 | Per-source `SodaSession`; recovered SODA blend; transcript-first `AMBIENT_CONTINUOUS` |
+| Ambient microphone | 🟩🟩🟩🟩🟩 | Per-source `SodaSession`; recovered SODA blend; `AMBIENT_ONESHOT` + IntendedSpeech directedness |
 | Pixel Buds (Bluetooth SBC) | 🟩🟩🟩🟩🟩 | `MediaCodec`-based decoder; no vendored `libsbcdecoder_jni.so` needed |
 | Device / media audio | 🟩🟩🟩🟩🟩 | `AudioSource = REMOTE_SUBMIX` |
 | Call audio | 🟩🟩🟩🟩🟩 | `AudioSource = VOICE_CALL` |
@@ -31,14 +31,14 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | Location | 🟩🟩🟩🟩🟩 | Coarse + fine permission gated |
 | Glass / XR projected capture | 🟨🟨🟨⬜⬜ | Service binds; downstream consumer not wired |
 | Camera (image analysis frames) | 🟨🟨🟨⬜⬜ | Frames captured; prompt-grounding consumer not built |
-| AOC nanoapp audio transport | 🟨🟨⬜⬜⬜ | Routing + Context Hub binding live; callback subclass needs platform-signed compile or bytecode-gen |
+| AOC nanoapp audio transport | 🟨🟨🟨⬜⬜ | Routing + Context Hub/nanoapp plumbing live; callback subclass needs platform-capable compile or bytecode-gen |
 
 ### On-device speech (SODA)
 
 | Subsystem | Progress | Notes |
 |---|---|---|
 | End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled; emulator fixture corpus routes 10/10 speech phrases through SODA → regex skills |
-| Magic Mic / IntendedSpeech gate | 🟨⬜⬜⬜⬜ | Not used as launch gate; recovered cosmo SODA stays transcript-first with `AMBIENT_CONTINUOUS` |
+| Magic Mic / IntendedSpeech gate | 🟩🟩🟩🟨⬜ | CPU recovery directedness gate is wired; human-recorded fixture proof still pending |
 | Endpointer / punctuation / denorm / G2P | 🟩🟩🟩🟩🟩 | Internal to SODA; transcripts arrive complete |
 | Voice Match (speaker ID) | 🟨🟨⬜⬜⬜ | JNI stub + config plumbing; enrollment UI not ported |
 | Hotword event routing | 🟨🟨⬜⬜⬜ | Events arrive at callback; logged-only, no action wiring |
@@ -61,7 +61,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 |---|---|---|
 | LLM-backed intent extractor (second `Gatekeeper.output` subscriber) | 🟩🟩🟩🟩🟩 | Cosmo `{reasoning, final_answer}` parse path; context-gather from recent transcripts + screen interactions |
 | Skill catalog (22 action types from `filtered_skill_schema.textproto`) | 🟩🟩🟩🟩🟩 | Schema-driven, required args + trigger regexes + permission gates |
-| Fulfillment runner + confirmation policy | 🟩🟩🟩🟩⬜ | Functional end-to-end; single action handler awaiting per-subtype split |
+| Fulfillment runner + confirmation policy | 🟩🟩🟩🟩🟨 | Functional end-to-end; subtype executors split; richer execution-error UI remains |
 | Browsing agent surface (TaskMonitor) | 🟩🟩🟩🟩🟩 | Mariner-style prompt/response rendering |
 
 ### LLM clients
@@ -77,6 +77,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 ### Memory + state
 
 | Subsystem | Progress | Notes |
+|---|---|---|
 | Per-source ephemeral buffers (23 qualifiers) | 🟩🟩🟩🟩🟩 | Timestamp-based eviction; max age tracks settings |
 | Encrypted persistent context store | 🟩🟩🟩🟩🟩 | Room + SQLCipher; Keystore-wrapped passphrase |
 | State probe (`CosmoStateSource`) | 🟩🟩🟩🟩🟩 | Cosmo-aligned 2-method interface |
