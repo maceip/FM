@@ -20,7 +20,7 @@ can answer "what did cosmo do?" They are not a work queue.
 
 ## Current Truth
 
-As of 2026-05-16, Steps 1 through 5 are green on `codex/ship-plan-audit`.
+As of 2026-05-17, Steps 1 through 5 are green on `codex/ship-plan-audit`.
 
 - Tier 0 passes locally:
   `scripts/verify-relocation-safety.sh`,
@@ -46,9 +46,15 @@ As of 2026-05-16, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   injected PCM. Artifacts:
   `artifacts/device-core-capability/20260516-172858/`.
 - The same core smoke can push recorded phrases through SODA:
-  `scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav`. The
-  synthetic timer fixture validated injection + SODA directedness events, but
-  produced a blank transcript; real human-recorded phrases are still needed.
+  `scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav`.
+- The generated fixture corpus passed on emulator with 10/10 speech phrases
+  producing final SODA transcripts and expected regex skill routing. Artifacts:
+  `artifacts/audio-run/20260517-161257/`. Real human-recorded phrases are still
+  needed once a phone is available.
+- The raw Conformer/Darwinn audio debug path now fails closed on emulator with
+  `raw_audio_native_unsupported_on_emulator` instead of crashing in
+  `libtensorflowlite_jni.so`; Pixel hardware is still required for EdgeTPU
+  proof.
 - The existing path to ship next remains:
 
 ```text

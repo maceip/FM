@@ -37,7 +37,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled; emulator core smoke passes SODA native lifecycle |
+| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled; emulator fixture corpus routes 10/10 speech phrases through SODA → regex skills |
 | Magic Mic / IntendedSpeech gate | 🟨⬜⬜⬜⬜ | Not used as launch gate; recovered cosmo SODA stays transcript-first with `AMBIENT_CONTINUOUS` |
 | Endpointer / punctuation / denorm / G2P | 🟩🟩🟩🟩🟩 | Internal to SODA; transcripts arrive complete |
 | Voice Match (speaker ID) | 🟨🟨⬜⬜⬜ | JNI stub + config plumbing; enrollment UI not ported |
@@ -51,7 +51,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | Unified `Gatekeeper` (single dispatch) | 🟩🟩🟩🟩🟩 | Owns subscriptions; C1 mutex via backend type-filter |
 | BERT classifier (CPU + Tensor G4 + Tensor G5) | 🟩🟩🟩🟩🟩 | Combined BERT + regex fusion |
 | C9 selector-routed dispatch | 🟩🟩🟩🟩🟩 | Backend returns null for non-native input type — that IS the mutex |
-| Conformer EdgeTPU audio backend | 🟩🟩🟩🟩⬜ | Code path bundled; activation gated on Pixel + Darwinn proof |
+| Conformer EdgeTPU audio backend | 🟩🟩🟩🟩⬜ | Code path bundled; activation gated on Pixel + Darwinn proof; emulator raw-audio debug path fails closed instead of SIGILL |
 | Inherent (joint audio→intent) backend | 🟩🟩🟩⬜⬜ | Wired; v0.1 LiteRT artifact now matches Android tensor contract; quality + real-device proof pending |
 | MediaTek Dimensity (mt6989) BERT variant | 🟩⬜⬜⬜⬜ | Manifest slot reserved; AOT pipeline drafted; model not built yet |
 
