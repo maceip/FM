@@ -1252,7 +1252,8 @@ methods route through `CosmoController`, `CosmoStateManager`, `ContextStore`,
 returns), Inherent backend (contract-valid artifact available, quality and
 device proof pending), AOC nanoapp transport (reflection-bridged; needs platform-signed callback or
 bytecode-gen), Voice Match (JNI stub + config plumbing; no UI / no enrollment),
-HotwordEvent routing (logged-only), LiteRT-LM (provisioning needed),
+HotwordEvent routing (logged-only), LiteRT-LM (E2B app-private fallback proven on Xiaomi;
+production delivery still needed),
 remote inference (live config needed), glass + camera capture (services
 bind; consumers not wired), richer fulfillment execution-error UI, **Presence state driver
 (surfaces render, but the `GatekeeperOutput → PresenceState` producer isn't
