@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LANE="${1:-${DEVICE_LANE:-fallback}}"
 PACKAGE_NAME="${PACKAGE_NAME:-com.google.research.air.cosmo}"
-LITERTLM_MODEL_ID="${LITERTLM_MODEL_ID:-${MODEL_ID:-google-gemma-4-E4B-it-litertlm}}"
+LITERTLM_MODEL_ID="${LITERTLM_MODEL_ID:-${MODEL_ID:-google-gemma-4-E2B-it-litertlm}}"
 TEST_RUNNER="$PACKAGE_NAME.test/com.google.research.air.cosmo.GenesisTestRunner"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_DIR/artifacts/device-model-routing/$STAMP-$LANE}"

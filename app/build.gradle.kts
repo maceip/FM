@@ -68,7 +68,7 @@ android {
         buildConfigField("String", "REMOTE_INFERENCE_AUDIENCE", "\"${providers.gradleProperty("cosmo.remoteInference.audience").orNull ?: "cosmo-remote-inference"}\"")
         buildConfigField("String", "LOCAL_LITERTLM_BACKEND", "\"${providers.gradleProperty("cosmo.localLlm.litertLmBackend").orNull ?: "AUTO"}\"")
         buildConfigField("int", "LOCAL_LITERTLM_MAX_TOKENS", providers.gradleProperty("cosmo.localLlm.litertLmMaxTokens").orNull ?: "4096")
-        buildConfigField("String", "LOCAL_LITERTLM_MODEL_ID", "\"${providers.gradleProperty("cosmo.localLlm.litertLmModelId").orNull ?: "google-gemma-4-E4B-it-litertlm"}\"")
+        buildConfigField("String", "LOCAL_LITERTLM_MODEL_ID", "\"${providers.gradleProperty("cosmo.localLlm.litertLmModelId").orNull ?: "google-gemma-4-E2B-it-litertlm"}\"")
         buildConfigField("boolean", "AICORE_EXPERIMENTAL_NON_PUBLIC", "${providers.gradleProperty("cosmo.aicore.experimentalNonPublic").orNull ?: "false"}")
         buildConfigField("String", "SODA_PACK_CPU_URL", "\"${providers.gradleProperty("cosmo.soda.languagePack.cpuUrl").orNull.orEmpty()}\"")
         buildConfigField("String", "SODA_PACK_CPU_SHA256", "\"${providers.gradleProperty("cosmo.soda.languagePack.cpuSha256").orNull ?: "fac23ca956f473c5025621784a1657a1663a16b0754886b975f3cde3f1345f04"}\"")

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_NAME="${PACKAGE_NAME:-com.google.research.air.cosmo}"
-MODEL_ID="${MODEL_ID:-google-gemma-4-E4B-it-litertlm}"
+MODEL_ID="${MODEL_ID:-google-gemma-4-E2B-it-litertlm}"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 is required to derive the LiteRT-LM model storage path." >&2
@@ -26,7 +26,7 @@ fi
 
 if [[ ! -r "$LOCAL_MODEL" ]]; then
   echo "Local model is missing or unreadable: $LOCAL_MODEL" >&2
-  echo "Run scripts/convert-gemma4-e4b-litertlm.sh or scripts/provision-gemma4-litertlm.sh first." >&2
+  echo "Run scripts/provision-local-litertlm.sh first, or set MODEL_ID/LOCAL_MODEL explicitly." >&2
   exit 1
 fi
 

@@ -161,6 +161,19 @@ Convert a phone recording before injection:
 ffmpeg -i phrase.m4a -ac 1 -ar 16000 -sample_fmt s16 phrase.wav
 ```
 
+**Dogfood LiteRT-LM fallback:**
+
+```bash
+scripts/provision-local-litertlm.sh
+DEPLOY_LITERTLM=1 scripts/run-device-model-routing-smoke.sh fallback
+```
+
+The launch fallback default is the app-private
+`google-gemma-4-E2B-it-litertlm` bundle. It is not checked into git; the
+provision script copies the local `.litertlm` file into the hashed storage path
+that `LiteRtLmLLM` and the deploy script both use. Test E4B or future bundles
+by passing `LITERTLM_MODEL_ID=...` and `LOCAL_MODEL=...`.
+
 **Remote emu smoke:**
 
 ```bash

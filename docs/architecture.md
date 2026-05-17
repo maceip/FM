@@ -313,7 +313,7 @@ impls; selection is policy-driven.
 | Backend | File | Status | Notes |
 |---|---|---|---|
 | Public AICore (Gemini Nano via `GenerativeModel`) | `lib/llm/AICoreClientWrapper.kt` | ✅ | Production default when AICore feature is available on device |
-| LiteRT-LM (on-device Gemma bundle) | `lib/llm/LiteRtLmLLM.kt` | ⚠️ | Requires provisioning the official Gemma 4 LiteRT-LM bundle (`scripts/provision-gemma4-litertlm.sh`); bundled-asset / app-private / runtime-download delivery |
+| LiteRT-LM (on-device Gemma bundle) | `lib/llm/LiteRtLmLLM.kt` | ⚠️ | Dogfood default is the app-private E2B bundle (`scripts/provision-local-litertlm.sh`); E4B and asset-pack delivery are explicit overrides |
 | Remote inference (Oak session) | `lib/llm/RemoteInferenceClient.kt` (`OkHttpRemoteInferenceClient`) | ⚠️ | Live path needs endpoint + certificate pin + audience configuration |
 | Network-aware selector | `lib/llm/NetworkAwareLLM`-shape (in `LlmBackend.kt`) | ✅ | Routes local vs remote vs hybrid |
 | Simulation LLM (debug) | `lib/llm/SimulationLLM.kt` | ✅ | Deterministic fixture LLM for unit tests |

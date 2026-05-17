@@ -49,11 +49,17 @@ The current public `litert_torch` exporter can verify/download that checkpoint,
 but it does not expose the Gemma 4 `tf_lite_mtp_drafter` export path needed to
 turn the assistant safetensors into a valid standalone `.litertlm` bundle.
 
-The production LiteRT-LM fallback is therefore the official
-`litert-community/gemma-4-E4B-it-litert-lm` bundle, which includes the target
-model and `tf_lite_mtp_drafter` section. Use `scripts/provision-gemma4-litertlm.sh`
-to fetch and validate it locally at
-`artifacts/models/google-gemma-4-E4B-it-litertlm/model.litertlm`.
+The dogfood LiteRT-LM fallback is the local
+`google-gemma-4-E2B-it-litertlm` bundle. Use
+`scripts/provision-local-litertlm.sh` to copy the local `.litertlm` file into
+`artifacts/models/google-gemma-4-E2B-it-litertlm-165e6fc4354294a0/model.litertlm`.
+That artifact is 2,583,085,056 bytes with SHA-256
+`ab7838cdfc8f77e54d8ca45eadceb20452d9f01e4bfade03e5dce27911b27e42`.
+
+The larger official E4B fallback remains available as an explicit override via
+`litert-community/gemma-4-E4B-it-litert-lm`, which includes the target model and
+`tf_lite_mtp_drafter` section. Use `scripts/provision-gemma4-litertlm.sh` to
+fetch and validate it locally when that path is intentionally being tested.
 
 LiteRT-LM is intentionally unavailable until that provisioned model file is
 provisioned as either a bundled APK asset
@@ -67,6 +73,6 @@ Delivery choices:
   `scripts/deploy-gemma4-litertlm.sh`, then stages a bundled asset if present.
 - Runtime download is not active. Re-add it only when a release-owned download
   workflow exists.
-- The Hugging Face artifact URL is `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm`. Generate the SHA-256 and size via `scripts/provision-gemma4-litertlm.sh`, which now writes `model.manifest-entry.json` next to the artifact for direct merge into `app/src/main/assets/model-manifest.json`.
+- The E4B Hugging Face artifact URL is `https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm`. Generate the SHA-256 and size via `scripts/provision-gemma4-litertlm.sh`, which writes `model.manifest-entry.json` next to the artifact for direct merge into `app/src/main/assets/model-manifest.json` if that future release path is selected.
 - Internal/teamfood builds use bundled or app-private deployment. Android AI
   packs and Play/Game Asset Delivery are deferred until release variants exist.

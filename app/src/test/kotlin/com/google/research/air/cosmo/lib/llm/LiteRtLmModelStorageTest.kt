@@ -5,7 +5,15 @@ import org.junit.Test
 
 class LiteRtLmModelStorageTest {
     @Test
-    fun runtimeStorageSlugMatchesDeployScriptForDefaultModel() {
+    fun runtimeStorageSlugMatchesDeployScriptForDogfoodDefaultModel() {
+        assertEquals(
+            "google-gemma-4-E2B-it-litertlm-165e6fc4354294a0",
+            liteRtLmModelStorageSlug("google-gemma-4-E2B-it-litertlm")
+        )
+    }
+
+    @Test
+    fun runtimeStorageSlugSupportsExplicitE4bModel() {
         assertEquals(
             "google-gemma-4-E4B-it-litertlm-ad73b9f96e3f1965",
             liteRtLmModelStorageSlug("google-gemma-4-E4B-it-litertlm")
