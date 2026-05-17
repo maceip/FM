@@ -25,32 +25,37 @@ case "$TARGET" in ambient|soda|both) ;; *) echo "target must be one of ambient|s
 if ! command -v adb >/dev/null 2>&1; then
   echo "adb not on PATH" >&2; exit 64
 fi
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  ADB=(adb -s "$ANDROID_SERIAL")
+else
+  ADB=(adb)
+fi
 if [[ ! -d "$AUDIO_DIR" ]] || ! ls "$AUDIO_DIR"/*.wav >/dev/null 2>&1; then
   echo "no fixtures in $AUDIO_DIR — run ./generate-audio-fixtures.sh first" >&2; exit 65
 fi
 
-device=$(adb get-serialno || true)
+device=$("${ADB[@]}" get-serialno || true)
 if [[ -z "$device" || "$device" == "unknown" ]]; then
   echo "no device connected" >&2; exit 66
 fi
 echo "==> device: $device"
 
 echo "==> ensuring directories exist on device"
-adb shell mkdir -p "$TMP_DIR"
-adb shell run-as "$PACKAGE" mkdir -p "files/cosmo-test"
+"${ADB[@]}" shell mkdir -p "$TMP_DIR"
+"${ADB[@]}" shell run-as "$PACKAGE" mkdir -p "files/cosmo-test"
 
 echo "==> pushing fixtures via $TMP_DIR -> $DEVICE_DIR (run-as $PACKAGE)"
 for wav in "$AUDIO_DIR"/*.wav; do
   name=$(basename "$wav")
-  adb push "$wav" "$TMP_DIR/$name" >/dev/null
+  "${ADB[@]}" push "$wav" "$TMP_DIR/$name" >/dev/null
   # `run-as ... tee` writes to the app's private dir under the app's uid, so the receiver
   # can read the file without any storage permission. Discard tee stdout for quietness.
-  adb shell "cat $TMP_DIR/$name | run-as $PACKAGE sh -c 'cat > files/cosmo-test/$name'"
+  "${ADB[@]}" shell "cat $TMP_DIR/$name | run-as $PACKAGE sh -c 'cat > files/cosmo-test/$name'"
 done
-adb shell rm -rf "$TMP_DIR" 2>/dev/null || true
+"${ADB[@]}" shell rm -rf "$TMP_DIR" 2>/dev/null || true
 
 echo "==> starting app so the debug receiver is registered"
-adb shell am start -n "$ACTIVITY" >/dev/null
+"${ADB[@]}" shell am start -n "$ACTIVITY" >/dev/null
 sleep 4
 
 logcat_pid=""
@@ -60,8 +65,8 @@ artifacts="$SCRIPT_DIR/../../artifacts/audio-run/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$artifacts"
 logfile="$artifacts/logcat.txt"
 echo "==> tailing logcat to $logfile"
-adb logcat -c
-adb logcat -v time \
+"${ADB[@]}" logcat -c
+"${ADB[@]}" logcat -v time \
   GatekeeperDebug:* \
   COSMO-Gatekeeper:* \
   COSMO-RawAudioGatekeeper:* \
@@ -79,7 +84,7 @@ logcat_pid=$!
 for wav in "$AUDIO_DIR"/*.wav; do
   name=$(basename "$wav")
   echo "==> inject $name target=$TARGET"
-  adb shell am broadcast \
+  "${ADB[@]}" shell am broadcast \
     -a com.google.research.air.cosmo.DEBUG_INJECT_AUDIO \
     --es path "$DEVICE_DIR/$name" \
     --es target "$TARGET" \
@@ -98,3 +103,10 @@ grep -E "GatekeeperDebug|SodaSession|JniSodaCapability|RawAudioGatekeeperRunResu
 
 echo
 echo "logcat: $logfile"
+
+if [[ "${ASSERT_AUDIO_FIXTURES:-1}" != "0" ]]; then
+  echo "==> validating fixture output"
+  python3 "$SCRIPT_DIR/assert-audio-fixture-run.py" "$logfile" \
+    --index "$SCRIPT_DIR/gatekeeper-utterances.json" \
+    --target "$TARGET"
+fi

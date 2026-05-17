@@ -138,37 +138,44 @@ constructor(
             Log.w(TAG, "audio inject: not a 16k mono PCM16 WAV path=$path size=$size")
             return
         }
-        Log.i(TAG, "audio inject: target=$target bytes=${pcm.size} (~${pcm.size / 32}ms @ 16k mono PCM16)")
+        val fixtureName = file.name
+        Log.i(TAG, "audio inject: name=$fixtureName target=$target bytes=${pcm.size} (~${pcm.size / 32}ms @ 16k mono PCM16)")
         val chunks = pcm.toList().chunked(FRAME_BYTES).map { it.toByteArray() }
-        if (target == TARGET_AMBIENT || target == TARGET_BOTH) feedAmbient(chunks)
-        if (target == TARGET_SODA || target == TARGET_BOTH) feedSoda(chunks)
+        if (target == TARGET_AMBIENT || target == TARGET_BOTH) feedAmbient(chunks, fixtureName)
+        if (target == TARGET_SODA || target == TARGET_BOTH) feedSoda(chunks, fixtureName)
     }
 
-    private suspend fun feedAmbient(chunks: List<ByteArray>) {
+    private suspend fun feedAmbient(
+        chunks: List<ByteArray>,
+        fixtureName: String
+    ) {
         chunks.forEach { ambientBuffer.add(it) }
-        Log.i(TAG, "audio inject ambient: pushed ${chunks.size} chunks; running AudioGatekeepingModel")
+        Log.i(TAG, "audio inject ambient: name=$fixtureName pushed ${chunks.size} chunks; running AudioGatekeepingModel")
         val result = audioGatekeepingModel.predict(chunks.flattenBytes())
-        Log.i(TAG, "audio inject ambient: result=$result")
+        Log.i(TAG, "audio inject ambient: name=$fixtureName result=$result")
     }
 
-    private suspend fun feedSoda(chunks: List<ByteArray>) {
+    private suspend fun feedSoda(
+        chunks: List<ByteArray>,
+        fixtureName: String
+    ) {
         if (!sodaCapability.isAvailable) {
-            Log.w(TAG, "audio inject soda: capability unavailable (libsoda_dev_jni missing or load failed)")
+            Log.w(TAG, "audio inject soda: name=$fixtureName capability unavailable (libsoda_dev_jni missing or load failed)")
             return
         }
         val prepared = sodaCapability.prepare()
         if (prepared !is SodaPrepareResult.Available) {
-            Log.w(TAG, "audio inject soda: prepare failed: $prepared")
+            Log.w(TAG, "audio inject soda: name=$fixtureName prepare failed: $prepared")
             return
         }
         // Dedicated debug session so we don't interfere with production per-source controllers.
         val session = SodaSession(appContext, prepared.packDir, clock)
         val started = session.start(SodaTranscriptCallback { text, isFinal ->
-            Log.i(TAG, "audio inject soda transcript: isFinal=$isFinal text=$text")
-            if (isFinal && text.isNotBlank()) classifyInjectedTranscript(text)
+            Log.i(TAG, "audio inject soda transcript: name=$fixtureName isFinal=$isFinal text=$text")
+            if (isFinal && text.isNotBlank()) classifyInjectedTranscript(text, fixtureName)
         })
         if (started !is SodaStartResult.Started) {
-            Log.w(TAG, "audio inject soda: start failed: $started")
+            Log.w(TAG, "audio inject soda: name=$fixtureName start failed: $started")
             return
         }
         val trailingSilenceChunks = List(DEBUG_SODA_TRAILING_SILENCE_CHUNKS) { ByteArray(FRAME_BYTES) }
@@ -181,16 +188,19 @@ constructor(
         }
         Log.i(
             TAG,
-            "audio inject soda: pushed ${chunks.size} audio chunks + ${trailingSilenceChunks.size} silence chunks; awaiting transcripts on callback"
+            "audio inject soda: name=$fixtureName pushed ${chunks.size} audio chunks + ${trailingSilenceChunks.size} silence chunks; awaiting transcripts on callback"
         )
         scope.launch {
             delay(DEBUG_SODA_SESSION_STOP_DELAY_MS)
             session.stop()
-            Log.i(TAG, "audio inject soda: stopped debug session")
+            Log.i(TAG, "audio inject soda: name=$fixtureName stopped debug session")
         }
     }
 
-    private fun classifyInjectedTranscript(text: String) {
+    private fun classifyInjectedTranscript(
+        text: String,
+        fixtureName: String
+    ) {
         scope.launch {
             val result =
                 cpuRecoveryBackend.classify(
@@ -200,7 +210,7 @@ constructor(
                         directednessTrigger = true
                     )
                 )
-            Log.i(TAG, "audio inject soda gatekeeper: result=$result")
+            Log.i(TAG, "audio inject soda gatekeeper: name=$fixtureName result=$result")
         }
     }
 

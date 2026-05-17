@@ -78,7 +78,7 @@
     "2. From genesis root: `./gradlew installDebug` (787MB APK).",
     "3. Grant mic permission (open the app once, accept rationale; or `adb shell pm grant com.google.research.air.cosmo android.permission.RECORD_AUDIO`).",
     "4. `cd scripts/test-fixtures && ./generate-audio-fixtures.sh && ./run-audio-fixtures.sh both`",
-    "5. Inspect the captured logcat in artifacts/audio-run/<timestamp>/logcat.txt.",
+    "5. The script validates the captured logcat and writes artifacts/audio-run/<timestamp>/logcat.txt.",
     "",
     "Pass criteria per fixture:",
     "  ambient → exactly one log line matching `audio inject ambient: result=Success(detectedSkills=...)` with the expected skill in the map (or Success with empty map for the synthetic sine).",
