@@ -33,4 +33,5 @@ abstract class DebugPanelModule {
     @Binds @IntoSet abstract fun bindSkillsPanel(impl: SkillsDebugPanel): CosmoDebugPanel
     @Binds @IntoSet abstract fun bindModelAssetsPanel(impl: ModelAssetsDebugPanel): CosmoDebugPanel
     @Binds @IntoSet abstract fun bindObservabilitySchemaPanel(impl: ObservabilitySchemaDebugPanel): CosmoDebugPanel
+    @Binds @IntoSet abstract fun bindPresenceOverlayPanel(impl: PresenceOverlayDebugPanel): CosmoDebugPanel
 }

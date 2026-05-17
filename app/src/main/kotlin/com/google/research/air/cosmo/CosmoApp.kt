@@ -12,6 +12,7 @@ import com.google.research.air.cosmo.lib.performance.DebugDiagnostics
 import com.google.research.air.cosmo.lib.performance.MemoryPressureTrimmer
 import com.google.research.air.cosmo.notifications.CosmoNotificationManager
 import com.google.research.air.cosmo.presence.PresenceController
+import com.google.research.air.cosmo.presence.overlay.PresenceOverlayStarter
 import com.google.research.air.cosmo.runtime.ProcessInitializerRunner
 import com.google.research.air.cosmo.runtime.PureProcess
 import com.google.research.air.cosmo.setting.CosmoStateManager
@@ -38,6 +39,8 @@ class CosmoApp :
 
     @Inject lateinit var presenceController: PresenceController
 
+    @Inject lateinit var presenceOverlayStarter: PresenceOverlayStarter
+
     private var batteryReceiver: BatteryStateReceiver? = null
 
     override fun onCreate() {
@@ -58,6 +61,7 @@ class CosmoApp :
         // C7: app-level GatekeeperOutputSource consumers subscribe once at app start.
         intentExtractor.start()
         presenceController.start()
+        presenceOverlayStarter.start()
     }
 
     override fun onTerminate() {

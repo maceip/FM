@@ -100,8 +100,9 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | Subsystem | Progress | Notes |
 |---|---|---|
 | Nav3 with per-tab stacks + predictive back | 🟩🟩🟩🟩🟩 | `NavDisplay`; adaptive support-pane scene strategy for foldables/tablets |
-| 24 Hilt-multibound debug panels | 🟩🟩🟩🟩🟩 | Live controller jobs, settings, LLM stats, gatekeeper output, buffer sizes, skill registry, manifest state |
+| 25 Hilt-multibound debug panels | 🟩🟩🟩🟩🟩 | Live controller jobs, settings, LLM stats, gatekeeper output, buffer sizes, skill registry, manifest state, presence overlay |
 | Route-state JSON persistence | 🟩🟩🟩🟩🟩 | TaskMonitor token round-trip, corrupted route rejection, tab-history restore |
+| Presence overlay window | 🟩🟩🟩⬜⬜ | Orb/tab/card-stack surfaces hosted in `TYPE_APPLICATION_OVERLAY`; permission-gated with unit coverage and debug-panel controls |
 | Glass / XR surface | 🟩🟩🟩🟩⬜ | Activity bound; capture consumer wiring partial |
 
 ### Voice output (intentionally deferred)
