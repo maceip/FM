@@ -26,7 +26,6 @@ PR notes should point here instead of maintaining parallel blocker lists.
 | B-P1-003 | Release remote inference environment is not provisioned. | `docs/remote-inference-contract.md` defines the issuer and inference contract. Build config is intentionally blank by default. | Provision endpoint, certificate pin, audience, and credential issuer. Validate MockWebServer parity plus one live transcript with no secrets logged. |
 | B-P1-004 | LiteRT-LM model packaging decision is open. | Runtime can use a bundled asset or an app-private file keyed by `cosmo.localLlm.litertLmModelId`; the deploy script and runtime now agree on the hashed storage path. The requested E4B LiteRT-LM bundle is not yet checked into a release-owned path. | Decide bundled asset, app-private file, or future asset-pack delivery. Record model id, byte size, SHA-256, install behavior, and storage budget. |
 | B-P1-005 | SODA transcript quality still needs human-recorded fixture proof. | `SodaConfigBuilder` uses `AMBIENT_ONESHOT` + `IntendedSpeechConfig.OPEN_MIC`; `JniSodaCapability` emits directedness when intended-query score meets threshold; `SodaController.directedness` and `Gatekeeper` consume it locally. Xiaomi core smoke proved SODA native startup and PCM acceptance. Debug WAV injection proved SODA event and intended-query logging with `scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav`; the synthetic timer fixture produced directedness signals but blank transcripts. | Run directed-command and undirected-conversation human recordings on target hardware. Record intended-query score/threshold, final transcript, and absence/presence of directedness. |
-| B-P1-006 | C9 backend router is scaffolded but not classification-complete. | `AudioGatekeepingBackend`, selector, and concrete backend classes exist, but backend `classify()` methods still contain `TODO(...)`; `Gatekeeper` still calls concrete models directly after using the selector only for active-backend id. | Wire `CpuRecoveryBackend` to BERT-on-transcript, keep EdgeTPU and Inherent unavailable until their prerequisites exist, and route Gatekeeper classification through the selector without direct model calls. |
 
 ## P2 Blockers
 
@@ -54,6 +53,7 @@ PR notes should point here instead of maintaining parallel blocker lists.
 - Fulfillment parser defaulting: invalid or incomplete action payloads are rejected instead of silently defaulted.
 - Side-effect confirmation coverage: schema action subtypes now have confirmation-policy coverage.
 - Nav3 saveable route-state gap: route serialization and restore paths are covered by `MainNavigationStateTest`.
+- C9 backend router classification gap: `CpuRecoveryBackend.classify()` now runs BERT/regex on directed transcripts, EdgeTPU/Inherent remain raw-audio-only until their prerequisites are available, and `Gatekeeper` routes ambient/raw inputs through `AudioGatekeepingBackendSelector`. Verified with `GatekeeperDispatchInvariantTest` and `CpuRecoveryBackendTest` on 2026-05-17.
 
 ## Maintenance Rules
 
