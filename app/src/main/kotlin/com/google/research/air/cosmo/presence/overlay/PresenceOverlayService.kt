@@ -77,15 +77,13 @@ class PresenceOverlayService : Service() {
     private fun startForegroundSafely(): Boolean =
         runCatching {
             val channelId = "presence_overlay"
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                getSystemService(NotificationManager::class.java).createNotificationChannel(
-                    NotificationChannel(
-                        channelId,
-                        "Presence overlay",
-                        NotificationManager.IMPORTANCE_MIN
-                    )
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(
+                    channelId,
+                    "Presence overlay",
+                    NotificationManager.IMPORTANCE_MIN
                 )
-            }
+            )
             val notification =
                 NotificationCompat.Builder(this, channelId)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
