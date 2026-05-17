@@ -30,7 +30,6 @@ PR notes should point here instead of maintaining parallel blocker lists.
 
 | ID | Blocker | Current State | Exit Evidence |
 | --- | --- | --- | --- |
-| B-P2-001 | Fulfillment executor remains too centralized. | Action parsing rejects missing required fields and side-effect confirmation coverage exists, but one implementation still owns many action branches. | Move subtype execution into focused executors or a registry with typed results. Preserve parser and confirmation tests. |
 | B-P2-002 | Some fulfillment actions intentionally downgrade to generic intents/search. | Calendar, external agent, and unavailable first-party surfaces use explicit downgrade paths instead of fake integrations. | Implement concrete provider/API integrations where required, or document the downgrade as accepted product behavior for dogfood. |
 | B-P2-003 | Nav3 result/adaptive recipe parity needs device/UI proof. | Saveable route-state tests cover tab stacks, TaskMonitor payloads, corrupted tokens, and adaptive support panes. | Validate result-passing flow and compact, unfolded, and tablet adaptive layouts with screenshots or instrumentation logs. |
 | B-P2-004 | Broader phase gates remain incomplete. | Phase 6 gates cover model manifest, release signing separation, telemetry provenance, Firebase boundary, LiteRT-LM path safety, raw-audio production binding, and Nav3 route-state coverage. | Add phase-specific gates for live LLM path proof, model delivery manifest, gatekeeper outputs, capture jobs, action execution, and battery thresholds as those surfaces become device-validated. |
@@ -54,6 +53,7 @@ PR notes should point here instead of maintaining parallel blocker lists.
 - Nav3 saveable route-state gap: route serialization and restore paths are covered by `MainNavigationStateTest`.
 - C9 backend router classification gap: `CpuRecoveryBackend.classify()` now runs BERT/regex on directed transcripts, EdgeTPU/Inherent remain raw-audio-only until their prerequisites are available, and `Gatekeeper` routes ambient/raw inputs through `AudioGatekeepingBackendSelector`. Verified with `GatekeeperDispatchInvariantTest` and `CpuRecoveryBackendTest` on 2026-05-17.
 - LiteRT-LM model packaging decision: dogfood/default fallback uses the app-private `google-gemma-4-E2B-it-litertlm` bundle, not a checked-in APK asset. Local file size is 2,583,085,056 bytes with SHA-256 `ab7838cdfc8f77e54d8ca45eadceb20452d9f01e4bfade03e5dce27911b27e42`; `scripts/provision-local-litertlm.sh` writes the hashed artifact directory and `scripts/run-device-model-routing-smoke.sh` deploys it with `DEPLOY_LITERTLM=1`. E4B and asset-pack delivery remain explicit overrides/future release work.
+- Centralized fulfillment executor: `FulfillmentActionHandlerImpl` now delegates to a Hilt multibound `FulfillmentActionExecutor` registry split across intent/calendar/draft actions, memory actions, TaskMonitor/AgentQ actions, and passive removed/unsupported actions. Verified by `FulfillmentActionHandlerImplTest` plus the existing fulfillment parser/parity tests on 2026-05-17.
 
 ## Maintenance Rules
 

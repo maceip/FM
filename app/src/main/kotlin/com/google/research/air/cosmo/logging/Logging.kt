@@ -331,8 +331,8 @@ private val TELEMETRY_EVENT_PROVENANCE: List<TelemetryEventProvenance> =
             eventName = "calendar_writable_fallback",
             owner = CosmoLogTag.CALENDAR,
             privacyClass = TelemetryPrivacyClass.ACTION_METADATA,
-            sourcePath = "app/src/main/kotlin/com/google/research/air/cosmo/fulfillment/FulfillmentActionHandler.kt",
-            emittedFrom = "FulfillmentActionHandlerImpl.insertCalendarEvent"
+            sourcePath = "app/src/main/kotlin/com/google/research/air/cosmo/fulfillment/FulfillmentActionExecutors.kt",
+            emittedFrom = "IntentFulfillmentActionExecutor.insertCalendarEvent"
         ),
         TelemetryEventProvenance(
             eventName = "glass_session",
