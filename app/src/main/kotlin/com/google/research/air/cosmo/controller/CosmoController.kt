@@ -6,6 +6,7 @@ import com.google.research.air.cosmo.audiocapture.BudsAudioCaptor
 import com.google.research.air.cosmo.audiocapture.DeviceAudioCaptor
 import com.google.research.air.cosmo.audiocapture.WatchAudioCaptor
 import com.google.research.air.cosmo.contentcapture.PeriodicScreenCaptor
+import com.google.research.air.cosmo.di.ApplicationScope
 import com.google.research.air.cosmo.devicediscovery.AmbientLanPeerBridge
 import com.google.research.air.cosmo.gatekeeping.Gatekeeper
 import com.google.research.air.cosmo.glasses.CosmoGlassManager
@@ -23,7 +24,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -44,9 +44,9 @@ constructor(
     private val notificationCaptureManager: NotificationCaptureController,
     private val gatekeeper: Gatekeeper,
     private val settingStore: CosmoSettingStore,
-    private val cosmoStateManager: CosmoStateManager
+    private val cosmoStateManager: CosmoStateManager,
+    @ApplicationScope private val scope: CoroutineScope
 ) : CosmoStateSource {
-    private val scope = CoroutineScope(SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
     private var initialized = false
     private var settingsJob: Job? = null
     private var audioJob: Job? = null
@@ -90,6 +90,11 @@ constructor(
             isDeviceAudioCaptureOn() ||
             isWatchAudioCaptureOn()
 
+    fun close() {
+        settingsJob = stopJob(settingsJob)
+        stopCaptureJobs()
+    }
+
     fun isRawAudioGatekeeperOn(): Boolean =
         settingStore.isAmbientAudioEnabled() && settingStore.isRawAudioGatekeeperEnabled()
 
@@ -104,37 +109,25 @@ constructor(
     fun isAmbientDeviceDiscoveryOn(): Boolean = deviceDiscoveryJob?.isActive == true
 
     fun pauseMicAudioCapture() {
-        audioJob?.cancel()
-        audioJob = null
+        audioJob = stopJob(audioJob)
+        budsAudioJob = stopJob(budsAudioJob)
+        deviceAudioJob = stopJob(deviceAudioJob)
+        watchAudioJob = stopJob(watchAudioJob)
     }
 
     fun resumeMicAudioCapture() {
         if (!initialized) {
             init()
-            return
         }
-        if (audioJob?.isActive != true && settingStore.isGlobalCosmoEnabled() && settingStore.isAmbientAudioEnabled()) {
-            audioJob = startAudioJob(ambientAudioCaptor)
-        }
+        if (captureAllowed()) reconcileAudioJobs()
     }
 
     private fun reconcileCaptureJobs() {
-        if (!settingStore.isGlobalCosmoEnabled() || cosmoStateManager.getCosmoState().value != CosmoState.ENABLED) {
+        if (!captureAllowed()) {
             stopCaptureJobs()
             return
         }
-        audioJob = reconcileJob(audioJob, settingStore.isAmbientAudioEnabled()) {
-            startAudioJob(ambientAudioCaptor)
-        }
-        budsAudioJob = reconcileJob(budsAudioJob, settingStore.isBudsAudioEnabled()) {
-            startAudioJob(budsAudioCaptor)
-        }
-        deviceAudioJob = reconcileJob(deviceAudioJob, settingStore.isMediaAudioEnabled()) {
-            startAudioJob(deviceAudioCaptor)
-        }
-        watchAudioJob = reconcileJob(watchAudioJob, settingStore.isWatchAudioEnabled()) {
-            startAudioJob(watchAudioCaptor)
-        }
+        reconcileAudioJobs()
         glassJob = reconcileJob(glassJob, settingStore.isConnectToGlassEnabled()) {
             scope.launch {
                 try {
@@ -168,6 +161,25 @@ constructor(
         }
     }
 
+    private fun reconcileAudioJobs() {
+        audioJob = reconcileJob(audioJob, settingStore.isAmbientAudioEnabled()) {
+            startAudioJob(ambientAudioCaptor)
+        }
+        budsAudioJob = reconcileJob(budsAudioJob, settingStore.isBudsAudioEnabled()) {
+            startAudioJob(budsAudioCaptor)
+        }
+        deviceAudioJob = reconcileJob(deviceAudioJob, settingStore.isMediaAudioEnabled()) {
+            startAudioJob(deviceAudioCaptor)
+        }
+        watchAudioJob = reconcileJob(watchAudioJob, settingStore.isWatchAudioEnabled()) {
+            startAudioJob(watchAudioCaptor)
+        }
+    }
+
+    private fun captureAllowed(): Boolean {
+        return settingStore.isGlobalCosmoEnabled() && cosmoStateManager.getCosmoState().value == CosmoState.ENABLED
+    }
+
     private fun startAudioJob(
         captor: AudioCaptor
     ): Job =
@@ -187,27 +199,23 @@ constructor(
         return null
     }
 
+    private fun stopJob(current: Job?): Job? {
+        current?.cancel()
+        return null
+    }
+
     private fun stopCaptureJobs() {
-        audioJob?.cancel()
-        budsAudioJob?.cancel()
-        deviceAudioJob?.cancel()
-        watchAudioJob?.cancel()
-        screenJob?.cancel()
-        interactionJob?.cancel()
-        locationJob?.cancel()
-        glassJob?.cancel()
-        deviceDiscoveryJob?.cancel()
+        audioJob = stopJob(audioJob)
+        budsAudioJob = stopJob(budsAudioJob)
+        deviceAudioJob = stopJob(deviceAudioJob)
+        watchAudioJob = stopJob(watchAudioJob)
+        screenJob = stopJob(screenJob)
+        interactionJob = stopJob(interactionJob)
+        locationJob = stopJob(locationJob)
+        glassJob = stopJob(glassJob)
+        deviceDiscoveryJob = stopJob(deviceDiscoveryJob)
         glassManager.stopProjectedCapture()
         ambientLanPeerBridge.stop()
-        audioJob = null
-        budsAudioJob = null
-        deviceAudioJob = null
-        watchAudioJob = null
-        screenJob = null
-        interactionJob = null
-        locationJob = null
-        glassJob = null
-        deviceDiscoveryJob = null
     }
 }
 
