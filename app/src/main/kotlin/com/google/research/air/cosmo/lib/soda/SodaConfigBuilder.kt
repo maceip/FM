@@ -6,7 +6,6 @@ import com.google.speech.soda.AudioProto
 import com.google.speech.soda.ApplicationDomainProto
 import com.google.speech.soda.ClientInfoProto
 import com.google.speech.soda.HybridAsrConfigProto
-import com.google.speech.soda.IntendedSpeechConfigProto
 import com.google.speech.soda.LoggingProto
 import com.google.speech.soda.SodaCoreConfigProto
 import com.google.speech.soda.client.SodaClientConfigProto
@@ -34,12 +33,7 @@ internal object SodaConfigBuilder {
      * Fields populated:
      *   - `cacheDirectory` → `<filesDir>/soda`
      *   - `onDeviceAsrConfig.languagePackDirectory` → caller-supplied (the extracted `lp_cpu` dir)
-     *   - `onDeviceAsrConfig.applicationDomain` → `AMBIENT_ONESHOT` (per-utterance pipeline that
-     *     activates the IntendedSpeechDetector / Magic Mic; verified on-device 2026-05-10)
-     *   - `onDeviceAsrConfig.attachHotwordEvent` → true (so HotwordEvents reach the callback)
-     *   - `intendedSpeechConfig` → enabled, mode `INTENT_DETECTION_MODE_OPEN_MIC`,
-     *     attachOpenMicResult — surfaces `intendedQueryScore`/`intendedQueryThreshold` on
-     *     FinalRecognitionResult
+     *   - `onDeviceAsrConfig.applicationDomain` → `AMBIENT_CONTINUOUS`
      *   - `audioInputConfig.micsAudioFormat` → 16 kHz mono PCM (INT16)
      *   - `audioProcessingConfig.cachedAudioConfig.maxAudioMs` → 60 s
      *   - `audioLoggingPolicy.policyType` → `AUDIO_LOGGING_POLICY_TYPE_NONE`
@@ -62,18 +56,9 @@ internal object SodaConfigBuilder {
             SodaCoreConfigProto.OnDeviceAsrConfig
                 .newBuilder()
                 .setLanguagePackDirectory(languagePackDirectory.absolutePath)
-                // AMBIENT_ONESHOT routes ambient audio through SODA's per-utterance pipeline,
-                // running the IntendedSpeechDetector (Magic Mic) on each segment. AMBIENT_CONTINUOUS
-                // is pure-transcription with no gating; DEFAULT_ONESHOT is single-session.
-                // AMBIENT_ONESHOT is the combination genesis needs: continuous listening with
-                // per-utterance directedness scores attached to each FinalRecognitionResult.
-                .setApplicationDomain(ApplicationDomainProto.ApplicationDomain.AMBIENT_ONESHOT)
-                // Cosmo never sets this because cosmo only consumed transcripts. Genesis needs
-                // HotwordEvents surfaced (Magic Mic discriminator); without
-                // attachHotwordEvent=true, SODA computes the trigger internally but the event
-                // never reaches the SodaCallback. Field 0x1c on OnDeviceAsrConfig per
-                // SodaCoreConfigProto$OnDeviceAsrConfig.smali:47.
-                .setAttachHotwordEvent(true)
+                // Match recovered cosmo exactly: SODA is the transcript source. Directedness
+                // comes from the audio gatekeeper backend, not from SODA suppressing transcripts.
+                .setApplicationDomain(ApplicationDomainProto.ApplicationDomain.AMBIENT_CONTINUOUS)
                 .build()
         val audioInputConfig =
             SodaCoreConfigProto.AudioInputConfig
@@ -105,34 +90,10 @@ internal object SodaConfigBuilder {
                 .setPlatformId(PLATFORM_ID_ANDROID)
                 .setDeviceModel(Build.MODEL.orEmpty().take(MAX_DEVICE_MODEL_CHARS))
                 .build()
-        // IntendedSpeechConfig is the Magic Mic / directedness gate. "Open Mic" is the
-        // proto-internal name; "Magic Mic" is marketing. Per
-        // IntendedSpeechConfigProto$IntendedSpeechConfig$IntentDetectionMode.smali:46-52:
-        //   INTENT_DETECTION_MODE_OPEN_MIC (2) = the Magic Mic mode. SODA's directedness
-        //   classifier runs and tags the resulting RecognitionEvent with TRIGGER_TYPE_MAGIC_MIC
-        //   (or suppresses the transcript if undirected, depending on attach flags).
-        // Cosmo never sets this — cosmo used the EdgeTPU Conformer's isInteresting head as its
-        // directedness gate. Genesis activates Magic Mic here because we don't have a working
-        // EdgeTPU Conformer on generic CPU hardware.
-        val intendedSpeechConfig =
-            IntendedSpeechConfigProto.IntendedSpeechConfig
-                .newBuilder()
-                .setEnabled(true)
-                // OPEN_MIC mode runs SODA's IntendedSpeechDetector (Magic Mic) acoustic
-                // classifier on each utterance. Verified on-device 2026-05-10: per-utterance
-                // intendedQueryScores ranged 0.22-0.998 across 11 fixtures with reasonable
-                // discrimination (real commands score high, partial/empty frames score low).
-                // NONEMPTY is the degenerate wiring-check mode and must not ship.
-                .setIntentDetectionMode(
-                    IntendedSpeechConfigProto.IntendedSpeechConfig.IntentDetectionMode.INTENT_DETECTION_MODE_OPEN_MIC
-                )
-                .setAttachOpenMicResult(true)
-                .build()
         return SodaCoreConfigProto.SodaCoreConfig
             .newBuilder()
             .setCacheDirectory(cacheDir.absolutePath)
             .setOnDeviceAsrConfig(asrConfig)
-            .setIntendedSpeechConfig(intendedSpeechConfig)
             .setAudioInputConfig(audioInputConfig)
             .setAudioProcessingConfig(audioProcessingConfig)
             .setAudioLoggingPolicy(audioLoggingPolicy)

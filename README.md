@@ -38,7 +38,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | Subsystem | Progress | Notes |
 |---|---|---|
 | End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled |
-| Magic Mic / IntendedSpeech gate | 🟩🟩🟩🟩🟩 | `intendedQueryScore ≥ intendedQueryThreshold` becomes a `DirectednessEvent` |
+| Magic Mic / IntendedSpeech gate | 🟨⬜⬜⬜⬜ | Not used as launch gate; recovered cosmo SODA stays transcript-first with `AMBIENT_CONTINUOUS` |
 | Endpointer / punctuation / denorm / G2P | 🟩🟩🟩🟩🟩 | Internal to SODA; transcripts arrive complete |
 | Voice Match (speaker ID) | 🟨🟨⬜⬜⬜ | JNI stub + config plumbing; enrollment UI not ported |
 | Hotword event routing | 🟨🟨⬜⬜⬜ | Events arrive at callback; logged-only, no action wiring |

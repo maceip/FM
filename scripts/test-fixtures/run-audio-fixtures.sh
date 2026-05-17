@@ -12,12 +12,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUDIO_DIR="$SCRIPT_DIR/audio"
 PACKAGE="com.google.research.air.cosmo"
 TARGET="${1:-both}"
+ACTIVITY="$PACKAGE/.ui.mainscreen.MainActivity"
 # Push to /data/local/tmp first (always shell-readable), then `run-as` the app to copy into
 # its own private files dir (always app-readable, no scoped-storage games). The broadcast
 # carries the app-private path so the receiver opens it under the app's own uid.
 TMP_DIR="/data/local/tmp/cosmo-test"
 DEVICE_DIR="/data/data/$PACKAGE/files/cosmo-test"
-PER_FIXTURE_WAIT_SEC=8
+PER_FIXTURE_WAIT_SEC="${PER_FIXTURE_WAIT_SEC:-14}"
 
 case "$TARGET" in ambient|soda|both) ;; *) echo "target must be one of ambient|soda|both" >&2; exit 64 ;; esac
 
@@ -48,6 +49,10 @@ for wav in "$AUDIO_DIR"/*.wav; do
 done
 adb shell rm -rf "$TMP_DIR" 2>/dev/null || true
 
+echo "==> starting app so the debug receiver is registered"
+adb shell am start -n "$ACTIVITY" >/dev/null
+sleep 4
+
 logcat_pid=""
 trap '[[ -n "$logcat_pid" ]] && kill "$logcat_pid" 2>/dev/null || true' EXIT
 
@@ -62,6 +67,8 @@ adb logcat -v time \
   COSMO-RawAudioGatekeeper:* \
   COSMO-ConformerEncoder:* \
   JniSodaCapability:* \
+  SodaSession:* \
+  SodaSession.Callback:* \
   Telemetry:* \
   nativeloader:* \
   AndroidRuntime:E \
@@ -87,7 +94,7 @@ logcat_pid=""
 
 echo
 echo "==> summary"
-grep -E "GatekeeperDebug|JniSodaCapability|RawAudioGatekeeperRunResult|ConformerEncoder|UnsatisfiedLink|FATAL" "$logfile" | head -80 || true
+grep -E "GatekeeperDebug|SodaSession|JniSodaCapability|RawAudioGatekeeperRunResult|ConformerEncoder|UnsatisfiedLink|FATAL" "$logfile" | head -120 || true
 
 echo
 echo "logcat: $logfile"

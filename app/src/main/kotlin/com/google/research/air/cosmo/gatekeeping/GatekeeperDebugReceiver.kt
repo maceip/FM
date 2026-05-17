@@ -8,6 +8,9 @@ import android.util.Log
 import com.google.research.air.cosmo.BuildConfig
 import com.google.research.air.cosmo.ephemeralbuffer.AmbientAudioBytesEphemeralBuffer
 import com.google.research.air.cosmo.ephemeralbuffer.InMemoryEphemeralBuffer
+import com.google.research.air.cosmo.gatekeeping.api.ContextSource
+import com.google.research.air.cosmo.gatekeeping.backend.AudioInput
+import com.google.research.air.cosmo.gatekeeping.backend.CpuRecoveryBackend
 import com.google.research.air.cosmo.lib.soda.JniSodaCapability
 import com.google.research.air.cosmo.lib.soda.SodaPrepareResult
 import com.google.research.air.cosmo.lib.soda.SodaSession
@@ -57,6 +60,7 @@ class GatekeeperDebugReceiver
 constructor(
     private val gatekeeper: Gatekeeper,
     private val audioGatekeepingModel: AudioGatekeepingModel,
+    private val cpuRecoveryBackend: CpuRecoveryBackend,
     @AmbientAudioBytesEphemeralBuffer private val ambientBuffer: InMemoryEphemeralBuffer<ByteArray>,
     @ApplicationContext private val appContext: Context,
     private val sodaCapability: JniSodaCapability,
@@ -161,22 +165,42 @@ constructor(
         val session = SodaSession(appContext, prepared.packDir, clock)
         val started = session.start(SodaTranscriptCallback { text, isFinal ->
             Log.i(TAG, "audio inject soda transcript: isFinal=$isFinal text=$text")
+            if (isFinal && text.isNotBlank()) classifyInjectedTranscript(text)
         })
         if (started !is SodaStartResult.Started) {
             Log.w(TAG, "audio inject soda: start failed: $started")
             return
         }
-        chunks.forEach { chunk ->
+        val trailingSilenceChunks = List(DEBUG_SODA_TRAILING_SILENCE_CHUNKS) { ByteArray(FRAME_BYTES) }
+        (chunks + trailingSilenceChunks).forEach { chunk ->
             val direct = ByteBuffer.allocateDirect(chunk.size).order(ByteOrder.nativeOrder())
             direct.put(chunk)
             direct.position(0)
             session.addAudio(direct, chunk.size)
+            delay(DEBUG_SODA_CHUNK_DELAY_MS)
         }
-        Log.i(TAG, "audio inject soda: pushed ${chunks.size} chunks; awaiting transcripts on callback")
+        Log.i(
+            TAG,
+            "audio inject soda: pushed ${chunks.size} audio chunks + ${trailingSilenceChunks.size} silence chunks; awaiting transcripts on callback"
+        )
         scope.launch {
             delay(DEBUG_SODA_SESSION_STOP_DELAY_MS)
             session.stop()
             Log.i(TAG, "audio inject soda: stopped debug session")
+        }
+    }
+
+    private fun classifyInjectedTranscript(text: String) {
+        scope.launch {
+            val result =
+                cpuRecoveryBackend.classify(
+                    AudioInput.TranscribedSegment(
+                        source = ContextSource.AMBIENT_AUDIO,
+                        transcript = "Ambient audio: $text",
+                        directednessTrigger = true
+                    )
+                )
+            Log.i(TAG, "audio inject soda gatekeeper: result=$result")
         }
     }
 
@@ -265,6 +289,8 @@ constructor(
         const val TARGET_SODA = "soda"
         const val TARGET_BOTH = "both"
         const val FRAME_BYTES = 1280 // 40 ms at 16 kHz mono PCM16
+        const val DEBUG_SODA_CHUNK_DELAY_MS = 40L
+        const val DEBUG_SODA_TRAILING_SILENCE_CHUNKS = 50 // 2 seconds at 40 ms/chunk.
         const val DEBUG_SODA_SESSION_STOP_DELAY_MS = 10_000L
         const val TAG = "GatekeeperDebug"
     }

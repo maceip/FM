@@ -12,10 +12,10 @@ import javax.inject.Singleton
  *
  * Architecture (per architecture-delta C8 + PR0):
  *
- *  1. **Directedness gate** — SODA Magic Mic reports per-utterance directedness via
- *     `FinalRecognitionResult.intendedQueryScore`. The caller wires that into
- *     [AudioInput.TranscribedSegment.directednessTrigger]. If false (and the source is the
- *     ambient mic), [classify] returns null so the text classifier isn't invoked.
+ *  1. **Optional directedness gate** — callers can provide an upstream directedness decision
+ *     through [AudioInput.TranscribedSegment.directednessTrigger]. If false (and the source is
+ *     the ambient mic), [classify] returns null so the text classifier isn't invoked. Launch
+ *     SODA is transcript-only, matching recovered cosmo; Conformer/Inherent own directedness.
  *  2. **Per-skill classification** — when the gate passes, [classify] runs the bound
  *     [GatekeepingModel] (today: `CombinedBertRegexGatekeepingModel`, which fuses BERT
  *     per-skill scores with the regex fast-path) on the transcript and returns its
