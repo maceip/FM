@@ -197,15 +197,25 @@ private class TensorFlowLiteSplitConformerRuntime(
 }
 
 @Singleton
-class AudioGatekeepingModel
-@Inject
-constructor(
-    private val encoder: ConformerEncoderImpl
+class AudioGatekeepingModel internal constructor(
+    private val encoder: ConformerEncoderImpl,
+    private val nativeRuntimeSupported: () -> Boolean
 ) : GatekeepingModel {
+    @Inject
+    constructor(
+        encoder: ConformerEncoderImpl
+    ) : this(
+        encoder = encoder,
+        nativeRuntimeSupported = NativeAudioRuntimeGuard::isSupportedOnThisDevice
+    )
+
     override suspend fun predict(input: String): GatekeepingResult =
         throw UnsupportedOperationException("Audio gatekeeper does not support text prediction")
 
     override suspend fun predict(pcm: ByteArray): GatekeepingResult {
+        if (!nativeRuntimeSupported()) {
+            return unavailable("raw_audio_native_unsupported_on_emulator")
+        }
         val scores =
             runCatching { encoder.run(pcm) }
                 .getOrElse { error ->
@@ -267,4 +277,8 @@ constructor(
                 12 to listOf("add_timer")
             )
     }
+}
+
+internal object NativeAudioRuntimeGuard {
+    fun isSupportedOnThisDevice(): Boolean = !NativeBertRuntimeGuard.isProbablyEmulator()
 }
