@@ -53,7 +53,7 @@ scripts/install-inherent-litert-artifact.py
 scripts/download-models.sh --verify-only
 ```
 
-`~/inherent` owns training and export. The installer copies `~/inherent/artifacts/model-groups/001/export/litert/inherent.tflite` and `inherent.metadata.json` into `app/src/main/assets/models/`, then upserts both into `app/src/main/assets/model-manifest.json`. The Android side runs `audio_frontend.tflite` first and feeds the mel tensor into `inherent.tflite`, matching `~/inherent/contracts/runtime_contract.md`.
+`~/inherent` owns training and export. The installer defaults to `~/inherent/artifacts/asap-static3000-int8/`, copies `inherent.tflite` and `inherent.metadata.json` into `app/src/main/assets/models/`, then upserts both into `app/src/main/assets/model-manifest.json`. The older `model-groups/001/export/litert` path is a 50-frame export and must not be installed. The Android side runs `audio_frontend.tflite` first and feeds the mel tensor into `inherent.tflite`, matching `~/inherent/contracts/runtime_contract.md`.
 
 ## Next Steps
 

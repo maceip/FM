@@ -12,8 +12,8 @@ import java.io.Closeable
  *  - `CpuRecoveryBackend` — always-available CPU baseline: SODA Magic Mic gates → BERT-on-text
  *    per-skill classification. The directedness decision arrives via `AudioInput.TranscribedSegment.directednessTrigger`;
  *    backend returns null when the gate suppressed the segment.
- *  - `InherentBackend` — from-scratch CPU model loaded from `inherent.tflite`; opt-in via
- *    setting + asset presence. Today: stub.
+ *  - `InherentBackend` — from-scratch CPU model loaded from `inherent.tflite`; opt-in via raw
+ *    audio realtime settings plus asset presence. Quality and device proof are still pending.
  *
  * Selection is performed once per session by [AudioGatekeepingBackendSelector]; the result is
  * cached for the lifetime of the `Gatekeeper`. Each backend produces a [GatekeepingResult] directly

@@ -169,7 +169,7 @@ audio path via Conformer EdgeTPU when available, text path via Magic Mic gate
 | Backend selector | `gatekeeping/backend/AudioGatekeepingBackendSelector.kt` | ✅ | Priority: `ConformerEdgeTpu` → `Inherent` → `CpuRecovery` |
 | CPU recovery backend | `gatekeeping/backend/CpuRecoveryBackend.kt` | ✅ | Wraps Combined BERT+regex; gates on `directednessTrigger` for ambient source; passes through trusted (buds/device/watch) sources |
 | EdgeTPU Conformer backend | `gatekeeping/backend/ConformerEdgeTpuBackend.kt` | ⚠️ | `isAvailable=false` until Pixel+Darwinn proof; calls `audioModel.predict(pcm)` when active. Awaiting hackathon-notes resolution + arrived Pixel |
-| Inherent backend | `gatekeeping/backend/InherentBackend.kt` | ⚠️ | `isAvailable` checks for `inherent.tflite` + `inherent.metadata.json` assets; `classify(RawPcm)` runs `InherentAudioGatekeepingModel.predict`. Real model produced by `~/inherent` project (in progress); placeholder bytes shipped today |
+| Inherent backend | `gatekeeping/backend/InherentBackend.kt` | ⚠️ | `isAvailable` checks for `inherent.tflite` + `inherent.metadata.json` assets; `classify(RawPcm)` runs `InherentAudioGatekeepingModel.predict`. The validated `asap-static3000-int8` artifact matches Android's tensor contract; quality + real-device proof remain open |
 | BERT classifier | `gatekeeping/GatekeepingBert.kt` (`BertClassifierGatekeepingModel`) | ✅ | Recovered model; CPU + Tensor-G4/G5 variants |
 | Combined BERT+regex | `gatekeeping/GatekeepingBert.kt` (`CombinedBertRegexGatekeepingModel`) | ✅ | Default text model; regex fast-path fused with BERT scores |
 | Audio gatekeeping model | `gatekeeping/AudioGatekeepingModel.kt` | ✅ (loadable) | Code path is the Conformer + audio_frontend pipeline; activation gated on EdgeTPU backend availability |
@@ -183,7 +183,7 @@ audio path via Conformer EdgeTPU when available, text path via Magic Mic gate
 | `bert_v0_p25.tflite` (46M) | Tensor G5 EdgeTPU | ✅ |
 | `bert_v0_mt6989.tflite` (placeholder hash, 1 byte) | MediaTek Dimensity 9300 | 🔵 | Slot reserved; AOT pipeline drafted in `cosmo-dev/repo/docs/bert_gatekeeper_litert_jni_replacement.md` (`mtk_target.SocModel.MT6989`). No model bundled yet |
 | `audio_frontend.tflite` + `audio_gatekeeper_edgetpu.tflite` | Conformer audio path | ✅ (bundled) / ⚠️ (active = false) |
-| `inherent.tflite` + `inherent.metadata.json` (placeholder bytes) | Genesis joint model | 🔵 | Real artifact pending from `~/inherent` |
+| `inherent.tflite` + `inherent.metadata.json` | Genesis joint model | ⚠️ | Validated `asap-static3000-int8` artifact available locally and manifest-pinned; ignored binary must be provisioned before strict release gates |
 
 ### 4.3 Dispatch invariant (C1 mutex)
 
@@ -1242,19 +1242,19 @@ Combined BERT+regex fusion), C9 selector routing, intent extraction (LLM-backed
 and context gather), fulfillment (22 action types, confirmation policy, audit
 trail), LLM clients (public AICore, simulation), persistent context store
 (Room + SQLCipher), state probe (`CosmoStateSource` cosmo-aligned), settings
-DataStore, Nav3 UI with 24 debug panels, telemetry catalog with provenance,
+DataStore, Nav3 UI with 25 debug panels, telemetry catalog with provenance,
 **Presence surfaces (orb / tab / card stack / glass-panel primitive,
 aerospace-HUD palette)**, **AppFunctions logic surface (`AmbientAppFunctions`
 methods route through `CosmoController`, `CosmoStateManager`, `ContextStore`,
 `FulfillmentOrchestrator`, `TaskMonitorNavigationBridge`)**.
 
 **Partial (⚠️):** EdgeTPU Conformer backend (`isAvailable=false` until Pixel
-returns), Inherent backend (placeholder asset until `~/inherent` ships),
-AOC nanoapp transport (reflection-bridged; needs platform-signed callback or
+returns), Inherent backend (contract-valid artifact available, quality and
+device proof pending), AOC nanoapp transport (reflection-bridged; needs platform-signed callback or
 bytecode-gen), Voice Match (JNI stub + config plumbing; no UI / no enrollment),
 HotwordEvent routing (logged-only), LiteRT-LM (provisioning needed),
 remote inference (live config needed), glass + camera capture (services
-bind; consumers not wired), action handler split, **Presence state driver
+bind; consumers not wired), richer fulfillment execution-error UI, **Presence state driver
 (surfaces render, but the `GatekeeperOutput → PresenceState` producer isn't
 written)**, **AppFunctions platform binding (`@AppFunctionSchema` /
 `@AppFunctionSerializable` annotations + `AppFunctionService` registration

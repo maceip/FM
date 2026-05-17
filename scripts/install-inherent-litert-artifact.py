@@ -14,7 +14,7 @@ from inherent_litert_contract import ContractError, validate_artifact
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INHERENT_LITERT_DIR = Path.home() / "inherent" / "artifacts" / "model-groups" / "001" / "export" / "litert"
+DEFAULT_INHERENT_LITERT_DIR = Path.home() / "inherent" / "artifacts" / "asap-static3000-int8"
 ASSETS_MODELS_DIR = REPO_ROOT / "app" / "src" / "main" / "assets" / "models"
 MODEL_MANIFEST_PATH = REPO_ROOT / "app" / "src" / "main" / "assets" / "model-manifest.json"
 

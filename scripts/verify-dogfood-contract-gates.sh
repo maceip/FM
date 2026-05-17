@@ -39,6 +39,8 @@ fulfillment_module="app/src/main/kotlin/com/google/research/air/cosmo/fulfillmen
 fulfillment_executors="app/src/main/kotlin/com/google/research/air/cosmo/fulfillment/FulfillmentActionExecutors.kt"
 fulfillment_test="app/src/test/kotlin/com/google/research/air/cosmo/fulfillment/FulfillmentActionHandlerImplTest.kt"
 logging="app/src/main/kotlin/com/google/research/air/cosmo/logging/Logging.kt"
+inherent_installer="scripts/install-inherent-litert-artifact.py"
+inherent_backend_doc="app/src/main/kotlin/com/google/research/air/cosmo/gatekeeping/backend/AudioGatekeepingBackend.kt"
 
 require "AMBIENT_ONESHOT" "${soda_builder}" "SODA oneshot app domain"
 require "setAttachHotwordEvent(true)" "${soda_builder}" "SODA hotword-event attachment"
@@ -73,5 +75,7 @@ require "CPU recovery directedness gate is wired" "README.md" "README Magic Mic 
 require "subtype executors split" "README.md" "README fulfillment executor status"
 forbid "Not used as launch gate" "README.md" "stale Magic Mic launch status"
 forbid "single action handler awaiting" "README.md" "stale fulfillment split status"
+require "asap-static3000-int8" "${inherent_installer}" "validated inherent installer default"
+forbid "Today: stub" "${inherent_backend_doc}" "stale Inherent backend stub label"
 
 echo "Dogfood contract gates passed."

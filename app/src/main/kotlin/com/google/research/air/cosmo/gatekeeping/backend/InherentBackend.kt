@@ -17,8 +17,8 @@ import javax.inject.Singleton
  * Activation is double-gated:
  *  1. The `inherent.tflite` asset (and `inherent.metadata.json` sidecar) must be present, either
  *     bundled in `assets/models/` or provisioned to the app-private files dir at runtime.
- *  2. The user setting `isInherentBackendEnabled` must be true. Off by default — this is opt-in
- *     until the model has shipped at least one validated release.
+ *  2. Raw-audio realtime gatekeeping must be enabled. Off by default, so this backend remains
+ *     opt-in until the model has shipped at least one validated release.
  *
  * Default selection priority (see [AudioGatekeepingBackendSelector]):
  *   ConformerEdgeTpu (Pixel only, off today) → Inherent (if available + enabled) → CpuRecovery (always)

@@ -310,10 +310,10 @@ These are parked unless a concrete ship-blocking test pulls them in:
 
 - CaMeL.
 - Mariner/browser backend.
-- Per-action handler split.
+- Richer fulfillment execution-error UI.
 - Voice Match enrollment UI.
 - Pixel-only EdgeTPU/AOC activation beyond the Lane A probe.
-- Inherent model integration.
+- Inherent model quality tuning and attached-device proof.
 - First-party provider integrations beyond the existing Android intents, web
   search, text drafts, and TaskMonitor fallbacks.
 - Remote inference production server unless it becomes the chosen Lane B
