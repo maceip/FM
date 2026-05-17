@@ -314,6 +314,8 @@ These are parked unless a concrete ship-blocking test pulls them in:
 - Voice Match enrollment UI.
 - Pixel-only EdgeTPU/AOC activation beyond the Lane A probe.
 - Inherent model integration.
+- First-party provider integrations beyond the existing Android intents, web
+  search, text drafts, and TaskMonitor fallbacks.
 - Remote inference production server unless it becomes the chosen Lane B
   fallback.
 - New contract documents.
