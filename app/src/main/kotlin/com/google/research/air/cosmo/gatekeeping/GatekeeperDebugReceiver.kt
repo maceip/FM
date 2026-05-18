@@ -50,9 +50,10 @@ import kotlinx.coroutines.withContext
  *   -p com.google.research.air.cosmo
  * ```
  *
- * `target` ∈ {`ambient`, `soda`, `both`}: `ambient` feeds AmbientAudioBytesEphemeralBuffer and
- * triggers the selected raw-audio backend; `soda` feeds JniSodaCapability via addAudio
- * (libsoda_dev_jni). Tail logcat with
+ * `target` in {`ambient`, `soda`, `both`, `conformer`}: `ambient` feeds
+ * AmbientAudioBytesEphemeralBuffer and triggers the selected raw-audio backend; `conformer`
+ * directly probes the recovered EdgeTPU Conformer path; `soda` feeds JniSodaCapability via
+ * addAudio (libsoda_dev_jni). Tail logcat with
  * `adb logcat -s COSMO-Gatekeeper Telemetry JniSodaCapability ConformerEncoder GatekeeperDebug`.
  */
 @Singleton
@@ -61,6 +62,7 @@ class GatekeeperDebugReceiver
 constructor(
     private val gatekeeper: Gatekeeper,
     private val backendSelector: AudioGatekeepingBackendSelector,
+    private val audioGatekeepingModel: AudioGatekeepingModel,
     private val cpuRecoveryBackend: CpuRecoveryBackend,
     @AmbientAudioBytesEphemeralBuffer private val ambientBuffer: InMemoryEphemeralBuffer<ByteArray>,
     @ApplicationContext private val appContext: Context,
@@ -143,6 +145,7 @@ constructor(
         Log.i(TAG, "audio inject: name=$fixtureName target=$target bytes=${pcm.size} (~${pcm.size / 32}ms @ 16k mono PCM16)")
         val chunks = pcm.toList().chunked(FRAME_BYTES).map { it.toByteArray() }
         if (target == TARGET_AMBIENT || target == TARGET_BOTH) feedAmbient(chunks, fixtureName)
+        if (target == TARGET_CONFORMER) feedConformer(chunks, fixtureName)
         if (target == TARGET_SODA || target == TARGET_BOTH) feedSoda(chunks, fixtureName)
     }
 
@@ -160,6 +163,15 @@ constructor(
                 )
             )
         Log.i(TAG, "audio inject ambient: name=$fixtureName result=$result")
+    }
+
+    private suspend fun feedConformer(
+        chunks: List<ByteArray>,
+        fixtureName: String
+    ) {
+        Log.i(TAG, "audio inject conformer: name=$fixtureName pushed ${chunks.size} chunks; running recovered EdgeTPU path")
+        val result = audioGatekeepingModel.predict(chunks.flattenBytes())
+        Log.i(TAG, "audio inject conformer: name=$fixtureName result=$result")
     }
 
     private suspend fun feedSoda(
@@ -305,6 +317,7 @@ constructor(
         const val TARGET_AMBIENT = "ambient"
         const val TARGET_SODA = "soda"
         const val TARGET_BOTH = "both"
+        const val TARGET_CONFORMER = "conformer"
         const val FRAME_BYTES = 1280 // 40 ms at 16 kHz mono PCM16
         const val DEBUG_SODA_CHUNK_DELAY_MS = 40L
         const val DEBUG_SODA_TRAILING_SILENCE_CHUNKS = 50 // 2 seconds at 40 ms/chunk.

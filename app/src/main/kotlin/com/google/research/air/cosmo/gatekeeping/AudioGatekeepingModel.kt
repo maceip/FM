@@ -1,6 +1,7 @@
 package com.google.research.air.cosmo.gatekeeping
 
 import android.content.Context
+import android.util.Log
 import com.google.android.apps.hardware.protostar.components.delegate.DarwinnDelegate
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.FileInputStream
@@ -87,6 +88,7 @@ class ConformerEncoderImpl internal constructor(
         val created =
             runCatching { runtimeFactory(frontendModel, backendModel) }
                 .getOrElse { error ->
+                    Log.w(TAG, "split conformer runtime create failed", error)
                     failUnavailable(error.message ?: "audio_tflite_split_create_failed")
                 }
         runtime = created
@@ -111,6 +113,8 @@ class ConformerEncoderImpl internal constructor(
     private fun failUnavailable(reason: String): Nothing = throw IllegalStateException(reason)
 
     companion object {
+        private const val TAG = "COSMO-ConformerEncoder"
+
         const val SAMPLE_RATE: Int = 16_000
         const val MEL_BINS: Int = 128
         const val MAX_FRAMES: Int = 3_000
@@ -219,6 +223,7 @@ class AudioGatekeepingModel internal constructor(
         val scores =
             runCatching { encoder.run(pcm) }
                 .getOrElse { error ->
+                    Log.w(TAG, "raw audio gatekeeper unavailable: ${error.message}", error)
                     return unavailable(error.message ?: "audio_gatekeeper_unavailable")
                 }
         val detected = mapScores(scores)
@@ -255,6 +260,8 @@ class AudioGatekeepingModel internal constructor(
             .toMap()
 
     private companion object {
+        const val TAG = "COSMO-RawAudioGatekeeper"
+
         val AUDIO_THRESHOLDS =
             floatArrayOf(
                 0.57f, 0.65f, 0.90f, 0.90f, 0.90f, 0.90f, 0.56f, 0.74f, 0.90f, 0.90f, 0.90f, 0.90f, 0.90f

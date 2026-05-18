@@ -6,6 +6,7 @@
 #   ./run-audio-fixtures.sh            # run every fixture against target=both
 #   ./run-audio-fixtures.sh ambient    # only ambient (selected raw-audio backend)
 #   ./run-audio-fixtures.sh soda       # only SODA (libsoda_dev_jni)
+#   ./run-audio-fixtures.sh conformer  # directly probe recovered EdgeTPU Conformer
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +21,7 @@ TMP_DIR="/data/local/tmp/cosmo-test"
 DEVICE_DIR="/data/data/$PACKAGE/files/cosmo-test"
 PER_FIXTURE_WAIT_SEC="${PER_FIXTURE_WAIT_SEC:-25}"
 
-case "$TARGET" in ambient|soda|both) ;; *) echo "target must be one of ambient|soda|both" >&2; exit 64 ;; esac
+case "$TARGET" in ambient|soda|both|conformer) ;; *) echo "target must be one of ambient|soda|both|conformer" >&2; exit 64 ;; esac
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "adb not on PATH" >&2; exit 64
@@ -113,7 +114,7 @@ grep -E "GatekeeperDebug|SodaSession|JniSodaCapability|RawAudioGatekeeperRunResu
 echo
 echo "logcat: $logfile"
 
-if [[ "${ASSERT_AUDIO_FIXTURES:-1}" != "0" ]]; then
+if [[ "${ASSERT_AUDIO_FIXTURES:-1}" != "0" && "$TARGET" != "conformer" ]]; then
   echo "==> validating fixture output"
   enforce_quality_args=""
   if [[ "${ENFORCE_INHERENT_QUALITY:-0}" == "1" ]]; then
@@ -126,4 +127,6 @@ if [[ "${ASSERT_AUDIO_FIXTURES:-1}" != "0" ]]; then
     --ambient-quality-report "$artifacts/inherent-quality.json" \
     $enforce_quality_args
   echo "inherent quality report: $artifacts/inherent-quality.json"
+elif [[ "$TARGET" == "conformer" ]]; then
+  echo "==> skipping fixture validator for direct Conformer probe; inspect raw_audio result in logcat"
 fi

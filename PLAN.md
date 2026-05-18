@@ -61,10 +61,12 @@ As of 2026-05-18, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   `artifacts/audio-run/20260518-022111/` shows all 8 labeled positives were
   scored, but 0/8 matched the expected top-1 head; 3/3 negative controls stayed
   clean. Runtime is no longer the blocker. Model training/threshold quality is.
-- The raw Conformer/Darwinn audio debug path now fails closed on emulator with
-  `raw_audio_native_unsupported_on_emulator` instead of crashing in
-  `libtensorflowlite_jni.so`; Pixel hardware is still required for EdgeTPU
-  proof.
+- The raw Conformer/Darwinn audio path fails closed. Emulator reports
+  `raw_audio_native_unsupported_on_emulator`. Pixel 10 direct `target=conformer`
+  probe reports `raw_audio_unavailable:audio_tflite_split_create_failed`; the
+  stack shows TensorFlow Lite failing to create the Darwinn-backed interpreter
+  with `Internal error: Found invalid handle`. Artifacts:
+  `artifacts/audio-run/20260518-023616/`.
 - The existing path to ship next remains:
 
 ```text
