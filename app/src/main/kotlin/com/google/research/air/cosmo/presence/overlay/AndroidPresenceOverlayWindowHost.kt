@@ -8,6 +8,9 @@ import android.view.View
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 class AndroidPresenceOverlayWindowHost(
     private val context: Context,
@@ -15,6 +18,7 @@ class AndroidPresenceOverlayWindowHost(
     private val onEvent: (PresenceOverlayEvent) -> Unit
 ) : PresenceOverlayWindowHost {
     private var composeView: ComposeView? = null
+    private var viewTreeOwner: PresenceOverlayViewTreeOwner? = null
     private var attached: Boolean = false
 
     override fun show(state: PresenceOverlayUiState): Result<Unit> =
@@ -48,6 +52,8 @@ class AndroidPresenceOverlayWindowHost(
             attached = false
             view.disposeComposition()
             composeView = null
+            viewTreeOwner?.destroy()
+            viewTreeOwner = null
         }
 
     private fun ensureView(state: PresenceOverlayUiState): ComposeView {
@@ -57,6 +63,11 @@ class AndroidPresenceOverlayWindowHost(
             return existing
         }
         return ComposeView(context).also { view ->
+            val owner = PresenceOverlayViewTreeOwner().also { it.start() }
+            view.setViewTreeLifecycleOwner(owner)
+            view.setViewTreeSavedStateRegistryOwner(owner)
+            view.setViewTreeViewModelStoreOwner(owner)
+            viewTreeOwner = owner
             view.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             view.isFocusable = PresenceOverlayFocusPolicy.acceptsBackKey(state.route)
             view.isFocusableInTouchMode = PresenceOverlayFocusPolicy.acceptsBackKey(state.route)

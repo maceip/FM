@@ -79,6 +79,7 @@ import com.google.research.air.cosmo.lib.permission.PermissionRationaleHelper
 import com.google.research.air.cosmo.lib.permission.RuntimePermissionGrantState
 import com.google.research.air.cosmo.lib.permission.RuntimePermissionState
 import com.google.research.air.cosmo.notificationcapture.NotificationCaptureController
+import com.google.research.air.cosmo.presence.overlay.PresenceOverlayStarter
 import com.google.research.air.cosmo.setting.CosmoSettingStore
 import com.google.research.air.cosmo.setting.CosmoStateManager
 import com.google.research.air.cosmo.ui.theme.CosmoBarItem
@@ -134,6 +135,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var debugPanels: Set<@JvmSuppressWildcards CosmoDebugPanel>
 
+    @Inject lateinit var presenceOverlayStarter: PresenceOverlayStarter
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val debugTimerFlowEnabled =
@@ -155,6 +158,11 @@ class MainActivity : ComponentActivity() {
                 debugTimerFlowEnabled = debugTimerFlowEnabled
             )
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        presenceOverlayStarter.start()
     }
 }
 
