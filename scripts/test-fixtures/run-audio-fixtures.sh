@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./run-audio-fixtures.sh            # run every fixture against target=both
-#   ./run-audio-fixtures.sh ambient    # only ambient (TFLite frontend + EdgeTPU backend)
+#   ./run-audio-fixtures.sh ambient    # only ambient (selected raw-audio backend)
 #   ./run-audio-fixtures.sh soda       # only SODA (libsoda_dev_jni)
 set -euo pipefail
 
@@ -115,7 +115,14 @@ echo "logcat: $logfile"
 
 if [[ "${ASSERT_AUDIO_FIXTURES:-1}" != "0" ]]; then
   echo "==> validating fixture output"
+  quality_args=()
+  if [[ "${ENFORCE_INHERENT_QUALITY:-0}" == "1" ]]; then
+    quality_args+=(--enforce-ambient-quality)
+  fi
   python3 "$SCRIPT_DIR/assert-audio-fixture-run.py" "$logfile" \
     --index "$SCRIPT_DIR/gatekeeper-utterances.json" \
-    --target "$TARGET"
+    --target "$TARGET" \
+    --ambient-quality-report "$artifacts/inherent-quality.json" \
+    "${quality_args[@]}"
+  echo "inherent quality report: $artifacts/inherent-quality.json"
 fi

@@ -1,6 +1,7 @@
 package com.google.research.air.cosmo.gatekeeping
 
 import android.content.Context
+import com.google.research.air.cosmo.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -76,7 +77,8 @@ class InherentAudioGatekeepingModel internal constructor(
             triggeredFulfillment = detected.isNotEmpty(),
             input = "Ambient raw audio: latest buffered PCM window",
             inputSource = GatekeepingInputSource.AMBIENT_AUDIO,
-            detector = if (detected.isEmpty()) GatekeepingDetector.NONE else GatekeepingDetector.AUDIO_GATEKEEPER
+            detector = if (detected.isEmpty()) GatekeepingDetector.NONE else GatekeepingDetector.AUDIO_GATEKEEPER,
+            screenSignals = if (BuildConfig.DEBUG) scoreSignals(scores) else emptyMap()
         )
     }
 
@@ -175,6 +177,17 @@ class InherentAudioGatekeepingModel internal constructor(
         INDEX_TO_SKILLS.entries
             .filter { (index, _) -> index < scores.size && scores[index] >= thresholds[index] }
             .associate { (index, skill) -> skill to scores[index] }
+
+    private fun scoreSignals(scores: FloatArray): Map<String, Float> {
+        val topIndex = scores.indices.maxByOrNull { scores[it] } ?: return emptyMap()
+        return buildMap {
+            scores.forEachIndexed { index, score ->
+                put("inherent_head_$index", score)
+            }
+            put("inherent_top_index", topIndex.toFloat())
+            put("inherent_top_score", scores[topIndex])
+        }
+    }
 
     private fun loadThresholds(): FloatArray {
         val json = loadMetadataText()?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return DEFAULT_THRESHOLDS
