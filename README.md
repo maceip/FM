@@ -52,7 +52,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | BERT classifier (CPU + Tensor G4 + Tensor G5) | 🟩🟩🟩🟩🟩 | Combined BERT + regex fusion |
 | C9 selector-routed dispatch | 🟩🟩🟩🟩🟩 | Backend returns null for non-native input type — that IS the mutex |
 | Conformer EdgeTPU audio backend | 🟩🟩🟩🟩⬜ | Code path bundled; activation gated on Pixel + Darwinn proof; emulator raw-audio debug path fails closed instead of SIGILL |
-| Inherent (joint audio→intent) backend | 🟩🟩🟩🟩⬜ | Pixel 10 runtime proof passes through frontend + 13-head backend; current model quality needs tuning |
+| Inherent (joint audio→intent) backend | 🟩🟩🟩🟩⬜ | Pixel 10 runtime proof passes; scorecard shows 8/8 labeled positives scored, 0/8 top-1, 3/3 negatives clean, so current model quality is not launch-ready |
 | MediaTek Dimensity (mt6989) BERT variant | 🟩⬜⬜⬜⬜ | Manifest slot reserved; AOT pipeline drafted; model not built yet |
 
 ### Intent + fulfillment

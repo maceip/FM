@@ -115,14 +115,15 @@ echo "logcat: $logfile"
 
 if [[ "${ASSERT_AUDIO_FIXTURES:-1}" != "0" ]]; then
   echo "==> validating fixture output"
-  quality_args=()
+  enforce_quality_args=""
   if [[ "${ENFORCE_INHERENT_QUALITY:-0}" == "1" ]]; then
-    quality_args+=(--enforce-ambient-quality)
+    enforce_quality_args="--enforce-ambient-quality"
   fi
+  # shellcheck disable=SC2086
   python3 "$SCRIPT_DIR/assert-audio-fixture-run.py" "$logfile" \
     --index "$SCRIPT_DIR/gatekeeper-utterances.json" \
     --target "$TARGET" \
     --ambient-quality-report "$artifacts/inherent-quality.json" \
-    "${quality_args[@]}"
+    $enforce_quality_args
   echo "inherent quality report: $artifacts/inherent-quality.json"
 fi

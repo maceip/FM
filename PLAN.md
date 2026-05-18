@@ -57,9 +57,10 @@ As of 2026-05-18, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   phrases. Artifacts: `artifacts/audio-run/20260518-015814/`. Human-recorded
   directed and undirected phrases are still needed.
 - Inherent runtime plumbing passes on Pixel 10: `GatekeepingRuntimeSmokeTest`
-  runs the frontend and 13-head backend. Current model quality is not launch
-  quality yet; tune thresholds/training against held-out audio before relying
-  on it for product decisions.
+  runs the frontend and 13-head backend. The Pixel 10 ambient scorecard at
+  `artifacts/audio-run/20260518-022111/` shows all 8 labeled positives were
+  scored, but 0/8 matched the expected top-1 head; 3/3 negative controls stayed
+  clean. Runtime is no longer the blocker. Model training/threshold quality is.
 - The raw Conformer/Darwinn audio debug path now fails closed on emulator with
   `raw_audio_native_unsupported_on_emulator` instead of crashing in
   `libtensorflowlite_jni.so`; Pixel hardware is still required for EdgeTPU
