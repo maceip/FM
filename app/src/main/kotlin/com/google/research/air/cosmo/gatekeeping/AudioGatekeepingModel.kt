@@ -88,7 +88,7 @@ class ConformerEncoderImpl internal constructor(
         val created =
             runCatching { runtimeFactory(frontendModel, backendModel) }
                 .getOrElse { error ->
-                    Log.w(TAG, "split conformer runtime create failed", error)
+                    runCatching { Log.w(TAG, "split conformer runtime create failed", error) }
                     failUnavailable(error.message ?: "audio_tflite_split_create_failed")
                 }
         runtime = created
@@ -223,7 +223,7 @@ class AudioGatekeepingModel internal constructor(
         val scores =
             runCatching { encoder.run(pcm) }
                 .getOrElse { error ->
-                    Log.w(TAG, "raw audio gatekeeper unavailable: ${error.message}", error)
+                    runCatching { Log.w(TAG, "raw audio gatekeeper unavailable: ${error.message}", error) }
                     return unavailable(error.message ?: "audio_gatekeeper_unavailable")
                 }
         val detected = mapScores(scores)
