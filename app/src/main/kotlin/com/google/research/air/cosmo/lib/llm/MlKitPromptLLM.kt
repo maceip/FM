@@ -238,7 +238,7 @@ constructor() : LlmBackendAdapter(
     private companion object {
         private const val DOWNLOAD_TIMEOUT_MS = 120_000L
         private const val GENERATION_TIMEOUT_MS = 30_000L
-        private const val MAX_OUTPUT_TOKENS = 1024
+        private const val MAX_OUTPUT_TOKENS = 256
         private const val TEMPERATURE = 0.2f
         private const val TOP_K = 16
         private val MODEL_PROFILES =

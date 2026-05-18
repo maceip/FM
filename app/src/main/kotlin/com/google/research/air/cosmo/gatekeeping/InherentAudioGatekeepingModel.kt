@@ -1,14 +1,16 @@
 package com.google.research.air.cosmo.gatekeeping
 
 import android.content.Context
-import com.google.research.air.cosmo.gatekeeping.models.AudioGatekeeperLiteRtImpl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import org.json.JSONObject
+import org.tensorflow.lite.Interpreter
 
 private fun inherentMetadataTextLoader(context: Context): () -> String? = {
     GatekeeperModelIds.filenameFor(GatekeeperModelIds.INHERENT_V0_METADATA)?.let { filename ->
@@ -32,16 +34,15 @@ class InherentAudioGatekeepingModel internal constructor(
     ) : this(
         loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context),
         loadMetadataText = inherentMetadataTextLoader(context),
-        nativeCreate = { modelBuffer, useNpu, expectedInputShape, expectedOutputShape ->
-            AudioGatekeeperLiteRtImpl.nativeCreate(
+        nativeCreate = { modelBuffer, _, expectedInputShape, expectedOutputShape ->
+            TensorFlowLiteInherentRuntimeRegistry.create(
                 modelBuffer,
-                useNpu,
                 expectedInputShape,
                 expectedOutputShape
             )
         },
-        nativeRun = { handle, input, output -> AudioGatekeeperLiteRtImpl.nativeRun(handle, input, output) },
-        nativeDestroy = { handle -> AudioGatekeeperLiteRtImpl.nativeDestroy(handle) }
+        nativeRun = { handle, input, output -> TensorFlowLiteInherentRuntimeRegistry.run(handle, input, output) },
+        nativeDestroy = { handle -> TensorFlowLiteInherentRuntimeRegistry.destroy(handle) }
     )
 
     private var frontendHandle: Long = 0L
@@ -229,5 +230,76 @@ class InherentAudioGatekeepingModel internal constructor(
                 11 to "call_agent",
                 12 to "add_timer"
             )
+    }
+}
+
+private object TensorFlowLiteInherentRuntimeRegistry {
+    private val nextHandle = AtomicLong(1L)
+    private val runtimes = ConcurrentHashMap<Long, TensorFlowLiteInherentRuntime>()
+
+    fun create(
+        modelBytes: ByteArray,
+        expectedInputShape: IntArray,
+        expectedOutputShape: IntArray
+    ): Long =
+        runCatching {
+            val runtime = TensorFlowLiteInherentRuntime(modelBytes, expectedInputShape, expectedOutputShape)
+            val handle = nextHandle.getAndIncrement()
+            runtimes[handle] = runtime
+            handle
+        }.getOrDefault(0L)
+
+    fun run(
+        handle: Long,
+        input: FloatBuffer,
+        output: FloatBuffer
+    ): Boolean = runtimes[handle]?.run(input, output) == true
+
+    fun destroy(handle: Long) {
+        runtimes.remove(handle)?.close()
+    }
+}
+
+private class TensorFlowLiteInherentRuntime(
+    modelBytes: ByteArray,
+    expectedInputShape: IntArray,
+    expectedOutputShape: IntArray
+) : AutoCloseable {
+    private val modelBuffer =
+        ByteBuffer
+            .allocateDirect(modelBytes.size)
+            .order(ByteOrder.nativeOrder())
+            .also { buffer ->
+                buffer.put(modelBytes)
+                buffer.position(0)
+            }
+    private val interpreter = Interpreter(modelBuffer, Interpreter.Options())
+
+    init {
+        check(interpreter.inputTensorCount == 1) { "inherent_tflite_input_count" }
+        check(interpreter.outputTensorCount == 1) { "inherent_tflite_output_count" }
+        check(interpreter.getInputTensor(0).shape().contentEquals(expectedInputShape)) {
+            "inherent_tflite_input_shape"
+        }
+        check(interpreter.getOutputTensor(0).shape().contentEquals(expectedOutputShape)) {
+            "inherent_tflite_output_shape"
+        }
+    }
+
+    @Synchronized
+    fun run(
+        input: FloatBuffer,
+        output: FloatBuffer
+    ): Boolean =
+        runCatching {
+            input.position(0)
+            output.position(0)
+            interpreter.run(input, output)
+            output.position(0)
+            true
+        }.getOrDefault(false)
+
+    override fun close() {
+        interpreter.close()
     }
 }

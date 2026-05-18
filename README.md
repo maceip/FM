@@ -37,7 +37,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; 3 SoC language packs bundled; emulator fixture corpus routes 10/10 speech phrases through SODA → regex skills |
+| End-to-end ASR (transcripts) | 🟩🟩🟩🟩🟩 | Runs inside `libsoda_dev_jni.so`; launch path uses CPU pack after Pixel 10 rejected TPU pack; Pixel fixture corpus routes 9 speech phrases through SODA → regex skills |
 | Magic Mic / IntendedSpeech gate | 🟩🟩🟩🟨⬜ | CPU recovery directedness gate is wired; human-recorded fixture proof still pending |
 | Endpointer / punctuation / denorm / G2P | 🟩🟩🟩🟩🟩 | Internal to SODA; transcripts arrive complete |
 | Voice Match (speaker ID) | 🟨🟨⬜⬜⬜ | JNI stub + config plumbing; enrollment UI not ported |
@@ -52,7 +52,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | BERT classifier (CPU + Tensor G4 + Tensor G5) | 🟩🟩🟩🟩🟩 | Combined BERT + regex fusion |
 | C9 selector-routed dispatch | 🟩🟩🟩🟩🟩 | Backend returns null for non-native input type — that IS the mutex |
 | Conformer EdgeTPU audio backend | 🟩🟩🟩🟩⬜ | Code path bundled; activation gated on Pixel + Darwinn proof; emulator raw-audio debug path fails closed instead of SIGILL |
-| Inherent (joint audio→intent) backend | 🟩🟩🟩⬜⬜ | Wired; v0.1 LiteRT artifact now matches Android tensor contract; quality + real-device proof pending |
+| Inherent (joint audio→intent) backend | 🟩🟩🟩🟩⬜ | Pixel 10 runtime proof passes through frontend + 13-head backend; current model quality needs tuning |
 | MediaTek Dimensity (mt6989) BERT variant | 🟩⬜⬜⬜⬜ | Manifest slot reserved; AOT pipeline drafted; model not built yet |
 
 ### Intent + fulfillment
@@ -68,7 +68,7 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| Public AICore (Gemini Nano via `GenerativeModel`) | 🟩🟩🟩🟩🟩 | Pixel/Nano happy path; Pixel 10 device proof pending |
+| Public AICore (Gemini Nano via `GenerativeModel`) | 🟩🟩🟩🟩🟩 | Pixel 10 Pro Fold proof passed via `LOCAL_LLM / LOCAL_ELIGIBLE`; public API still lacks explicit Nano v3 feature selection |
 | Simulation LLM (deterministic test) | 🟩🟩🟩🟩🟩 | Test fixture |
 | LiteRT-LM (on-device Gemma bundle) | 🟩🟩🟩⬜⬜ | Local fallback path; E2B model deploys to app storage, but `liblitertlm_jni.so` SIGILLs on arm64 emulator so physical-device proof is required |
 | Remote inference (Oak session) | 🟨⬜⬜⬜⬜ | Post-launch fallback; endpoint + cert pin + audience config intentionally not provisioned for launch |

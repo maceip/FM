@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "backend": "litert",
   "artifact_format": "tflite",
-  "training_hash": "15f92fff6cd5e62048c9674313b79f9fe11d4f88:09c0f1abed79cc68",
+  "training_hash": "nogit:a4396bf3b1e95d27",
   "input_tensor": "mel_spectrogram",
   "output_tensor": "intent_output",
   "head_order": [
@@ -50,10 +50,10 @@
     "has_calling_agent_intent": 0.9,
     "has_start_timer_intent": 0.9
   },
-  "artifact_size_bytes": 10554256,
+  "artifact_size_bytes": 10559320,
   "reports": {
-    "source_saved_model": "artifacts/model-groups/002-static3000-asap/export/saved_model",
-    "representative_dataset_size": "8"
+    "onnx_parity": "artifacts/model-groups/ec2-production/export/litert/reports/onnx_parity.json",
+    "delegate_cpu": "artifacts/model-groups/ec2-production/export/litert/delegates/cpu.json"
   },
   "config": {
     "model": {
@@ -67,20 +67,20 @@
       "max_frames": 3000
     },
     "training": {
-      "batch_size": 32,
+      "batch_size": 8,
       "learning_rate": 0.0003,
       "weight_decay": 0.01,
       "warmup_steps": 1000,
-      "max_steps": 2000,
+      "max_steps": 100000,
       "eval_every_steps": 2000,
       "save_every_steps": 2000,
       "loss": "focal_bce",
       "focal_gamma": 2.0,
       "class_weights": "balanced",
-      "train_manifest": "artifacts/model-groups/002-static3000-asap/work/mels/train_manifest.csv",
-      "eval_manifest": "artifacts/model-groups/002-static3000-asap/work/mels/eval_manifest.csv",
-      "num_workers": 4,
-      "device": "mps",
+      "train_manifest": "data/production_train_manifest.csv",
+      "eval_manifest": "data/production_eval_manifest.csv",
+      "num_workers": 0,
+      "device": "cuda",
       "seed": 1337
     },
     "export": {
@@ -91,7 +91,7 @@
         "tpu"
       ],
       "quantization": "int8",
-      "representative_dataset_size": 8,
+      "representative_dataset_size": 500,
       "target_size_mb": 50,
       "output_path": "artifacts/production/inherent.tflite",
       "metadata_path": "artifacts/production/inherent.metadata.json",
@@ -106,7 +106,10 @@
       "parity_atol": 0.0001
     }
   },
-  "tflite_size_bytes": 10554256,
+  "delegates": [
+    "cpu"
+  ],
+  "tflite_size_bytes": 10559320,
   "tflite_io": {
     "input_name": "serving_default_mel_spectrogram:0",
     "input_shape": [

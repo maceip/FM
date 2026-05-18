@@ -13,7 +13,7 @@ mkdir -p "$OUT_DIR"
 phrases=(
   "timer_ten_minutes|Samantha|Set a timer for ten minutes."
   "define_polymorphism|Samantha|Define polymorphism."
-  "add_oat_milk|Samantha|Add oat milk to my list."
+  "add_oat_milk|Samantha|Add milk to my list."
   "remind_call_dentist|Samantha|Remind me to call the dentist tomorrow."
   "meaning_foreshadowing|Samantha|What is the meaning of foreshadowing?"
   "schedule_meeting_avery|Samantha|Schedule a meeting with Avery on Tuesday at three."

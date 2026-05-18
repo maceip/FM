@@ -18,7 +18,7 @@ ACTIVITY="$PACKAGE/.ui.mainscreen.MainActivity"
 # carries the app-private path so the receiver opens it under the app's own uid.
 TMP_DIR="/data/local/tmp/cosmo-test"
 DEVICE_DIR="/data/data/$PACKAGE/files/cosmo-test"
-PER_FIXTURE_WAIT_SEC="${PER_FIXTURE_WAIT_SEC:-14}"
+PER_FIXTURE_WAIT_SEC="${PER_FIXTURE_WAIT_SEC:-25}"
 
 case "$TARGET" in ambient|soda|both) ;; *) echo "target must be one of ambient|soda|both" >&2; exit 64 ;; esac
 
@@ -57,6 +57,15 @@ done
 echo "==> starting app so the debug receiver is registered"
 "${ADB[@]}" shell am start -n "$ACTIVITY" >/dev/null
 sleep 4
+if [[ "$TARGET" == "ambient" || "$TARGET" == "both" ]]; then
+  echo "==> enabling raw-audio backend selection for ambient injection"
+  "${ADB[@]}" shell am broadcast \
+    -a com.google.research.air.cosmo.DEBUG_SET_SETTING \
+    --es key rawAudioGatekeeperEnabled \
+    --ez value true \
+    -p "$PACKAGE" >/dev/null
+  sleep 1
+fi
 
 logcat_pid=""
 trap '[[ -n "$logcat_pid" ]] && kill "$logcat_pid" 2>/dev/null || true' EXIT

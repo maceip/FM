@@ -20,7 +20,7 @@ can answer "what did cosmo do?" They are not a work queue.
 
 ## Current Truth
 
-As of 2026-05-17, Steps 1 through 5 are green on `codex/ship-plan-audit`.
+As of 2026-05-18, Steps 1 through 5 are green on `codex/ship-plan-audit`.
 
 - Tier 0 passes locally:
   `scripts/verify-relocation-safety.sh`,
@@ -39,6 +39,11 @@ As of 2026-05-17, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   `2506BPN68G` (`Xiaomi/klimt_eea/klimt:16/BP2A.250605.031.A3/OS3.0.13.0.WOSEUXM:user/release-keys`)
   with app-private `google-gemma-4-E2B-it-litertlm` LiteRT-LM. Artifacts:
   `artifacts/device-model-routing/20260516-165925-fallback/`.
+- Pixel 10 Pro Fold production model routing passed on
+  `google/rango/rango:16/BD3A.251105.010.E1/14337626:user/release-keys`.
+  AICore was visible as `com.google.android.aicore`; the production route was
+  `LOCAL_LLM / LOCAL_ELIGIBLE` with redacted output `ok`. Artifacts:
+  `artifacts/device-model-routing/20260518-020349-pixel10/`.
 - Xiaomi core capability smoke passed on device with
   `scripts/run-device-core-capability-smoke.sh`: gatekeeper timer detection,
   debug/test fulfillment actions for timer/list/doc/calendar/search/email,
@@ -47,10 +52,14 @@ As of 2026-05-17, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   `artifacts/device-core-capability/20260516-172858/`.
 - The same core smoke can push recorded phrases through SODA:
   `scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav`.
-- The generated fixture corpus passed on emulator with 10/10 speech phrases
-  producing final SODA transcripts and expected regex skill routing. Artifacts:
-  `artifacts/audio-run/20260517-161257/`. Real human-recorded phrases are still
-  needed once a phone is available.
+- The generated fixture corpus passed on Pixel 10 with SODA CPU pack,
+  selected raw-audio backend, and expected regex skill routing for the SODA
+  phrases. Artifacts: `artifacts/audio-run/20260518-015814/`. Human-recorded
+  directed and undirected phrases are still needed.
+- Inherent runtime plumbing passes on Pixel 10: `GatekeepingRuntimeSmokeTest`
+  runs the frontend and 13-head backend. Current model quality is not launch
+  quality yet; tune thresholds/training against held-out audio before relying
+  on it for product decisions.
 - The raw Conformer/Darwinn audio debug path now fails closed on emulator with
   `raw_audio_native_unsupported_on_emulator` instead of crashing in
   `libtensorflowlite_jni.so`; Pixel hardware is still required for EdgeTPU

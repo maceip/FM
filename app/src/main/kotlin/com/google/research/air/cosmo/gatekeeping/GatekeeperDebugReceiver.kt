@@ -9,6 +9,7 @@ import com.google.research.air.cosmo.BuildConfig
 import com.google.research.air.cosmo.ephemeralbuffer.AmbientAudioBytesEphemeralBuffer
 import com.google.research.air.cosmo.ephemeralbuffer.InMemoryEphemeralBuffer
 import com.google.research.air.cosmo.gatekeeping.api.ContextSource
+import com.google.research.air.cosmo.gatekeeping.backend.AudioGatekeepingBackendSelector
 import com.google.research.air.cosmo.gatekeeping.backend.AudioInput
 import com.google.research.air.cosmo.gatekeeping.backend.CpuRecoveryBackend
 import com.google.research.air.cosmo.lib.soda.JniSodaCapability
@@ -41,7 +42,7 @@ import kotlinx.coroutines.withContext
  *   --es text "Screen: define polymorphism" -p com.google.research.air.cosmo
  * ```
  *
- * Audio → exercises libtensorflowlite_jni / libdarwinndelegatejni / libsoda_dev_jni / Conformer:
+ * Audio → exercises the selected raw-audio backend plus libsoda_dev_jni:
  * ```
  * adb push fixture.wav /sdcard/cosmo-test/fixture.wav
  * adb shell am broadcast -a com.google.research.air.cosmo.DEBUG_INJECT_AUDIO \
@@ -50,8 +51,8 @@ import kotlinx.coroutines.withContext
  * ```
  *
  * `target` ∈ {`ambient`, `soda`, `both`}: `ambient` feeds AmbientAudioBytesEphemeralBuffer and
- * triggers AudioGatekeepingModel (TFLite frontend + EdgeTPU backend); `soda` feeds
- * JniSodaCapability via addAudio (libsoda_dev_jni). Tail logcat with
+ * triggers the selected raw-audio backend; `soda` feeds JniSodaCapability via addAudio
+ * (libsoda_dev_jni). Tail logcat with
  * `adb logcat -s COSMO-Gatekeeper Telemetry JniSodaCapability ConformerEncoder GatekeeperDebug`.
  */
 @Singleton
@@ -59,7 +60,7 @@ class GatekeeperDebugReceiver
 @Inject
 constructor(
     private val gatekeeper: Gatekeeper,
-    private val audioGatekeepingModel: AudioGatekeepingModel,
+    private val backendSelector: AudioGatekeepingBackendSelector,
     private val cpuRecoveryBackend: CpuRecoveryBackend,
     @AmbientAudioBytesEphemeralBuffer private val ambientBuffer: InMemoryEphemeralBuffer<ByteArray>,
     @ApplicationContext private val appContext: Context,
@@ -150,8 +151,14 @@ constructor(
         fixtureName: String
     ) {
         chunks.forEach { ambientBuffer.add(it) }
-        Log.i(TAG, "audio inject ambient: name=$fixtureName pushed ${chunks.size} chunks; running AudioGatekeepingModel")
-        val result = audioGatekeepingModel.predict(chunks.flattenBytes())
+        Log.i(TAG, "audio inject ambient: name=$fixtureName pushed ${chunks.size} chunks; running selected backend")
+        val result =
+            backendSelector.select().classify(
+                AudioInput.RawPcm(
+                    source = ContextSource.AMBIENT_AUDIO,
+                    pcm = chunks.flattenBytes()
+                )
+            )
         Log.i(TAG, "audio inject ambient: name=$fixtureName result=$result")
     }
 

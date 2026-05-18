@@ -1,7 +1,6 @@
 package com.google.research.air.cosmo.lib.soda
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import com.google.research.air.cosmo.runtime.CosmoBuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -65,11 +64,10 @@ sealed class SodaStartResult {
 }
 
 /**
- * Manages download, checksum, extraction, and SoC selection for the SODA language packs ported
- * from the recovered `LanguagePackManager.smali` constants:
- *   - Tensor G4 / Pixel 9 → `lp_lga_tpu.zip`
- *   - Tensor G5 / Pixel 10 → `lp_zuma_tpu.zip`
- *   - other SoCs → `lp_cpu.zip`
+ * Manages download, checksum, and extraction for the SODA language pack. The recovered
+ * `LanguagePackManager.smali` has SoC-specific TPU constants, but those packs currently fail
+ * `initSoda` with this JNI/runtime combination on Pixel 10. The launch path therefore uses
+ * the CPU pack on all devices until the TPU packs are proven by the device fixture harness.
  *
  * Each pack is configured via Gradle properties (`cosmo.soda.languagePack.*`) so operators can
  * swap hosting without rebuilding. Resolution order: bundled APK asset → app-private cache →
@@ -119,14 +117,7 @@ constructor(
         }
     }
 
-    private fun pickDescriptor(): SodaPackDescriptor? {
-        val model = Build.MODEL.orEmpty()
-        return when {
-            model.contains("Pixel 9", ignoreCase = true) -> describeFromConfig(SodaPackKind.LGA_TPU)
-            model.contains("Pixel 10", ignoreCase = true) -> describeFromConfig(SodaPackKind.ZUMA_TPU)
-            else -> describeFromConfig(SodaPackKind.CPU)
-        }
-    }
+    private fun pickDescriptor(): SodaPackDescriptor? = describeFromConfig(SodaPackKind.CPU)
 
     private fun describeFromConfig(kind: SodaPackKind): SodaPackDescriptor? {
         val url = CosmoBuildConfig.sodaPackUrl(kind).trim()

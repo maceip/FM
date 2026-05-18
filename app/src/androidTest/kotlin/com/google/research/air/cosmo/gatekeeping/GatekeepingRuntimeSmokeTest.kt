@@ -2,6 +2,7 @@ package com.google.research.air.cosmo.gatekeeping
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.research.air.cosmo.gatekeeping.models.BertEncoderImpl
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -36,6 +37,19 @@ class GatekeepingRuntimeSmokeTest {
         } finally {
             BertEncoderImpl.nativeDestroy(handle)
         }
+    }
+
+    @Test
+    fun inherentCpuModelRunsFrontendAndThirteenHeadBackend() = runBlocking {
+        assumeFalse(
+            "LiteRT JNI crashes inside libLiteRt.so on the arm64 emulator; run this smoke on physical devices.",
+            NativeBertRuntimeGuard.isProbablyEmulator()
+        )
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val result = InherentAudioGatekeepingModel(context).predict(ByteArray(16_000 * 2))
+
+        assertEquals("inherent_v0", result.modelId)
+        assertTrue("Inherent result should expose only finite confidences", result.detectedSkills.values.all { it.isFinite() })
     }
 
     private fun ((String) -> ByteArray?).required(id: String): ByteArray =

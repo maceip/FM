@@ -17,6 +17,8 @@ BAD_PATTERNS = (
     "Application Not Responding",
     "ANR in ",
     "signal 4 (SIGILL)",
+    "raw_audio_unavailable",
+    "inherent_unavailable",
 )
 
 TRANSCRIPT_RE = re.compile(r"audio inject soda transcript: name=(\S+) isFinal=true text=(.*)$")

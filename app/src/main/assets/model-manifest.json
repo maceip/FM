@@ -70,8 +70,8 @@
       "id": "gatekeeper_inherent_v0",
       "filename": "inherent.tflite",
       "delivery": "bundled",
-      "sha256": "d85aea7c3715c4ad29ae288f250fd52d3e7f627fc3bb3d22714a8e3f7a76b8c5",
-      "sizeBytes": 10554256,
+      "sha256": "40d73a3f4cf43f510a8eff61fcb6043b6ef434352113c1933e585385bd4b559b",
+      "sizeBytes": 10559320,
       "mediaType": "application/vnd.tensorflow.lite",
       "required": true
     },
@@ -79,8 +79,8 @@
       "id": "gatekeeper_inherent_v0_metadata",
       "filename": "inherent.metadata.json",
       "delivery": "bundled",
-      "sha256": "6ab353dd97ccc8ec14674b995246a0dc17e0288af201f673cda3706b9d5624df",
-      "sizeBytes": 3537,
+      "sha256": "7be8fac2c323f05942e0355c368847a7990d6d19ead4549109fb071a7bb1f3e2",
+      "sizeBytes": 3526,
       "mediaType": "application/json",
       "required": true
     }
