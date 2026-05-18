@@ -1096,16 +1096,18 @@ deeply Google-internal and replaced with off-the-shelf alternatives.
 
 ---
 
-## 16. Voice output (🟡 DEFERRED)
+## 16. Voice output (🟢 Kokoro replacement path)
 
-**Status: 🟡 deferred. Architecturally placed; no plans to build for current scope.**
+**Status: active replacement path.** The Android `TextToSpeech` shim verifies
+that spoken output is wired through the app, but real-device quality is not
+acceptable for the product voice. The launch path is now Kokoro 82M ONNX with
+Android `TextToSpeech` retained as the emergency fallback.
 
 Cosmo's recovered code includes a full on-device TTS stack. Genesis intentionally
-does not build it for the parity demo scope (consolidated plan calls it
-"VoiceLM/SoundStream → deferred; not required for parity demo"). This section
-documents the placement so the slot is clear when (if) it becomes scope.
+does not depend on that private stack for launch. This section preserves the
+placement and the behavioral shape we should copy.
 
-### 13.1 What cosmo had
+### 16.1 What cosmo had
 
 | Cosmo component | Files (recovered) | Function |
 |---|---|---|
@@ -1119,11 +1121,40 @@ documents the placement so the slot is clear when (if) it becomes scope.
 
 The recovered `temporal_decoder_int4-graph-custom_op.tflite` is **truncated** —
 `audio_stack_map.md §H` flags 64.8MB missing of 112.5MB total. Even if the
-slot were activated, the asset would need re-acquisition.
+slot were activated, the asset would need re-acquisition. The recovered app also
+logged `NOT_FOUND: No suitable capability found` while initializing the Vogo
+VoiceLM capability, which means the current recovered binary/asset set is not a
+ship-ready path.
 
-### 13.2 Architectural placement in genesis
+### 16.2 Launch architecture
 
-If/when voice output enters scope:
+Use the existing `lib/voice/VoiceOutput.kt` contract:
+
+| Slot | Genesis location |
+|---|---|
+| `VoiceOutput` interface | `app/src/main/kotlin/.../lib/voice/VoiceOutput.kt` |
+| Kokoro implementation | `lib/voice/KokoroVoiceOutput.kt` (new) — wraps Sherpa-ONNX or a direct ONNX Runtime backend |
+| Android fallback | `lib/voice/AndroidTextToSpeechVoiceOutput.kt` (split from the current file) |
+| Playback | `AudioTrack` streaming PCM float32/short buffers, matching Cosmo's `AudioRenderer` shape |
+| Assets | External model bundle/cache, not Git. Candidate bundles: `kokoro-int8-en-v0_19`, `kokoro-int8-multi-lang-v1_1`, and direct E2E `aufklarer/Kokoro-82M-ONNX` for comparison |
+
+The first integration should prefer Sherpa-ONNX because it already exposes the
+right Android/Kotlin TTS abstraction:
+
+```
+OfflineTts.generateWithConfigAndCallback(text, GenerationConfig(...)) { samples ->
+    audioTrack.write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
+}
+```
+
+That is structurally close to Cosmo's `VoiceLMTTS`: initialize one native
+engine, keep a reusable task/runtime object, submit a text utterance, stream
+audio into an `AudioTrack`, and provide `stop()` by cancelling/flushing the
+active utterance.
+
+### 16.3 Research-only Cosmo placement
+
+If VoiceLM/Vogo becomes viable later:
 
 | Slot | Genesis location |
 |---|---|
@@ -1135,9 +1166,10 @@ If/when voice output enters scope:
 | `libvogo_jni.so` | `app/src/main/jniLibs/arm64-v8a/` — recovered binary exists at `~/Downloads/cosmo_recovered_native_libs/`; not bundled |
 | VoiceLM assets | `app/src/main/assets/models/voicelm/` — recovered tflites exist at `~/Downloads/cosmo_recovered_large_assets/`; not bundled. `temporal_decoder` needs re-recovery. |
 
-Nothing in the current code references `lib/tts/` — when this slot lands,
-fulfillment action handlers that produce speakable output gain a single
-`TTS` dependency; otherwise unchanged.
+Nothing in the current code should depend on `lib/tts/` for launch. Fulfillment
+action handlers that produce speakable output should depend only on
+`VoiceOutput`; the backend behind that binding can be Kokoro, platform TTS, or a
+future recovered VoiceLM provider.
 
 ---
 

@@ -18,7 +18,7 @@ Conformer, move to tier 2).
 
 ---
 
-## Voice output / TTS (currently 🟡 DEFERRED — see architecture.md §16)
+## Voice output / TTS (active replacement path — see architecture.md §16)
 
 What we need: synthesized speech for the assistant's spoken replies. Inputs:
 text strings (skill responses, confirmation prompts). Output: audio buffer
@@ -26,20 +26,29 @@ ready to play through `AudioTrack`.
 
 | Tier | Option | Notes |
 |---|---|---|
-| 🟢 1 | **Cosmo VoiceLM + Vogo** (`libvogo_jni.so` + `voicelm/*.tflite`) | Recovered binaries exist at `~/Downloads/cosmo_recovered_*`. **Blocker:** `voicelm/temporal_decoder_int4-graph-custom_op.tflite` is truncated (64 MB missing in recovery). Either find an intact source, or skip the temporal decoder path and use the alt VoiceLM topology. Bundle is large (~250 MB across all .tflites) |
-| 🟡 2a | **Android `TextToSpeech`** (platform builtin) | Free, available on all Android, decent quality. No streaming; whole utterance synthesized at once. Voice quality is "system default" — not the warm presence palette the design wants |
-| 🟡 2b | **Coqui XTTS-v2** (open-source, MPL-2.0) | High-quality, multilingual, voice cloning supported. Quantized variants for mobile exist but are ~200 MB and need ONNX Runtime Mobile or TFLite conversion |
-| 🟡 2c | **OpenAI TTS API** (commercial — `tts-1` / `tts-1-hd`) | Excellent quality. Network-required. Costs ~$15/1M chars. Violates on-device-first stance unless behind explicit user opt-in |
-| 🟡 2d | **ElevenLabs API** (commercial) | Best voice quality on the market. Same opt-in caveat as OpenAI |
-| 🔴 3  | **Train a small distilled voice model** | E.g., fine-tune `microsoft/speecht5_tts` on a target voice. Weeks of work; large training data requirement |
+| 🟢 1 | **Kokoro 82M ONNX through Sherpa-ONNX** | Recommended ship path. Kokoro is Apache-2.0, 82M params, 24kHz output, and has public Android/Kotlin integration via Sherpa-ONNX `OfflineTts.generateWithConfigAndCallback`. Start with `kokoro-int8-en-v0_19` for the smallest English proof, then evaluate `kokoro-int8-multi-lang-v1_1` if multilingual voices matter. This preserves Cosmo's streaming `AudioTrack` shape without relying on private Vogo. |
+| 🟢 1b | **Kokoro 82M single E2E ONNX** (`aufklarer/Kokoro-82M-ONNX` / Soniqo) | Viable validation path if we want fixed-shape ONNX Runtime + NNAPI directly. Inputs are phoneme ids, mask, 256-dim voice embedding, speed, random phases; output is `[1,1,120000]` 24kHz PCM plus valid length. It is newer and less battle-tested than Sherpa-ONNX, so use it as a comparison/prototype rather than the first app integration. |
+| 🟡 2 | **Android `TextToSpeech`** (platform builtin) | Keep only as an emergency fallback. Real-device smoke proved it works, but quality is too robotic for the product voice. |
+| 🟡 3 | **Supertonic 3 ONNX** | Worth benchmarking behind the same interface: 2026 open-weight, 31 languages, ONNX Runtime, 44.1kHz, expression tags, small enough for on-device. Do not switch before a device listen/latency pass because it is newer than Kokoro and has a different voice/style contract. |
+| 🟠 4 | **Cosmo VoiceLM + Vogo** (`libvogo_jni.so` + `voicelm/*.tflite`) | Research-only unless recovered intact. The recovered stack shows the desired architecture, but `voicelm/temporal_decoder_int4-graph-custom_op.tflite` is truncated by 64 MB, Vogo is a private native runtime, and prior recovered-app launch logs fail capability initialization with `NOT_FOUND: No suitable capability found`. |
+| 🔴 5 | **Train a small distilled voice model** | Not a launch path. Even a clean-room VoiceLM/SoundStream replacement is a research project with data, vocoder, tokenizer/phonemizer, latency, and mobile export risk. |
 
-**Trigger to descend:** `voicelm/temporal_decoder_int4-graph-custom_op.tflite`
-re-recovery fails → tier 2. Quality of platform `TextToSpeech` ruled
-insufficient → tier 2b/2c.
+**Decision:** replace the platform TTS implementation with a Kokoro-backed
+`VoiceOutput` provider, keeping Android `TextToSpeech` as fallback. Use Cosmo
+for API shape only: streaming callback, reusable task/engine instance,
+single utterance update, and `AudioTrack` playback.
 
-**Recommendation today:** start with tier 2a (`android.speech.tts.TextToSpeech`)
-because it ships free and works everywhere; design `lib/tts/TTS.kt` interface
-so swap to VoiceLM (tier 1) or XTTS (tier 2b) is a binding change.
+**Validation gate before making Kokoro default:** on Pixel 10 and Xiaomi, run
+the same 20 assistant utterances through (1) Android TTS, (2) Kokoro int8 CPU,
+and, where supported, (3) Kokoro NNAPI/NPU. Record cold start, first-audio
+latency, total synthesis time, failure reason, model RSS, and a human
+listen-score. Kokoro becomes default only if it wins quality and stays
+comfortably interactive for short skill replies.
+
+Source checks: `hexgrad/Kokoro-82M` model card (Apache-2.0, 82M params,
+24kHz, StyleTTS2/iSTFTNet architecture), Sherpa-ONNX Kokoro docs and Android
+sample (`OfflineTts.generateWithConfigAndCallback`), and
+`aufklarer/Kokoro-82M-ONNX` model card (fixed-shape ONNX Runtime E2E variant).
 
 ---
 
@@ -294,7 +303,7 @@ For a project lead picking what to invest in next, sorted by leverage
 | Build/run loop (`scripts/dev-loop.sh`) | n/a | DONE | Unblocks all other iteration |
 | Diarization config flip | 🟢 1 | ~½ day | Needs a consumer first; skip until there's one |
 | Inherent model (`~/inherent`) | 🟢 1 | 5–6 weeks | Already in flight on a separate project |
-| TTS / Voice output | 🟡 2a (`android.speech.tts`) for stopgap | ~2 days | Tier 2a unblocks any spoken response; tier 1 (Vogo + VoiceLM) waits on temporal_decoder re-recovery |
+| TTS / Voice output | 🟢 Kokoro 82M ONNX via Sherpa-ONNX, Android TTS fallback | ~2-4 days for first app integration + device benchmark | Platform TTS works but quality is unacceptable. VoiceLM/Vogo remains research-only until an intact private runtime/asset set can initialize |
 | Gecko semantic search | 🟢 1 | ~3 days | Assets present; ContextStore hook exists. Unblocks tier-2 PI replacement |
 | Conformer EdgeTPU activation | 🟢 1 | 1 day after Pixel arrives | Hardware-dependent |
 | mt6989 BERT | 🟢 1 | 1 day on a Neuron-toolchain machine | Hardware-dependent |
