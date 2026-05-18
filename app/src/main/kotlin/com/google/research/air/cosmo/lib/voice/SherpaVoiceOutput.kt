@@ -126,7 +126,7 @@ constructor(
             AudioRenderer(
                 sampleRate = tts.sampleRate(),
                 channelMask = AudioFormat.CHANNEL_OUT_MONO,
-                encoding = AudioFormat.ENCODING_PCM_FLOAT
+                encoding = AudioFormat.ENCODING_PCM_16BIT
             )
         return Runtime(tts = tts, audioRenderer = audioRenderer).also { runtime = it }
     }

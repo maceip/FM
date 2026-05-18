@@ -9,7 +9,7 @@ import android.util.Log
 class AudioRenderer(
     sampleRate: Int,
     private val channelMask: Int = AudioFormat.CHANNEL_OUT_MONO,
-    private val encoding: Int = AudioFormat.ENCODING_PCM_FLOAT
+    private val encoding: Int = AudioFormat.ENCODING_PCM_16BIT
 ) {
     private val audioTrack: AudioTrack = createAudioTrack(sampleRate)
 
@@ -17,8 +17,7 @@ class AudioRenderer(
 
     fun render(samples: FloatArray) {
         if (samples.isEmpty()) return
-        startIfNeeded()
-        audioTrack.write(samples, 0, samples.size, AudioTrack.WRITE_BLOCKING)
+        render(samples.toPcm16())
     }
 
     fun render(samples: ShortArray) {
@@ -49,7 +48,8 @@ class AudioRenderer(
                 channelMask,
                 encoding
             )
-        val bufferSize = minBufferSize.coerceAtLeast(sampleRate / 2)
+        val fallbackBufferSize = sampleRate * bytesPerSample(encoding) / MIN_BUFFER_FRACTION
+        val bufferSize = minBufferSize.takeIf { it > 0 }?.coerceAtLeast(fallbackBufferSize) ?: fallbackBufferSize
         val attributes =
             AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -72,5 +72,17 @@ class AudioRenderer(
 
     private companion object {
         const val TAG = "AudioRenderer"
+        const val MIN_BUFFER_FRACTION = 2
     }
 }
+
+private fun FloatArray.toPcm16(): ShortArray =
+    ShortArray(size) { index ->
+        (this[index].coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort()
+    }
+
+private fun bytesPerSample(encoding: Int): Int =
+    when (encoding) {
+        AudioFormat.ENCODING_PCM_FLOAT -> 4
+        else -> 2
+    }
