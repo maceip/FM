@@ -27,6 +27,10 @@ class CosmoQuickSettingsTileService : TileService() {
         qsTile?.postDelayedUpdate()
     }
 
+    companion object {
+        const val EXTRA_SHOW_SETTINGS = "cosmo_show_settings"
+    }
+
     private fun updateTile() {
         qsTile?.apply {
             val currentState = stateManager.getCosmoState().value

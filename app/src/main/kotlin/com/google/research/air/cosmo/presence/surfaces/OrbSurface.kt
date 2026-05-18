@@ -113,9 +113,9 @@ fun OrbSurface(
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.10f),
-                        PresenceTokens.Palette.SurfaceGlassHigh,
-                        PresenceTokens.Palette.SurfaceGlass
+                        Color.White.copy(alpha = 0.055f),
+                        Color(0xE00A0F18),
+                        Color(0xF0040710)
                     )
                 ),
                 shape
@@ -123,9 +123,26 @@ fun OrbSurface(
             .drawBehind {
                 drawRoundRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.30f), Color.Transparent)
+                        colors = listOf(Color.White.copy(alpha = 0.14f), Color.Transparent)
                     ),
                     size = Size(size.width, size.height * 0.45f)
+                )
+                drawRoundRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            state.accent.copy(alpha = 0.10f),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width * 0.68f, size.height * 0.46f),
+                        radius = size.minDimension * 0.42f
+                    ),
+                    size = size
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.14f),
+                    start = Offset(size.width * 0.12f, 1.dp.toPx()),
+                    end = Offset(size.width * 0.88f, 1.dp.toPx()),
+                    strokeWidth = 1.dp.toPx()
                 )
                 drawRoundRect(
                     brush = Brush.horizontalGradient(

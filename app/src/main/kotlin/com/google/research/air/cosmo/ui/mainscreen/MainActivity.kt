@@ -5,13 +5,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -79,7 +86,24 @@ import com.google.research.air.cosmo.lib.permission.PermissionRationaleHelper
 import com.google.research.air.cosmo.lib.permission.RuntimePermissionGrantState
 import com.google.research.air.cosmo.lib.permission.RuntimePermissionState
 import com.google.research.air.cosmo.notificationcapture.NotificationCaptureController
+import com.google.research.air.cosmo.presence.BrowserTab
+import com.google.research.air.cosmo.presence.CardAction
+import com.google.research.air.cosmo.presence.CardActionType
+import com.google.research.air.cosmo.presence.CardPayload
+import com.google.research.air.cosmo.presence.CheckItem
+import com.google.research.air.cosmo.presence.MessageChannel
+import com.google.research.air.cosmo.presence.OrbActivity
+import com.google.research.air.cosmo.presence.PresenceCard
+import com.google.research.air.cosmo.presence.PresenceController
+import com.google.research.air.cosmo.presence.PresenceState
+import com.google.research.air.cosmo.presence.PresenceTokens
+import com.google.research.air.cosmo.presence.Recipient
+import com.google.research.air.cosmo.presence.Source
 import com.google.research.air.cosmo.presence.overlay.PresenceOverlayStarter
+import com.google.research.air.cosmo.presence.surfaces.CardStackSurface
+import com.google.research.air.cosmo.presence.surfaces.OrbSurface
+import com.google.research.air.cosmo.presence.surfaces.TabSurface
+import com.google.research.air.cosmo.presence.surfaces.GlassPanel
 import com.google.research.air.cosmo.setting.CosmoSettingStore
 import com.google.research.air.cosmo.setting.CosmoStateManager
 import com.google.research.air.cosmo.ui.theme.CosmoBarItem
@@ -137,10 +161,15 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var presenceOverlayStarter: PresenceOverlayStarter
 
+    @Inject lateinit var presenceController: PresenceController
+
+    @Inject lateinit var specialtyCards: com.google.research.air.cosmo.presence.PresenceSpecialtyCards
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val debugTimerFlowEnabled =
             BuildConfig.DEBUG_TIMER_FLOW_AUTOMATION && intent.getBooleanExtra(EXTRA_DEBUG_TIMER_FLOW, false)
+        handleSettingsIntent(intent)
         cosmoController.init()
         setCosmoContent(wallpaperDriven = true) {
             CosmoGenesisApp(
@@ -155,20 +184,38 @@ class MainActivity : ComponentActivity() {
                 permissionRationaleHelper = permissionRationaleHelper,
                 taskMonitorNavigationBridge = taskMonitorNavigationBridge,
                 debugPanels = debugPanels,
+                presenceController = presenceController,
                 debugTimerFlowEnabled = debugTimerFlowEnabled
             )
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleSettingsIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
         presenceOverlayStarter.start()
     }
+
+    private fun handleSettingsIntent(intent: android.content.Intent?) {
+        if (intent == null) return
+        val isSettingsTrigger =
+            intent.action == android.content.Intent.ACTION_APPLICATION_PREFERENCES ||
+            intent.getBooleanExtra(
+                com.google.research.air.cosmo.ui.surfaces.CosmoQuickSettingsTileService.EXTRA_SHOW_SETTINGS,
+                false
+            )
+        if (isSettingsTrigger) specialtyCards.showSettings()
+    }
 }
 
 @Serializable
 internal sealed interface CosmoRoute : NavKey {
     @Serializable data object Actions : CosmoRoute
+    @Serializable data object Onboarding : CosmoRoute
     @Serializable data object Capture : CosmoRoute
     @Serializable data object Camera : CosmoRoute
     @Serializable data object Settings : CosmoRoute
@@ -184,6 +231,7 @@ internal enum class MainTab(
     val icon: ImageVector
 ) {
     Actions(CosmoRoute.Actions, "Actions", Icons.Filled.PlayArrow),
+    Onboarding(CosmoRoute.Onboarding, "Onboard", Icons.Filled.PlayArrow),
     Capture(CosmoRoute.Capture, "Capture", Icons.Filled.GraphicEq),
     Camera(CosmoRoute.Camera, "Camera", Icons.Filled.CameraAlt),
     Settings(CosmoRoute.Settings, "Settings", Icons.Filled.Settings),
@@ -219,6 +267,7 @@ internal fun defaultSavedNavigation(): SavedNavigationBundle =
 internal fun cosmoRouteToToken(route: CosmoRoute): String =
     when (route) {
         CosmoRoute.Actions -> "actions"
+        CosmoRoute.Onboarding -> "onboarding"
         CosmoRoute.Capture -> "capture"
         CosmoRoute.Camera -> "camera"
         CosmoRoute.Settings -> "settings"
@@ -232,6 +281,7 @@ internal fun cosmoRouteToToken(route: CosmoRoute): String =
 internal fun cosmoRouteFromToken(token: String): CosmoRoute? =
     when {
         token == "actions" -> CosmoRoute.Actions
+        token == "onboarding" -> CosmoRoute.Onboarding
         token == "capture" -> CosmoRoute.Capture
         token == "camera" -> CosmoRoute.Camera
         token == "settings" -> CosmoRoute.Settings
@@ -271,6 +321,7 @@ private fun CosmoGenesisApp(
     permissionRationaleHelper: PermissionRationaleHelper,
     taskMonitorNavigationBridge: TaskMonitorNavigationBridge,
     debugPanels: Set<CosmoDebugPanel>,
+    presenceController: PresenceController,
     debugTimerFlowEnabled: Boolean
 ) {
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
@@ -444,9 +495,13 @@ private fun CosmoGenesisApp(
             val hazeState = LocalHazeState.current
             Scaffold(
                 containerColor = Color.Transparent,
-                topBar = { CosmoTopBar(title = "Cosmo Genesis", frosted = true) },
+                topBar = {
+                    if (selectedTab != MainTab.Actions) {
+                        CosmoTopBar(title = "Cosmo", frosted = true)
+                    }
+                },
                 bottomBar = {
-                    if (!isSupportingPaneMode) {
+                    if (!isSupportingPaneMode && selectedTab != MainTab.Actions) {
                         BottomNavigationChrome(selectedTab, frosted = true) {
                             restoreTab(it, recordHistory = true)
                         }
@@ -462,8 +517,10 @@ private fun CosmoGenesisApp(
                 ) {
                     if (isSupportingPaneMode) {
                         Row(Modifier.fillMaxSize()) {
-                            NavigationRailChrome(selectedTab, frosted = true) {
-                                restoreTab(it, recordHistory = true)
+                            if (selectedTab != MainTab.Actions) {
+                                NavigationRailChrome(selectedTab, frosted = true) {
+                                    restoreTab(it, recordHistory = true)
+                                }
                             }
                             CosmoNavDisplay(
                                 backStack = backStack,
@@ -478,6 +535,7 @@ private fun CosmoGenesisApp(
                                 cameraViewComposable = cameraViewComposable,
                                 permissionRationaleHelper = permissionRationaleHelper,
                                 debugPanels = debugPanels,
+                                presenceController = presenceController,
                                 debugTimerFlowEnabled = debugTimerFlowEnabled,
                                 onNavigate = ::pushRoute,
                                 onBack = ::handleBack,
@@ -498,6 +556,7 @@ private fun CosmoGenesisApp(
                             cameraViewComposable = cameraViewComposable,
                             permissionRationaleHelper = permissionRationaleHelper,
                             debugPanels = debugPanels,
+                            presenceController = presenceController,
                             debugTimerFlowEnabled = debugTimerFlowEnabled,
                             onNavigate = ::pushRoute,
                             onBack = ::handleBack,
@@ -556,6 +615,7 @@ private fun CosmoNavDisplay(
     cameraViewComposable: DeviceCameraCaptureSurface,
     permissionRationaleHelper: PermissionRationaleHelper,
     debugPanels: Set<CosmoDebugPanel>,
+    presenceController: PresenceController,
     debugTimerFlowEnabled: Boolean,
     onNavigate: (CosmoRoute) -> Unit,
     onBack: () -> Unit,
@@ -569,7 +629,10 @@ private fun CosmoNavDisplay(
         entryProvider =
             entryProvider {
                 entry<CosmoRoute.Actions>(metadata = SupportingPaneSceneStrategy.mainPane()) {
-                    ActionsScreen(actionsRepository, actionHandler, fulfillmentOrchestrator, debugTimerFlowEnabled, onNavigate)
+                    ActionsScreen(actionsRepository, actionHandler, fulfillmentOrchestrator, presenceController, debugTimerFlowEnabled, onNavigate)
+                }
+                entry<CosmoRoute.Onboarding>(metadata = SupportingPaneSceneStrategy.mainPane()) {
+                    OnboardingStackScreen(onNavigate = onNavigate)
                 }
                 entry<CosmoRoute.Capture>(metadata = SupportingPaneSceneStrategy.mainPane()) {
                     CaptureScreen(settingStore, stateManager, notificationCaptureManager, glassManager, permissionRationaleHelper)
@@ -619,11 +682,13 @@ private fun ActionsScreen(
     actionsRepository: ActionsRepositoryContract,
     actionHandler: FulfillmentActionHandler,
     orchestrator: FulfillmentOrchestrator,
+    presenceController: PresenceController,
     debugTimerFlowEnabled: Boolean,
     onNavigate: (CosmoRoute) -> Unit
 ) {
     val actions by actionsRepository.userFacingActions.collectAsState()
     val executedActions by actionsRepository.executedActions.collectAsState()
+    val presenceState by presenceController.state.collectAsState()
     val scope = rememberCoroutineScope()
     var pendingConfirmation by remember { mutableStateOf<FulfillmentAction?>(null) }
     var askQuery by rememberSaveable { mutableStateOf("") }
@@ -666,83 +731,191 @@ private fun ActionsScreen(
             }
         )
     }
-    Column(
-        Modifier.fillMaxSize().padding(CosmoTokens.Spacing.screenHorizontal),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    PresenceLaunchDeck(
+        presenceState = presenceState,
+        pendingCount = actions.size,
+        executedCount = executedActions.size,
+        onBatchRun = { scope.launch { orchestrator.handleBatchRun() } },
+        onOpenOnboarding = { onNavigate(CosmoRoute.Onboarding) },
+        onCardAction = { cardId, actionId ->
+            val action = actions.firstOrNull { it.id == cardId } ?: return@PresenceLaunchDeck
+            when {
+                actionId.startsWith("review:") -> onNavigate(CosmoRoute.ActionDetail(action.id))
+                actionId == "open" -> onNavigate(CosmoRoute.ActionDetail(action.id))
+                actionId == "dismiss" -> actionsRepository.markActionAsDismissed(action.id)
+                actionId == "run" -> {
+                    if (action.requiresExecuteConfirmation()) {
+                        pendingConfirmation = action
+                    } else {
+                        scope.launch { actionHandler.execute(action) }
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun PresenceLaunchDeck(
+    presenceState: PresenceState,
+    pendingCount: Int,
+    executedCount: Int,
+    onBatchRun: () -> Unit,
+    onOpenOnboarding: () -> Unit,
+    onCardAction: (cardId: String, actionId: String) -> Unit
+) {
+    val ready = presenceState as? PresenceState.Ready
+    val cards = ready?.cards?.takeIf { it.isNotEmpty() } ?: launchPreviewCards()
+    val orbActivity =
+        when (presenceState) {
+            is PresenceState.Parked -> presenceState.activity
+            is PresenceState.NeedsInput,
+            is PresenceState.Ready,
+            is PresenceState.Working -> OrbActivity.LISTENING
+            is PresenceState.Dismissed,
+            PresenceState.Hidden -> OrbActivity.IDLE
+        }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(PresenceTokens.Palette.Background)
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("ACTION DECK", style = MaterialTheme.typography.headlineSmall)
-            CosmoSignalTag(
-                text = "SYSTEM ONLINE",
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                rotationDegrees = 5f
-            )
-        }
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = askQuery,
-                onValueChange = { askQuery = it },
-                modifier = Modifier.weight(1f),
-                label = { Text("Ask Cosmo") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { submitAsk() })
-            )
-            Button(
-                onClick = ::submitAsk,
-                enabled = askQuery.isNotBlank()
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Ask")
+                OrbSurface(activity = orbActivity)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "COSMO PRESENCE",
+                        color = PresenceTokens.Palette.CyanDim,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        "Orb / tab / card stack surface is live",
+                        color = PresenceTokens.Palette.OnSurfaceDim,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
-            Button(onClick = { scope.launch { orchestrator.handleBatchRun() } }) {
-                Text("Batch")
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CosmoSignalTag(
-                text = "PENDING ${actions.size}",
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                rotationDegrees = -3f
+
+            TabSurface(
+                expanded = true,
+                modifier = Modifier.align(Alignment.End)
             )
-            CosmoSignalTag(
-                text = "EXECUTED ${executedActions.size}",
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                rotationDegrees = 3f
+
+            PresenceDeckActions(
+                pendingCount = pendingCount,
+                executedCount = executedCount,
+                onBatchRun = onBatchRun,
+                onOpenOnboarding = onOpenOnboarding
             )
-        }
-        LazyColumn(
-            modifier = Modifier.verticalFadingEdges(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(actions, key = { it.id }) { action ->
-                ActionCard(
-                    action,
-                    onOpen = { onNavigate(CosmoRoute.ActionDetail(action.id)) },
-                    onMonitor = action.monitorRouteOrNull()?.let { route -> { onNavigate(route) } },
-                    onExecute = {
-                        if (action.requiresExecuteConfirmation()) {
-                            pendingConfirmation = action
-                        } else {
-                            scope.launch { actionHandler.execute(action) }
-                        }
-                    },
-                    onDismiss = { actionsRepository.markActionAsDismissed(action.id) }
-                )
-            }
+
+            CardStackSurface(
+                cards = cards,
+                modifier =
+                    Modifier
+                        .align(Alignment.End)
+                        .widthIn(max = PresenceTokens.Size.cardStackMaxWidth)
+                        .weight(1f),
+                onAction = onCardAction
+            )
         }
     }
 }
+
+@Composable
+private fun PresenceDeckActions(
+    pendingCount: Int,
+    executedCount: Int,
+    onBatchRun: () -> Unit,
+    onOpenOnboarding: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "PENDING $pendingCount  /  EXECUTED $executedCount",
+            color = PresenceTokens.Palette.OnSurfaceDim,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.weight(1f)
+        )
+        TacticalTextButton("Batch", onBatchRun)
+        TacticalTextButton("Onboarding", onOpenOnboarding)
+    }
+}
+
+@Composable
+private fun TacticalTextButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(PresenceTokens.Palette.SurfaceGlassHigh)
+            .border(1.dp, PresenceTokens.Palette.BorderBright, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label.uppercase(),
+            color = PresenceTokens.Palette.OnSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+private fun launchPreviewCards(): List<PresenceCard> =
+    listOf(
+        PresenceCard(
+            id = "preview-browser",
+            payload =
+                CardPayload.Browser(
+                    query = "Review launch telemetry and summarize the risky deltas",
+                    activeTab = BrowserTab.SOURCE_REVIEW,
+                    sources =
+                        listOf(
+                            Source("Overlay lifecycle", "WindowManager host", 94, "OL"),
+                            Source("Permission gate", "SYSTEM_ALERT_WINDOW", 89, "PG")
+                        )
+                )
+        ),
+        PresenceCard(
+            id = "preview-message",
+            payload =
+                CardPayload.Messaging(
+                    body = "I can take the next action once the card stack is confirmed.",
+                    recipients = listOf(Recipient("Design Review", "review@cosmo", "DR")),
+                    channel = MessageChannel.CLIPBOARD
+                ),
+            actions = listOf(CardAction("open", "Open", type = CardActionType.PRIMARY))
+        ),
+        PresenceCard(
+            id = "preview-list",
+            payload =
+                CardPayload.ListTasks(
+                    title = "Surface readiness",
+                    items =
+                        listOf(
+                            CheckItem("Orb visible on launch", checked = true),
+                            CheckItem("Tab renders high precision dock", checked = true),
+                            CheckItem("Card stack replaces sticker deck")
+                        )
+                )
+        )
+    )
 
 @Composable
 private fun DebugTimerFlowAutomation(
@@ -774,42 +947,6 @@ private fun DebugTimerFlowAutomation(
         onShowConfirmation(timer)
         delay(800)
         onConfirm(timer)
-    }
-}
-
-@Composable
-private fun ActionCard(
-    action: FulfillmentAction,
-    onOpen: () -> Unit,
-    onMonitor: (() -> Unit)?,
-    onExecute: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val rotation = if (action.id.hashCode() % 2 == 0) -1f else 1f
-    CosmoStickerSurface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-        containerColor = CosmoTokens.Color.SurfaceHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(CosmoTokens.Shape.cornerLarge),
-        rotationDegrees = rotation
-    ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CosmoSignalTag(
-                text = action::class.simpleName.orEmpty().ifBlank { "ACTION" },
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                rotationDegrees = -4f
-            )
-            Text(action.title, style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = onOpen, label = { Text("Details") })
-                if (onMonitor != null) {
-                    AssistChip(onClick = onMonitor, label = { Text("Monitor") })
-                }
-                Button(onClick = onExecute) { Text("Run") }
-                AssistChip(onClick = onDismiss, label = { Text("Dismiss") })
-            }
-        }
     }
 }
 
@@ -1117,37 +1254,203 @@ private fun SettingsScreen(
         permissionStates = activity?.let { permissionRationaleHelper.states(it) }.orEmpty()
     }
     val missingPermissions = permissionStates.filterNot { it.grantState == RuntimePermissionGrantState.GRANTED }
-    Column(
-        Modifier.fillMaxSize().padding(CosmoTokens.Spacing.screenHorizontal),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    StackScreenScaffold(
+        eyebrow = "CONTROL STACK",
+        title = "Settings",
+        summary = "Tune the presence runtime without leaving the tactical glass surface."
     ) {
-        ToggleRow("Cosmo", setting.globalCosmoEnabled) {
-            if (it) stateManager.enableCosmo() else stateManager.disableCosmo()
+        item {
+            StackPanel(label = "CORE", title = "Runtime") {
+                StackToggleRow("Cosmo", "Master agent availability", setting.globalCosmoEnabled) {
+                    if (it) stateManager.enableCosmo() else stateManager.disableCosmo()
+                }
+                StackToggleRow("Analytics", "Local telemetry and diagnostic counters", setting.analyticsEnabled) {
+                    settingStore.launchUpdate { analyticsEnabled = it }
+                }
+            }
         }
-        ToggleRow("Analytics", setting.analyticsEnabled) { settingStore.launchUpdate { analyticsEnabled = it } }
         if (missingPermissions.isNotEmpty()) {
-            PermissionRationaleCard(
-                permissionStates = missingPermissions,
-                onRequest = {
-                    val requestable =
-                        missingPermissions
-                            .filterNot { it.grantState == RuntimePermissionGrantState.DENIED_PERMANENTLY }
-                            .map { it.manifestPermission }
-                    if (requestable.isNotEmpty()) {
-                        scope.launch {
-                            permissionRationaleHelper.markRequested(requestable)
-                            permissions.launch(requestable.toTypedArray())
+            item {
+                StackPanel(label = "PERMISSIONS", title = "Required Access") {
+                    missingPermissions.forEach { state ->
+                        Text(state.descriptor.title, color = PresenceTokens.Palette.OnSurface, style = MaterialTheme.typography.titleSmall)
+                        Text(state.descriptor.rationale, color = PresenceTokens.Palette.OnSurfaceDim, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (missingPermissions.any { it.grantState != RuntimePermissionGrantState.DENIED_PERMANENTLY }) {
+                            Button(
+                                onClick = {
+                                    val requestable =
+                                        missingPermissions
+                                            .filterNot { it.grantState == RuntimePermissionGrantState.DENIED_PERMANENTLY }
+                                            .map { it.manifestPermission }
+                                    if (requestable.isNotEmpty()) {
+                                        scope.launch {
+                                            permissionRationaleHelper.markRequested(requestable)
+                                            permissions.launch(requestable.toTypedArray())
+                                        }
+                                    }
+                                }
+                            ) { Text("Grant") }
+                        }
+                        if (missingPermissions.any { it.grantState == RuntimePermissionGrantState.DENIED_PERMANENTLY }) {
+                            Button(onClick = { context.startActivity(permissionRationaleHelper.appSettingsIntent()) }) {
+                                Text("Open Settings")
+                            }
                         }
                     }
-                },
-                onOpenSettings = { context.startActivity(permissionRationaleHelper.appSettingsIntent()) }
-            )
+                }
+            }
         }
-        ToggleRow(
-            "Raw audio gatekeeper",
-            setting.rawAudioGatekeeperEnabled
-        ) { settingStore.launchUpdate { rawAudioGatekeeperEnabled = it } }
-        ToggleRow("Voice match", setting.voiceMatchEnabled) { settingStore.launchUpdate { voiceMatchEnabled = it } }
+        item {
+            StackPanel(label = "INTELLIGENCE", title = "Gatekeeping") {
+                StackToggleRow("Raw audio gatekeeper", "Classify low-level audio frames", setting.rawAudioGatekeeperEnabled) {
+                    settingStore.launchUpdate { rawAudioGatekeeperEnabled = it }
+                }
+                StackToggleRow("Voice match", "Prefer voice-authenticated triggers", setting.voiceMatchEnabled) {
+                    settingStore.launchUpdate { voiceMatchEnabled = it }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingStackScreen(onNavigate: (CosmoRoute) -> Unit) {
+    StackScreenScaffold(
+        eyebrow = "SETUP STACK",
+        title = "Onboarding",
+        summary = "Bring the overlay online in three checks: permission, capture, then live cards."
+    ) {
+        item {
+            StackPanel(label = "01", title = "Enable Overlay") {
+                Text(
+                    "Grant draw-over-apps access so the orb, tab, and card stack can float above the active app.",
+                    color = PresenceTokens.Palette.OnSurfaceDim,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                TacticalTextButton("Open Settings Stack") { onNavigate(CosmoRoute.Settings) }
+            }
+        }
+        item {
+            StackPanel(label = "02", title = "Choose Context Sources") {
+                Text(
+                    "Turn on the sensors you want Cosmo to use: screen context, notifications, audio, camera, watch, or glass.",
+                    color = PresenceTokens.Palette.OnSurfaceDim,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                TacticalTextButton("Configure Capture") { onNavigate(CosmoRoute.Capture) }
+            }
+        }
+        item {
+            StackPanel(label = "03", title = "Verify Live Surface") {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    OrbSurface(activity = OrbActivity.IDLE)
+                    Text(
+                        "The idle orb should be visible immediately. When work arrives, this expands into the tab and card stack.",
+                        color = PresenceTokens.Palette.OnSurfaceDim,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StackScreenScaffold(
+    eyebrow: String,
+    title: String,
+    summary: String,
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(PresenceTokens.Palette.Background)
+    ) {
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .verticalFadingEdges(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(PresenceTokens.Spacing.cardGap)
+        ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        eyebrow,
+                        color = PresenceTokens.Palette.CyanDim,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Text(
+                        title,
+                        color = PresenceTokens.Palette.OnSurface,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        summary,
+                        color = PresenceTokens.Palette.OnSurfaceDim,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun StackPanel(
+    label: String,
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        fill = PresenceTokens.Palette.SurfaceGlassMedium,
+        borderColor = PresenceTokens.Palette.BorderDim,
+        showGlowEdge = true
+    ) {
+        Column(
+            Modifier.padding(PresenceTokens.Spacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    label.uppercase(),
+                    color = PresenceTokens.Palette.CyanDim,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    title.uppercase(),
+                    color = PresenceTokens.Palette.OnSurface,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun StackToggleRow(
+    label: String,
+    detail: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(label, color = PresenceTokens.Palette.OnSurface, style = MaterialTheme.typography.bodyLarge)
+            Text(detail, color = PresenceTokens.Palette.OnSurfaceDim, style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

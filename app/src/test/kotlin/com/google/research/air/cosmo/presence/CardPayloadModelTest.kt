@@ -7,7 +7,7 @@ import org.junit.Test
 class CardPayloadModelTest {
 
     @Test
-    fun `all 12 sealed subtypes are instantiable with defaults`() {
+    fun `all card payload subtypes are instantiable with defaults`() {
         val payloads: List<CardPayload> = listOf(
             CardPayload.Browser(query = "quantum computing"),
             CardPayload.Calling(contactName = "Alice", contactInitials = "AL"),
@@ -20,9 +20,11 @@ class CardPayloadModelTest {
             CardPayload.PeopleContext(name = "Bob", initials = "BB", detail = "Engineer"),
             CardPayload.MediaImage(),
             CardPayload.SourceCitation(),
-            CardPayload.PermissionConfirmation(prompt = "Send?", actionLabel = "Send")
+            CardPayload.PermissionConfirmation(prompt = "Send?", actionLabel = "Send"),
+            CardPayload.Settings(),
+            CardPayload.Onboarding(body = "Welcome")
         )
-        assertEquals(12, payloads.size)
+        assertEquals(14, payloads.size)
         payloads.forEach { assertNotNull(it) }
     }
 
@@ -40,7 +42,9 @@ class CardPayloadModelTest {
             CardPayload.PeopleContext(name = "n", initials = "n", detail = "d"),
             CardPayload.MediaImage(),
             CardPayload.SourceCitation(),
-            CardPayload.PermissionConfirmation(prompt = "p", actionLabel = "a")
+            CardPayload.PermissionConfirmation(prompt = "p", actionLabel = "a"),
+            CardPayload.Settings(),
+            CardPayload.Onboarding(body = "b")
         )
         payloads.forEach { payload ->
             val label = when (payload) {
@@ -56,6 +60,8 @@ class CardPayloadModelTest {
                 is CardPayload.MediaImage -> "media"
                 is CardPayload.SourceCitation -> "citation"
                 is CardPayload.PermissionConfirmation -> "permission"
+                is CardPayload.Settings -> "settings"
+                is CardPayload.Onboarding -> "onboarding"
             }
             assertNotNull(label)
         }

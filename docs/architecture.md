@@ -1272,7 +1272,7 @@ the slots visible so that:
 
 ---
 
-## 19. Snapshot summary (2026-05-15)
+## 19. Snapshot summary (2026-05-18)
 
 **Live and exercised today (✅):** capture (ambient + buds + device + watch
 + screen + interactions + notifications + location), SODA stack (per-source
@@ -1288,23 +1288,25 @@ DataStore, Nav3 UI with 25 debug panels, telemetry catalog with provenance,
 **Presence surfaces (orb / tab / card stack / glass-panel primitive,
 aerospace-HUD palette)**, **AppFunctions logic surface (`AmbientAppFunctions`
 methods route through `CosmoController`, `CosmoStateManager`, `ContextStore`,
-`FulfillmentOrchestrator`, `TaskMonitorNavigationBridge`)**.
+`FulfillmentOrchestrator`, `TaskMonitorNavigationBridge`)**, **voice output
+through `VoiceOutput` using Sherpa-ONNX KittenTTS with Android
+`TextToSpeech` fallback and streaming `AudioTrack` playback**.
 
 **Partial (⚠️):** EdgeTPU Conformer backend (`isAvailable=false` until Pixel
 returns), Inherent backend (contract-valid artifact available, quality and
 device proof pending), AOC nanoapp transport (reflection-bridged; needs platform-signed callback or
 bytecode-gen), Voice Match (JNI stub + config plumbing; no UI / no enrollment),
-HotwordEvent routing (logged-only), LiteRT-LM (E2B app-private fallback proven on Xiaomi;
-production delivery still needed),
+HotwordEvent routing (logged-only), LiteRT-LM (E2B app-private fallback
+requires additional physical-device proof and production delivery),
 remote inference (live config needed), glass + camera capture (services
 bind; consumers not wired), richer fulfillment execution-error UI, **Presence state driver
-(surfaces render, but the `GatekeeperOutput → PresenceState` producer isn't
-written)**, **AppFunctions platform binding (`@AppFunctionSchema` /
+now emits idle/specialty/action/gatekeeper states but still needs full
+fulfillment-result and projected-XR consumers**, **AppFunctions platform binding (`@AppFunctionSchema` /
 `@AppFunctionSerializable` annotations + `AppFunctionService` registration
 not applied — methods aren't discoverable by the platform agent yet)**.
 
-**Deferred (🟡):** Voice output stack (VoiceLM + Vogo + LocalTTS + AudioRenderer),
-Gecko semantic search, Pumpkin semantic grammar, Diarization,
+**Deferred (🟡):** exact VoiceLM + Vogo recovered stack, Gecko semantic search,
+Pumpkin semantic grammar, Diarization,
 Android Auto context grammars, offline action data, 10 of 13 recovered
 native libraries.
 

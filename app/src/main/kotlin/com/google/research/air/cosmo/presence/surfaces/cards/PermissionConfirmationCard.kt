@@ -1,6 +1,6 @@
 package com.google.research.air.cosmo.presence.surfaces.cards
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -24,30 +23,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.research.air.cosmo.presence.CardPayload
 import com.google.research.air.cosmo.presence.PresenceTokens
+import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 
 @Composable
 internal fun PermissionConfirmationContent(data: CardPayload.PermissionConfirmation) {
     Column(Modifier.testTag("permissionCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         CardHeader(categoryLabel = "CONFIRM", title = "PERMISSION")
-        Text(data.prompt, color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, lineHeight = 18.sp)
+        InnerPanel(Modifier.fillMaxWidth()) {
+            Text(
+                data.prompt,
+                color = PresenceTokens.Palette.OnSurfaceVariant,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 18.sp
+            )
+        }
         Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                    .background(PresenceTokens.Palette.Cyan).padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(data.actionLabel.uppercase(), color = Color.Black, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            }
+            PermissionAction(label = data.actionLabel, modifier = Modifier.weight(1f), primary = true)
             if (data.undoable) {
-                Box(
-                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                        .background(PresenceTokens.Palette.SurfaceContainerHigh).padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("UNDO", color = PresenceTokens.Palette.OnSurface, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                }
+                PermissionAction(label = "UNDO", modifier = Modifier.weight(1f))
             }
         }
+    }
+}
+
+@Composable
+private fun PermissionAction(label: String, modifier: Modifier = Modifier, primary: Boolean = false) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(8.dp))
+            .border(
+                1.dp,
+                if (primary) PresenceTokens.Palette.CyanDim else PresenceTokens.Palette.BorderDim,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label.uppercase(),
+            color = if (primary) PresenceTokens.Palette.CyanDim else PresenceTokens.Palette.OnSurface,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
     }
 }

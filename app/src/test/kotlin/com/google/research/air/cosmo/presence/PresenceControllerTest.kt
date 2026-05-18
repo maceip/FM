@@ -23,7 +23,7 @@ class PresenceControllerTest {
     @Test
     fun actionsRepositoryDrivesReadyPresenceState() = runTest {
         val repository = ActionsRepository()
-        val controller = PresenceController(repository, FakeGatekeeperOutputSource(), testScope(testScheduler))
+        val controller = PresenceController(repository, FakeGatekeeperOutputSource(), emptySpecialtyCards(), testScope(testScheduler))
         controller.start()
 
         repository.maybeUpdateActionsList(
@@ -42,7 +42,7 @@ class PresenceControllerTest {
     @Test
     fun retiringActionsClearsReadyPresenceState() = runTest {
         val repository = ActionsRepository()
-        val controller = PresenceController(repository, FakeGatekeeperOutputSource(), testScope(testScheduler))
+        val controller = PresenceController(repository, FakeGatekeeperOutputSource(), emptySpecialtyCards(), testScope(testScheduler))
         controller.start()
         repository.maybeUpdateActionsList(
             actions = listOf(FulfillmentAction.AddTimer("timer-1", "Set timer", 600)),
@@ -53,13 +53,22 @@ class PresenceControllerTest {
         repository.markActionAsExecuted("timer-1")
         advanceUntilIdle()
 
-        assertTrue(controller.state.value is PresenceState.Hidden)
+        assertEquals(PresenceController.IDLE_PRESENCE_STATE, controller.state.value)
+    }
+
+    @Test
+    fun idlePresenceIsParkedAndVisibleByDefault() = runTest {
+        val controller = PresenceController(ActionsRepository(), FakeGatekeeperOutputSource(), emptySpecialtyCards(), testScope(testScheduler))
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(PresenceController.IDLE_PRESENCE_STATE, controller.state.value)
     }
 
     @Test
     fun triggeredGatekeeperOutputDrivesWorkingPresenceState() = runTest {
         val gatekeeper = FakeGatekeeperOutputSource()
-        val controller = PresenceController(ActionsRepository(), gatekeeper, testScope(testScheduler))
+        val controller = PresenceController(ActionsRepository(), gatekeeper, emptySpecialtyCards(), testScope(testScheduler))
         controller.start()
         advanceUntilIdle()
 
@@ -76,7 +85,7 @@ class PresenceControllerTest {
     fun actionablePresenceOverridesGatekeeperWorkingState() = runTest {
         val repository = ActionsRepository()
         val gatekeeper = FakeGatekeeperOutputSource()
-        val controller = PresenceController(repository, gatekeeper, testScope(testScheduler))
+        val controller = PresenceController(repository, gatekeeper, emptySpecialtyCards(), testScope(testScheduler))
         controller.start()
         advanceUntilIdle()
         gatekeeper.emit(gatekeeperResult(triggeredFulfillment = true))
@@ -107,6 +116,10 @@ class PresenceControllerTest {
 
     private fun testScope(scheduler: TestCoroutineScheduler): CoroutineScope =
         CoroutineScope(UnconfinedTestDispatcher(scheduler))
+
+    private fun emptySpecialtyCards(): PresenceSpecialtyCards = io.mockk.mockk {
+        io.mockk.every { cards } returns kotlinx.coroutines.flow.MutableStateFlow(emptyList())
+    }
 
     private class FakeGatekeeperOutputSource : GatekeeperOutputSource {
         private val mutable = MutableSharedFlow<GatekeepingResult>(extraBufferCapacity = 16)

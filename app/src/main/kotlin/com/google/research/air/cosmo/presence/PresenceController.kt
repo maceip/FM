@@ -22,10 +22,11 @@ class PresenceController
 constructor(
     private val actionsRepository: ActionsRepositoryContract,
     private val gatekeeperOutput: GatekeeperOutputSource,
+    private val specialtyCards: PresenceSpecialtyCards,
     @ApplicationScope private val scope: CoroutineScope
 ) : AutoCloseable {
     private val gatekeeperState = MutableStateFlow<GatekeepingResult?>(null)
-    private val _state = MutableStateFlow<PresenceState>(PresenceState.Hidden)
+    private val _state = MutableStateFlow<PresenceState>(IDLE_PRESENCE_STATE)
     private var gatekeeperJob: Job? = null
     private var stateJob: Job? = null
 
@@ -43,8 +44,10 @@ constructor(
                     actionsRepository.userFacingActions,
                     actionsRepository.lastFulfillmentId,
                     gatekeeperState,
-                    ::buildPresenceState
-                ).collect { next -> _state.value = next }
+                    specialtyCards.cards
+                ) { actions, fulfillmentId, gatekeeper, specialty ->
+                    buildPresenceState(actions, fulfillmentId, gatekeeper, specialty)
+                }.collect { next -> _state.value = next }
             }
     }
 
@@ -60,8 +63,18 @@ constructor(
     private fun buildPresenceState(
         actions: List<FulfillmentAction>,
         fulfillmentId: String?,
-        gatekeeper: GatekeepingResult?
+        gatekeeper: GatekeepingResult?,
+        specialty: List<PresenceCard>
     ): PresenceState {
+        if (specialty.isNotEmpty()) {
+            return PresenceState.Ready(
+                taskId = "specialty",
+                cards = specialty,
+                primaryAction = specialty.firstNotNullOfOrNull { card ->
+                    card.actions.firstOrNull { it.type == CardActionType.PRIMARY }
+                }
+            )
+        }
         if (actions.isNotEmpty()) {
             val cards = actions.map { it.toPresenceCard() }
             return PresenceState.Ready(
@@ -77,7 +90,7 @@ constructor(
 
     private fun GatekeepingResult?.toPresenceState(): PresenceState =
         when {
-            this == null -> PresenceState.Hidden
+            this == null -> IDLE_PRESENCE_STATE
             triggeredFulfillment ->
                 PresenceState.Working(
                     taskId = "gatekeeper-$timestampMillis",
@@ -85,7 +98,7 @@ constructor(
                     pillText = topSkillLabel()
                 )
             detectedSkills.isNotEmpty() -> PresenceState.Parked(PresenceMode.ORB, OrbActivity.LISTENING)
-            else -> PresenceState.Hidden
+            else -> IDLE_PRESENCE_STATE
         }
 
     private fun GatekeepingResult.topSkillLabel(): String =
@@ -93,4 +106,8 @@ constructor(
             .maxByOrNull { it.confidence }
             ?.let { "${it.skillId} ${(it.confidence * 100).roundToInt()}%" }
             ?: "Processing context"
+
+    companion object {
+        val IDLE_PRESENCE_STATE: PresenceState = PresenceState.Parked(PresenceMode.ORB, OrbActivity.IDLE)
+    }
 }

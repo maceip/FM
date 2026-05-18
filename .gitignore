@@ -46,16 +46,17 @@ __pycache__/
 # Test / smoke run artifacts
 artifacts/
 /tmp/
+.codex/
 
 # Logs
 *.log
 hs_err_pid*.log
 
-# Recovered cosmo assets (provisioned via scripts/download-models.sh; SHA-256
-# verified against app/src/main/assets/model-manifest.json and the SODA pack
-# manifest. Not tracked in git — GitHub rejects files >100MB and the assets
-# come from ~/Downloads/cosmo_recovered_large_assets/ and
-# ~/Downloads/cosmo_recovered_native_libs/).
+# Recovered/runtime binary assets. Hydrate from private S3 with
+# scripts/runtime-binaries.sh; verify APK model assets with
+# scripts/download-models.sh --verify-only and SODA packs with
+# scripts/verify-soda-assets.sh. These are not tracked in git because several
+# exceed GitHub's 100 MB limit and the byte source must not be a dev laptop.
 app/src/main/assets/models/*.tflite
 app/src/main/assets/models/tts/
 app/src/main/assets/soda/*.zip

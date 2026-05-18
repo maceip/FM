@@ -2,10 +2,14 @@ package com.google.research.air.cosmo.presence.overlay
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Build
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.window.BackEvent
+import android.window.OnBackAnimationCallback
+import android.window.OnBackInvokedCallback
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -20,6 +24,7 @@ class AndroidPresenceOverlayWindowHost(
     private var composeView: ComposeView? = null
     private var viewTreeOwner: PresenceOverlayViewTreeOwner? = null
     private var attached: Boolean = false
+    private var backCallback: OnBackInvokedCallback? = null
 
     override fun show(state: PresenceOverlayUiState): Result<Unit> =
         runCatching {
@@ -30,6 +35,7 @@ class AndroidPresenceOverlayWindowHost(
             } else {
                 windowManager.updateViewLayout(view, layoutParamsFor(state.route))
             }
+            syncPredictiveBackCallback(view, state.route)
         }
 
     override fun update(state: PresenceOverlayUiState): Result<Unit> =
@@ -41,6 +47,7 @@ class AndroidPresenceOverlayWindowHost(
                 windowManager.addView(view, layoutParamsFor(state.route))
                 attached = true
             }
+            syncPredictiveBackCallback(view, state.route)
         }
 
     override fun hide(): Result<Unit> =
@@ -50,6 +57,7 @@ class AndroidPresenceOverlayWindowHost(
                 windowManager.removeViewImmediate(view)
             }
             attached = false
+            unregisterPredictiveBackCallback(view)
             view.disposeComposition()
             composeView = null
             viewTreeOwner?.destroy()
@@ -84,6 +92,47 @@ class AndroidPresenceOverlayWindowHost(
         }
     }
 
+    private fun syncPredictiveBackCallback(view: View, route: PresenceOverlayRoute) {
+        if (!PresenceOverlayFocusPolicy.acceptsBackKey(route)) {
+            unregisterPredictiveBackCallback(view)
+            return
+        }
+        if (backCallback != null) return
+        val dispatcher = view.findOnBackInvokedDispatcher() ?: return
+        val callback =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                object : OnBackAnimationCallback {
+                    override fun onBackStarted(backEvent: BackEvent) {
+                        onEvent(PresenceOverlayEvent.BackStarted)
+                    }
+
+                    override fun onBackProgressed(backEvent: BackEvent) {
+                        onEvent(PresenceOverlayEvent.BackProgressed(backEvent.progress))
+                    }
+
+                    override fun onBackCancelled() {
+                        onEvent(PresenceOverlayEvent.BackCancelled)
+                    }
+
+                    override fun onBackInvoked() {
+                        onEvent(PresenceOverlayEvent.Back)
+                    }
+                }
+            } else {
+                OnBackInvokedCallback {
+                    onEvent(PresenceOverlayEvent.Back)
+                }
+            }
+        dispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
+        backCallback = callback
+    }
+
+    private fun unregisterPredictiveBackCallback(view: View) {
+        val callback = backCallback ?: return
+        view.findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(callback)
+        backCallback = null
+    }
+
     private fun ComposeView.setOverlayContent(state: PresenceOverlayUiState) {
         isFocusable = PresenceOverlayFocusPolicy.acceptsBackKey(state.route)
         isFocusableInTouchMode = PresenceOverlayFocusPolicy.acceptsBackKey(state.route)
@@ -100,6 +149,12 @@ class AndroidPresenceOverlayWindowHost(
             } else {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
             }
+        val touchFlag =
+            if (PresenceOverlayFocusPolicy.acceptsTouch(route)) {
+                0
+            } else {
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            }
         return WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -107,7 +162,8 @@ class AndroidPresenceOverlayWindowHost(
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                focusFlag,
+                focusFlag or
+                touchFlag,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START

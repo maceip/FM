@@ -12,6 +12,9 @@ class PresenceOverlayBackStack(
         state =
             when (event) {
                 PresenceOverlayEvent.Back -> onBack()
+                PresenceOverlayEvent.BackStarted -> state.copy(backProgress = 0.02f)
+                PresenceOverlayEvent.BackCancelled -> state.copy(backProgress = 0f)
+                is PresenceOverlayEvent.BackProgressed -> state.copy(backProgress = event.progress.coerceIn(0f, 1f))
                 PresenceOverlayEvent.Collapse -> collapse()
                 PresenceOverlayEvent.Dismiss -> hidden(state.presenceState, state.canDrawOverlays)
                 PresenceOverlayEvent.Expand -> push(PresenceOverlayRoute.EXPANDED_TAB)
@@ -22,7 +25,8 @@ class PresenceOverlayBackStack(
                     state.copy(
                         route = PresenceOverlayRoute.ERROR,
                         backStack = listOf(PresenceOverlayRoute.ERROR),
-                        lastError = event.message
+                        lastError = event.message,
+                        backProgress = 0f
                     )
             }
         return state
@@ -34,7 +38,8 @@ class PresenceOverlayBackStack(
                 route = PresenceOverlayRoute.PERMISSION_REQUIRED,
                 presenceState = next,
                 backStack = listOf(PresenceOverlayRoute.PERMISSION_REQUIRED),
-                lastError = null
+                    lastError = null,
+                    backProgress = 0f
             )
         }
 
@@ -46,7 +51,8 @@ class PresenceOverlayBackStack(
                     route = PresenceOverlayRoute.PARKED,
                     presenceState = next,
                     backStack = listOf(PresenceOverlayRoute.PARKED),
-                    lastError = null
+                    lastError = null,
+                    backProgress = 0f
                 )
             is PresenceState.Working,
             is PresenceState.NeedsInput ->
@@ -54,14 +60,16 @@ class PresenceOverlayBackStack(
                     route = PresenceOverlayRoute.EXPANDED_TAB,
                     presenceState = next,
                     backStack = listOf(PresenceOverlayRoute.PARKED, PresenceOverlayRoute.EXPANDED_TAB),
-                    lastError = null
+                    lastError = null,
+                    backProgress = 0f
                 )
             is PresenceState.Ready ->
                 state.copy(
                     route = PresenceOverlayRoute.CARD_STACK,
                     presenceState = next,
                     backStack = listOf(PresenceOverlayRoute.PARKED, PresenceOverlayRoute.EXPANDED_TAB, PresenceOverlayRoute.CARD_STACK),
-                    lastError = null
+                    lastError = null,
+                    backProgress = 0f
                 )
         }
     }
@@ -80,9 +88,14 @@ class PresenceOverlayBackStack(
     }
 
     private fun onBack(): PresenceOverlayUiState {
-        if (state.backStack.size <= 1) return hidden(state.presenceState, state.canDrawOverlays)
+        if (state.route == PresenceOverlayRoute.PARKED) {
+            return state.copy(backProgress = 0f, lastError = null)
+        }
+        if (state.backStack.size <= 1) {
+            return collapse()
+        }
         val nextStack = state.backStack.dropLast(1)
-        return state.copy(route = nextStack.last(), backStack = nextStack, lastError = null)
+        return state.copy(route = nextStack.last(), backStack = nextStack, lastError = null, backProgress = 0f)
     }
 
     private fun collapse(): PresenceOverlayUiState {
@@ -90,7 +103,8 @@ class PresenceOverlayBackStack(
         return state.copy(
             route = PresenceOverlayRoute.PARKED,
             backStack = listOf(PresenceOverlayRoute.PARKED),
-            lastError = null
+            lastError = null,
+            backProgress = 0f
         )
     }
 
@@ -100,7 +114,8 @@ class PresenceOverlayBackStack(
                 state.copy(
                     route = PresenceOverlayRoute.CARD_STACK,
                     backStack = listOf(PresenceOverlayRoute.PARKED, PresenceOverlayRoute.EXPANDED_TAB, PresenceOverlayRoute.CARD_STACK),
-                    lastError = null
+                    lastError = null,
+                    backProgress = 0f
                 )
             else -> push(PresenceOverlayRoute.EXPANDED_TAB)
         }
@@ -108,7 +123,7 @@ class PresenceOverlayBackStack(
     private fun push(route: PresenceOverlayRoute): PresenceOverlayUiState {
         if (state.route == PresenceOverlayRoute.HIDDEN || state.route == PresenceOverlayRoute.PERMISSION_REQUIRED) return state
         val stack = if (route in state.backStack) state.backStack.takeWhile { it != route } + route else state.backStack + route
-        return state.copy(route = route, backStack = stack, lastError = null)
+        return state.copy(route = route, backStack = stack, lastError = null, backProgress = 0f)
     }
 
     private fun hidden(presenceState: PresenceState, canDrawOverlays: Boolean): PresenceOverlayUiState =

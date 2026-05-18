@@ -103,16 +103,19 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 | Nav3 with per-tab stacks + predictive back | 🟩🟩🟩🟩🟩 | `NavDisplay`; adaptive support-pane scene strategy for foldables/tablets |
 | 25 Hilt-multibound debug panels | 🟩🟩🟩🟩🟩 | Live controller jobs, settings, LLM stats, gatekeeper output, buffer sizes, skill registry, manifest state, presence overlay |
 | Route-state JSON persistence | 🟩🟩🟩🟩🟩 | TaskMonitor token round-trip, corrupted route rejection, tab-history restore |
-| Presence overlay window | 🟩🟩🟩⬜⬜ | Orb/tab/card-stack surfaces hosted in `TYPE_APPLICATION_OVERLAY`; permission-gated with unit coverage and debug-panel controls |
+| Presence overlay window | 🟩🟩🟩🟩⬜ | Orb/tab/card-stack surfaces hosted in `TYPE_APPLICATION_OVERLAY`; idle/specialty/action states, predictive back, and debug-panel controls; full result/projected-XR consumers remain |
 | Glass / XR surface | 🟩🟩🟩🟩⬜ | Activity bound; capture consumer wiring partial |
 
-### Voice output (intentionally deferred)
+### Voice output
 
 | Subsystem | Progress | Notes |
 |---|---|---|
+| Sherpa KittenTTS `VoiceOutput` | 🟩🟩🟩🟩🟨 | Implemented as the launch voice path; Pixel 10 smoke test produced device audio; listen/latency bakeoff continues |
+| Android `TextToSpeech` fallback | 🟩🟩🟩🟩🟩 | Emergency fallback behind the same `VoiceOutput` interface |
+| AudioTrack streaming renderer | 🟩🟩🟩🟩🟨 | Sherpa callback streams PCM directly to `AudioTrack`; standalone Cosmo-style renderer/resampler remains optional |
 | VoiceLM / SoundStream (generative voice) | ⬜⬜⬜⬜⬜ | Recovered to disk; not bundled; one asset truncated in recovery |
 | Vogo native lib (`libvogo_jni.so`) | ⬜⬜⬜⬜⬜ | Recovered; not bundled |
-| `lib/tts/*` (TTS interface, AudioRenderer/Resampler) | ⬜⬜⬜⬜⬜ | Not ported. Architectural slot reserved |
+| `lib/tts/*` recovered-compatible facade | ⬜⬜⬜⬜⬜ | Not ported. Launch code uses `lib/voice/VoiceOutput`; exact VoiceLM/Vogo facade remains research-only |
 
 ---
 
@@ -131,12 +134,24 @@ scripts/dev-loop.sh --help           # all flags
 Requires an attached device or running emulator (`adb devices` should list
 one). Reads `ANDROID_SERIAL` for targeting if multiple are connected.
 
-**First-time setup on a new machine** — provision the gitignored recovered
-binaries (TFLites, SODA packs, JNI .so) from `~/Downloads/cosmo_recovered_*`:
+**First-time setup on a new machine** — hydrate the gitignored runtime
+binaries (TFLites, SODA packs, JNI `.so`) from the private S3 binary store:
 
 ```bash
-scripts/provision-from-recovery.sh   # copies binaries into the assets/jniLibs tree
+scripts/runtime-binaries.sh download
+scripts/download-models.sh --verify-only
+scripts/verify-soda-assets.sh
 ```
+
+The optional local LiteRT-LM dogfood model is large and stays out of the APK.
+Hydrate it when you need the local LLM fallback:
+
+```bash
+scripts/runtime-binaries.sh download --include-optional
+```
+
+`scripts/provision-from-recovery.sh` remains a fallback for re-copying from a
+local APK-recovery directory, but it is no longer the source of truth.
 
 **Standalone Gradle commands:**
 

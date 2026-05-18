@@ -52,7 +52,7 @@ object PresenceTokens {
         val tabIdleWidth: Dp = 12.dp
         val tabIdleHeight: Dp = 180.dp
         val tabExpandedWidth: Dp = 350.dp
-        val tabExpandedHeight: Dp = 160.dp
+        val tabExpandedHeight: Dp = 172.dp
         val tabCorner: Dp = 80.dp
 
         val cardCorner: Dp = 16.dp

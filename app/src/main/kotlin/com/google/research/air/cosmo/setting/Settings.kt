@@ -185,6 +185,10 @@ constructor(
 
     fun isDeviceControlEnabled(): Boolean = currentSetting.deviceControlEnabled
 
+    fun isOnboardingCompleted(): Boolean = currentSetting.onboardingCompleted
+
+    suspend fun markOnboardingCompleted() = update { onboardingCompleted = true }
+
     suspend fun update(transform: CosmoSetting.Builder.() -> Unit) {
         dataStore.updateData { current -> current.toBuilder().apply(transform).build() }
     }

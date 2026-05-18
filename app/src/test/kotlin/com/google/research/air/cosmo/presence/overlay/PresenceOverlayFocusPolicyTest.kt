@@ -15,4 +15,15 @@ class PresenceOverlayFocusPolicyTest {
         assertTrue(PresenceOverlayFocusPolicy.acceptsBackKey(PresenceOverlayRoute.EXPANDED_TAB))
         assertTrue(PresenceOverlayFocusPolicy.acceptsBackKey(PresenceOverlayRoute.CARD_STACK))
     }
+
+    @Test
+    fun onlyExpandedInteractiveRoutesAcceptTouch() {
+        assertFalse(PresenceOverlayFocusPolicy.acceptsTouch(PresenceOverlayRoute.HIDDEN))
+        assertFalse(PresenceOverlayFocusPolicy.acceptsTouch(PresenceOverlayRoute.PARKED))
+        assertFalse(PresenceOverlayFocusPolicy.acceptsTouch(PresenceOverlayRoute.PERMISSION_REQUIRED))
+        assertFalse(PresenceOverlayFocusPolicy.acceptsTouch(PresenceOverlayRoute.ERROR))
+
+        assertTrue(PresenceOverlayFocusPolicy.acceptsTouch(PresenceOverlayRoute.EXPANDED_TAB))
+        assertTrue(PresenceOverlayFocusPolicy.acceptsTouch(PresenceOverlayRoute.CARD_STACK))
+    }
 }

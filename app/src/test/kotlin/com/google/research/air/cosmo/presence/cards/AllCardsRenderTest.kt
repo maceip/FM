@@ -1,14 +1,17 @@
 package com.google.research.air.cosmo.presence.cards
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import com.google.research.air.cosmo.presence.CardAction
 import com.google.research.air.cosmo.presence.CardPayload
 import com.google.research.air.cosmo.presence.CheckItem
 import com.google.research.air.cosmo.presence.CitationEntry
+import com.google.research.air.cosmo.presence.OnboardingCheckpoint
 import com.google.research.air.cosmo.presence.PresenceCard
 import com.google.research.air.cosmo.presence.Recipient
 import com.google.research.air.cosmo.presence.Reminder
+import com.google.research.air.cosmo.presence.SettingItem
 import com.google.research.air.cosmo.presence.Source
 import com.google.research.air.cosmo.presence.Thumbnail
 import com.google.research.air.cosmo.presence.surfaces.CardStackSurface
@@ -52,20 +55,37 @@ class AllCardsRenderTest {
         "sourceCitation" to CardPayload.SourceCitation(
             citations = listOf(CitationEntry("Paper A", "https://a.com", 92, "Relevant"))
         ),
-        "permission" to CardPayload.PermissionConfirmation(prompt = "Send?", actionLabel = "Send")
+        "permission" to CardPayload.PermissionConfirmation(prompt = "Send?", actionLabel = "Send"),
+        "settings" to CardPayload.Settings(items = listOf(SettingItem("Dark Mode", enabled = true))),
+        "onboarding" to CardPayload.Onboarding(body = "Welcome", checkpoints = listOf(OnboardingCheckpoint("Setup", complete = true)))
     )
 
     @Test
-    fun `all 12 card types render without crash`() {
-        val cards = samplePayloads.mapIndexed { i, (id, payload) ->
+    fun `all card types render without crash`() {
+        rule.setContent {
+            Column {
+                samplePayloads.forEach { (id, payload) ->
+                    val card = PresenceCard(id = id, payload = payload, actions = listOf(CardAction("act", "Action")))
+                    CardStackSurface(cards = listOf(card))
+                }
+            }
+        }
+        samplePayloads.forEach { (id, _) ->
+            rule.onNodeWithTag("card_$id").assertExists()
+        }
+    }
+
+    @Test
+    fun `large stacks expose bounded visible depth`() {
+        val cards = samplePayloads.take(10).map { (id, payload) ->
             PresenceCard(id = id, payload = payload, actions = listOf(CardAction("act", "Action")))
         }
         rule.setContent {
             CardStackSurface(cards = cards)
         }
         rule.onNodeWithTag("cardStack").assertExists()
-        samplePayloads.forEach { (id, _) ->
-            rule.onNodeWithTag("card_$id").assertExists()
+        cards.take(4).forEach { card ->
+            rule.onNodeWithTag("card_${card.id}").assertExists()
         }
     }
 

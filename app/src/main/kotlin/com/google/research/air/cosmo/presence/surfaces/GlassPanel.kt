@@ -48,20 +48,29 @@ fun GlassPanel(
                 spotColor = glowColor.copy(alpha = if (showGlowEdge) 0.22f else 0.08f)
             )
             .clip(shape)
-            .background(fill, shape)
-            .border(1.dp, borderColor, shape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.08f),
+                        fill.copy(alpha = 0.92f),
+                        Color.Black.copy(alpha = 0.42f)
+                    )
+                ),
+                shape
+            )
+            .border(1.dp, if (showGlowEdge) PresenceTokens.Palette.BorderBright else borderColor, shape)
             .drawBehind {
                 // Top and bottom edge highlights create the machined glass outline from the comps.
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.48f), Color.Transparent)
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.72f), Color.Transparent)
                     ),
                     topLeft = Offset.Zero,
                     size = Size(size.width, 1.dp.toPx())
                 )
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent)
+                        colors = listOf(Color.White.copy(alpha = 0.32f), Color.Transparent)
                     ),
                     topLeft = Offset.Zero,
                     size = Size(1.dp.toPx(), size.height)
@@ -69,7 +78,7 @@ fun GlassPanel(
                 // bottom-edge subtle line
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Color.Transparent, PresenceTokens.Palette.BorderDim, Color.Transparent)
+                        colors = listOf(Color.Transparent, PresenceTokens.Palette.BorderBright.copy(alpha = 0.28f), Color.Transparent)
                     ),
                     topLeft = Offset(0f, size.height - 1.dp.toPx()),
                     size = Size(size.width, 1.dp.toPx())
@@ -112,7 +121,7 @@ private fun GlowEdgeStrip(
     Box(
         modifier = modifier
             .width(PresenceTokens.Glow.cardEdgeGlowWidth)
-            .height(60.dp) // ~60% of card height
+            .height(104.dp)
             .drawBehind {
                 drawRoundRect(
                     color = color,

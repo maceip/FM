@@ -38,7 +38,7 @@ enum class CardActionType { DEFAULT, PRIMARY, DESTRUCTIVE, COLLAPSE }
 
 // endregion
 
-// region Card capability payloads (12 sealed subtypes)
+// region Card capability payloads (12 agent cards + settings/onboarding placeholders)
 
 sealed interface CardPayload {
 
@@ -113,6 +113,19 @@ sealed interface CardPayload {
         val actionLabel: String,
         val undoable: Boolean = true
     ) : CardPayload
+
+    data class Settings(
+        val section: String = "SYSTEM SETTINGS",
+        val items: List<SettingItem> = emptyList()
+    ) : CardPayload
+
+    data class Onboarding(
+        val step: Int = 1,
+        val totalSteps: Int = 5,
+        val title: String = "WELCOME & SETUP",
+        val body: String,
+        val checkpoints: List<OnboardingCheckpoint> = emptyList()
+    ) : CardPayload
 }
 
 // endregion
@@ -139,6 +152,17 @@ data class CitationEntry(
     val url: String,
     val confidence: Int,
     val reason: String? = null
+)
+
+data class SettingItem(
+    val label: String,
+    val enabled: Boolean = false,
+    val value: String? = null
+)
+
+data class OnboardingCheckpoint(
+    val label: String,
+    val complete: Boolean = false
 )
 
 // endregion

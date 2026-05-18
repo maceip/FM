@@ -101,7 +101,7 @@ fun TabSurface(
 
 @Composable
 private fun IdleSliver(animationPhase: Float, onTap: () -> Unit) {
-    val sliverShape = RoundedCornerShape(topStart = 999.dp, bottomStart = 999.dp)
+    val sliverShape = RoundedCornerShape(999.dp)
     Box(
         modifier = Modifier
             .width(PresenceTokens.Size.tabIdleWidth)
@@ -126,7 +126,7 @@ private fun IdleSliver(animationPhase: Float, onTap: () -> Unit) {
             .drawBehind {
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.62f), Color.Transparent)
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.50f), Color.Transparent)
                     ),
                     topLeft = Offset.Zero,
                     size = Size(1.dp.toPx(), size.height)
@@ -139,19 +139,32 @@ private fun IdleSliver(animationPhase: Float, onTap: () -> Unit) {
                     size = Size(1.dp.toPx(), size.height)
                 )
                 val glintY = size.height * (0.18f + 0.64f * animationPhase)
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.92f), Color.Transparent)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.86f),
+                            PresenceTokens.Palette.CyanDim.copy(alpha = 0.42f),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width / 2f, glintY),
+                        radius = 28.dp.toPx()
                     ),
-                    topLeft = Offset(0f, glintY - 24.dp.toPx()),
-                    size = Size(size.width, 48.dp.toPx())
+                    radius = 28.dp.toPx(),
+                    center = Offset(size.width / 2f, glintY)
                 )
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Color.Transparent, PresenceTokens.Palette.CyanDim.copy(alpha = 0.92f), Color.Transparent)
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.95f), PresenceTokens.Palette.CyanDim.copy(alpha = 0.92f), Color.Transparent)
                     ),
-                    topLeft = Offset(-28.dp.toPx(), glintY - 0.5.dp.toPx()),
-                    size = Size(68.dp.toPx(), 1.dp.toPx())
+                    topLeft = Offset(-32.dp.toPx(), glintY - 0.5.dp.toPx()),
+                    size = Size(76.dp.toPx(), 1.dp.toPx())
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.88f), Color.Transparent)
+                    ),
+                    topLeft = Offset(size.width / 2f - 0.5.dp.toPx(), glintY - 56.dp.toPx()),
+                    size = Size(1.dp.toPx(), 112.dp.toPx())
                 )
                 drawRect(
                     color = PresenceTokens.Palette.Magenta.copy(alpha = 0.75f),
@@ -166,14 +179,14 @@ private fun IdleSliver(animationPhase: Float, onTap: () -> Unit) {
         // lens flare core
         Box(
             Modifier
-                .size(width = 2.dp, height = 12.dp)
+                .size(width = 2.dp, height = 18.dp)
                 .clip(RoundedCornerShape(50))
-                .background(PresenceTokens.Palette.CyanDim)
+                .background(Color.White.copy(alpha = 0.82f))
                 .drawBehind {
                     // horizontal lens flare
                     drawRect(
                         brush = Brush.horizontalGradient(
-                            colors = listOf(Color.Transparent, PresenceTokens.Palette.CyanDim.copy(alpha = 0.8f), Color.Transparent)
+                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.90f), PresenceTokens.Palette.CyanDim.copy(alpha = 0.72f), Color.Transparent)
                         ),
                         topLeft = Offset(-30.dp.toPx(), size.height / 2 - 0.5.dp.toPx()),
                         size = androidx.compose.ui.geometry.Size(60.dp.toPx(), 1.dp.toPx())
@@ -216,10 +229,11 @@ private fun ExpandedPill(
             .clickable(onClick = onTap),
         shape = pillShape,
         fill = PresenceTokens.Palette.SurfaceGlassMedium,
-        showGlowEdge = edgeDocked
+        borderColor = PresenceTokens.Palette.BorderBright,
+        showGlowEdge = true
     ) {
         Row(
-            Modifier.padding(start = 28.dp, top = 18.dp, end = 30.dp, bottom = 18.dp),
+            Modifier.padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             RadarGauge(modifier = Modifier.size(112.dp), animationPhase = animationPhase)
@@ -253,34 +267,37 @@ private fun ExpandedPill(
                         .height(1.dp)
                         .background(PresenceTokens.Palette.CyanDim.copy(alpha = 0.5f))
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
                 readouts.forEach { (label, value) ->
                     ReadoutRow(label = label, value = value)
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(7.dp))
                 }
             }
         }
-        if (edgeDocked) {
-            Box(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(4.dp)
-                    .height(52.dp)
-                    .drawBehind {
-                        drawRoundRect(
-                            color = Color.White.copy(alpha = 0.9f),
-                            size = Size(size.width, size.height)
-                        )
-                        drawRect(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(PresenceTokens.Palette.CyanDim.copy(alpha = 0.35f), Color.White.copy(alpha = 0.85f))
-                            ),
-                            topLeft = Offset(-32.dp.toPx(), 0f),
-                            size = Size(36.dp.toPx(), size.height)
-                        )
-                    }
-            )
-        }
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .width(10.dp)
+                .height(78.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                PresenceTokens.Palette.CyanDim.copy(alpha = 0.38f),
+                                Color.White.copy(alpha = 0.96f)
+                            )
+                        ),
+                        topLeft = Offset(-28.dp.toPx(), 0f),
+                        size = Size(38.dp.toPx(), size.height)
+                    )
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.92f),
+                        topLeft = Offset(size.width - 1.5.dp.toPx(), 0f),
+                        size = Size(1.5.dp.toPx(), size.height)
+                    )
+                }
+        )
     }
 }
 

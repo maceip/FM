@@ -249,6 +249,28 @@ tasks.register<Exec>("verifySodaAssets") {
     commandLine("bash", *args.toTypedArray())
 }
 
+val fmUiComposeScreenshotDir = rootProject.layout.projectDirectory.dir("artifacts/fm_ui/generated-compose")
+
+tasks.register("generateFmUiComposeScreenshots") {
+    group = "verification"
+    description =
+        "Generates PNG screenshots for the FM UI Compose @Preview fixtures into artifacts/fm_ui/generated-compose."
+
+    dependsOn("testDebugUnitTest")
+
+    doLast {
+        val outputDir = fmUiComposeScreenshotDir.asFile
+        val pngs = outputDir.listFiles { file -> file.extension == "png" }.orEmpty()
+        check(pngs.isNotEmpty()) {
+            "No FM UI Compose screenshots were generated in ${outputDir.absolutePath}"
+        }
+        logger.lifecycle("Generated ${pngs.size} FM UI Compose screenshots in ${outputDir.relativeTo(rootProject.projectDir)}")
+        pngs.sortedBy { it.name }.forEach { file ->
+            logger.lifecycle(" - ${file.relativeTo(rootProject.projectDir)}")
+        }
+    }
+}
+
 afterEvaluate {
     tasks
         .matching { it.name in setOf("assembleDebug", "assembleRelease", "bundleRelease") }
@@ -263,6 +285,21 @@ afterEvaluate {
             )
         }
         .configureEach { dependsOn("verifySodaAssets") }
+}
+
+gradle.taskGraph.whenReady {
+    if (!hasTask(":app:generateFmUiComposeScreenshots")) return@whenReady
+
+    tasks.named<Test>("testDebugUnitTest").configure {
+        outputs.upToDateWhen { false }
+        systemProperty("cosmo.captureFmUiScreenshots", "true")
+        systemProperty("cosmo.fmUiScreenshotDir", fmUiComposeScreenshotDir.asFile.absolutePath)
+        filter {
+            includeTestsMatching(
+                "com.google.research.air.cosmo.presence.surfaces.FmUiPresenceScreenshotCaptureTest"
+            )
+        }
+    }
 }
 
 gradle.taskGraph.whenReady {
@@ -313,8 +350,8 @@ dependencies {
     // production wiring keeps the binding on UnavailableSodaCapability until on-device
     // verification on Pixel 9/10 lands.
     implementation(files("libs/recovered-soda.jar"))
-    // Official Sherpa-ONNX Android runtime for TTS. The implementation keeps
-    // the same engine/update/playback shape as recovered VoiceLM/Vogo.
+    // Official Sherpa-ONNX Android runtime for Kokoro TTS. The implementation
+    // keeps the same engine/update/playback shape as recovered VoiceLM/Vogo.
     implementation(files("libs/sherpa-onnx-static-link-onnxruntime-1.13.2.aar"))
 
     implementation(libs.aicore)

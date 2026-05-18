@@ -1,5 +1,6 @@
 package com.google.research.air.cosmo.presence.surfaces.cards
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,8 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +46,7 @@ internal fun CardHeader(categoryLabel: String, title: String) {
                 .border(1.dp, PresenceTokens.Palette.BorderBright, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.7f)))
+            HeaderIcon(categoryLabel)
         }
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -61,10 +62,10 @@ internal fun CardHeader(categoryLabel: String, title: String) {
                             )
                         }
                 )
-                Text(categoryLabel, color = PresenceTokens.Palette.CyanDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Text(categoryLabel, color = PresenceTokens.Palette.CyanDim, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             }
             Spacer(Modifier.height(4.dp))
-            Text(title, color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 3.sp, modifier = Modifier.testTag("cardTitle"))
+            Text(title, color = Color.White, fontSize = 15.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Normal, letterSpacing = 3.sp, modifier = Modifier.testTag("cardTitle"))
         }
     }
 }
@@ -86,7 +87,7 @@ internal fun ActionButtonGrid(cardId: String, actions: List<CardAction>, onActio
                     .background(Color.Black.copy(alpha = 0.18f))
                     .border(1.dp, PresenceTokens.Palette.BorderDim, RoundedCornerShape(8.dp))
                     .clickable { onAction(cardId, action.id) }
-                    .padding(vertical = 8.dp, horizontal = 6.dp)
+                    .padding(vertical = 9.dp, horizontal = 6.dp)
                     .testTag("action_${action.id}")
             ) {
                 Text(action.label.uppercase(), color = PresenceTokens.Palette.OnSurfaceVariant, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
@@ -101,11 +102,25 @@ internal fun ActionButtonGrid(cardId: String, actions: List<CardAction>, onActio
 @Composable
 internal fun SourceRow(source: Source) {
     Row(Modifier.fillMaxWidth().testTag("source_${source.title}"), verticalAlignment = Alignment.CenterVertically) {
+        val iconLabel = source.iconLabel?.take(3) ?: "?"
+        val iconBackground =
+            when (iconLabel.uppercase()) {
+                "YT" -> Color(0xFFFF2D2D)
+                "Q" -> Color(0xFF05070B)
+                else -> Color.White
+            }
+        val iconForeground =
+            when (iconLabel.uppercase()) {
+                "IBM" -> Color(0xFF326CE5)
+                "YT" -> Color.White
+                "Q" -> Color.White
+                else -> Color.Black
+            }
         Box(
-            Modifier.size(24.dp).clip(RoundedCornerShape(4.dp)).background(Color.White).border(1.dp, PresenceTokens.Palette.BorderDim, RoundedCornerShape(4.dp)),
+            Modifier.size(24.dp).clip(RoundedCornerShape(4.dp)).background(iconBackground).border(1.dp, PresenceTokens.Palette.BorderDim, RoundedCornerShape(4.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Text(source.iconLabel?.take(3) ?: "?", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+            Text(iconLabel, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = iconForeground)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -113,6 +128,36 @@ internal fun SourceRow(source: Source) {
             Text(source.subtitle, color = PresenceTokens.Palette.OnSurfaceDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
         }
         Text("${source.confidence}%", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+    }
+}
+
+@Composable
+private fun HeaderIcon(categoryLabel: String) {
+    Canvas(Modifier.size(18.dp)) {
+        val stroke = Stroke(width = 1.2.dp.toPx())
+        val color = PresenceTokens.Palette.OnSurfaceVariant.copy(alpha = 0.9f)
+        val center = Offset(size.width / 2f, size.height / 2f)
+        when (categoryLabel.uppercase()) {
+            "BROWSER" -> {
+                drawCircle(color = color, radius = size.minDimension * 0.42f, center = center, style = stroke)
+                drawLine(color, Offset(center.x, size.height * 0.14f), Offset(center.x, size.height * 0.86f), strokeWidth = stroke.width)
+                drawLine(color, Offset(size.width * 0.16f, center.y), Offset(size.width * 0.84f, center.y), strokeWidth = stroke.width)
+                drawCircle(color = color.copy(alpha = 0.55f), radius = size.minDimension * 0.22f, center = center, style = stroke)
+            }
+            "MESSAGING" -> {
+                drawLine(color, Offset(size.width * 0.12f, size.height * 0.24f), Offset(size.width * 0.86f, size.height * 0.10f), strokeWidth = stroke.width)
+                drawLine(color, Offset(size.width * 0.86f, size.height * 0.10f), Offset(size.width * 0.56f, size.height * 0.86f), strokeWidth = stroke.width)
+                drawLine(color, Offset(size.width * 0.56f, size.height * 0.86f), Offset(size.width * 0.12f, size.height * 0.24f), strokeWidth = stroke.width)
+                drawLine(color.copy(alpha = 0.7f), Offset(size.width * 0.30f, size.height * 0.34f), Offset(size.width * 0.56f, size.height * 0.86f), strokeWidth = stroke.width)
+            }
+            "CALENDAR" -> {
+                drawRect(color = color, topLeft = Offset(size.width * 0.16f, size.height * 0.22f), size = androidx.compose.ui.geometry.Size(size.width * 0.68f, size.height * 0.58f), style = stroke)
+                drawLine(color, Offset(size.width * 0.16f, size.height * 0.38f), Offset(size.width * 0.84f, size.height * 0.38f), strokeWidth = stroke.width)
+                drawLine(color, Offset(size.width * 0.34f, size.height * 0.12f), Offset(size.width * 0.34f, size.height * 0.28f), strokeWidth = stroke.width)
+                drawLine(color, Offset(size.width * 0.66f, size.height * 0.12f), Offset(size.width * 0.66f, size.height * 0.28f), strokeWidth = stroke.width)
+            }
+            else -> drawCircle(color = color, radius = 2.dp.toPx(), center = center)
+        }
     }
 }
 
@@ -146,13 +191,40 @@ internal fun TimerDisplay(minutes: Int, seconds: Int, modifier: Modifier = Modif
 
 @Composable
 internal fun CheckItemRow(item: CheckItem, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().testTag("check_${item.text}"), verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(
-            checked = item.checked,
-            onCheckedChange = onToggle,
-            colors = CheckboxDefaults.colors(checkedColor = PresenceTokens.Palette.CyanDim, uncheckedColor = PresenceTokens.Palette.OnSurfaceDim)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black.copy(alpha = 0.22f))
+            .border(1.dp, PresenceTokens.Palette.BorderDim, RoundedCornerShape(8.dp))
+            .clickable { onToggle(!item.checked) }
+            .padding(10.dp)
+            .testTag("check_${item.text}"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(16.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .border(1.dp, if (item.checked) PresenceTokens.Palette.CyanDim else PresenceTokens.Palette.OnSurfaceDim, RoundedCornerShape(3.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (item.checked) {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(PresenceTokens.Palette.CyanDim)
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            item.text,
+            color = if (item.checked) PresenceTokens.Palette.OnSurfaceDim else Color.White.copy(alpha = 0.9f),
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace
         )
-        Text(item.text, color = if (item.checked) PresenceTokens.Palette.OnSurfaceDim else Color.White.copy(alpha = 0.9f), fontSize = 11.sp)
     }
 }
 

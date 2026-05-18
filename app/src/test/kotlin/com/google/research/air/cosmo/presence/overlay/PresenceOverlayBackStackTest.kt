@@ -22,13 +22,28 @@ class PresenceOverlayBackStackTest {
     }
 
     @Test
-    fun backNavigatesCardsToTabToParkedToHidden() {
+    fun backNavigatesCardsToTabToParkedAndKeepsParkedVisible() {
         val stack = PresenceOverlayBackStack()
         stack.dispatch(PresenceOverlayEvent.PresenceChanged(readyState()))
 
         assertEquals(PresenceOverlayRoute.EXPANDED_TAB, stack.dispatch(PresenceOverlayEvent.Back).route)
         assertEquals(PresenceOverlayRoute.PARKED, stack.dispatch(PresenceOverlayEvent.Back).route)
-        assertEquals(PresenceOverlayRoute.HIDDEN, stack.dispatch(PresenceOverlayEvent.Back).route)
+        assertEquals(PresenceOverlayRoute.PARKED, stack.dispatch(PresenceOverlayEvent.Back).route)
+    }
+
+    @Test
+    fun predictiveBackProgressResetsOnCancelAndCommit() {
+        val stack = PresenceOverlayBackStack()
+        stack.dispatch(PresenceOverlayEvent.PresenceChanged(readyState()))
+
+        assertEquals(0.02f, stack.dispatch(PresenceOverlayEvent.BackStarted).backProgress, 0.001f)
+        assertEquals(0.7f, stack.dispatch(PresenceOverlayEvent.BackProgressed(0.7f)).backProgress, 0.001f)
+        assertEquals(0f, stack.dispatch(PresenceOverlayEvent.BackCancelled).backProgress, 0.001f)
+
+        stack.dispatch(PresenceOverlayEvent.BackProgressed(0.8f))
+        val committed = stack.dispatch(PresenceOverlayEvent.Back)
+        assertEquals(PresenceOverlayRoute.EXPANDED_TAB, committed.route)
+        assertEquals(0f, committed.backProgress, 0.001f)
     }
 
     @Test

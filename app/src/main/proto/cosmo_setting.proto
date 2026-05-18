@@ -65,6 +65,7 @@ message CosmoSetting {
   bool altair_sync_enabled = 57;
   bool draft_sms_enabled = 58;
   bool play_music_enabled = 59;
+  bool onboarding_completed = 60;
 }
 
 enum ProcessingMode {
