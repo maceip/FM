@@ -194,7 +194,7 @@ android {
     }
 
     androidResources {
-        noCompress += setOf("bin", "jinja2", "task", "textproto", "tflite", "zip")
+        noCompress += setOf("bin", "data", "far", "fst", "jinja2", "onnx", "task", "textproto", "tflite", "zip")
     }
 
     lint {
@@ -313,6 +313,9 @@ dependencies {
     // production wiring keeps the binding on UnavailableSodaCapability until on-device
     // verification on Pixel 9/10 lands.
     implementation(files("libs/recovered-soda.jar"))
+    // Official Sherpa-ONNX Android runtime for TTS. The implementation keeps
+    // the same engine/update/playback shape as recovered VoiceLM/Vogo.
+    implementation(files("libs/sherpa-onnx-static-link-onnxruntime-1.13.2.aar"))
 
     implementation(libs.aicore)
     // Required by the recovered SODA `SodaJniLoader.attemptToLoadFullNativeLibrary` flow,

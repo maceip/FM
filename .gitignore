@@ -57,6 +57,7 @@ hs_err_pid*.log
 # come from ~/Downloads/cosmo_recovered_large_assets/ and
 # ~/Downloads/cosmo_recovered_native_libs/).
 app/src/main/assets/models/*.tflite
+app/src/main/assets/models/tts/
 app/src/main/assets/soda/*.zip
 app/src/main/jniLibs/arm64-v8a/*.so
 # recovered-soda.jar is a Kotlin compile-time dep (small, 3.4 MB) — must be tracked.

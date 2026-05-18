@@ -7,8 +7,8 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.util.Log
-import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -21,6 +21,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 interface VoiceOutput {
+    fun isPlaying(): Boolean
+
     suspend fun speak(text: String): VoiceOutputResult
 
     fun stop()
@@ -50,6 +52,9 @@ constructor(
     private var tts: TextToSpeech? = null
     private var initResult: CompletableDeferred<Int>? = null
     private var configured = false
+    @Volatile private var speaking = false
+
+    override fun isPlaying(): Boolean = speaking || tts?.isSpeaking == true
 
     override suspend fun speak(text: String): VoiceOutputResult =
         withContext(Dispatchers.Main.immediate) {
@@ -72,10 +77,12 @@ constructor(
             engine.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
                     override fun onStart(id: String) {
+                        speaking = true
                         Log.i(TAG, "speak started id=$id chars=${utterance.length}")
                     }
 
                     override fun onDone(id: String) {
+                        speaking = false
                         spoken.complete(
                             VoiceOutputResult.Spoken(
                                 characters = utterance.length,
@@ -87,6 +94,7 @@ constructor(
 
                     @Deprecated("Deprecated in Android framework")
                     override fun onError(id: String) {
+                        speaking = false
                         spoken.complete(VoiceOutputResult.Unavailable("tts_utterance_error"))
                         Log.w(TAG, "speak failed id=$id")
                     }
@@ -95,6 +103,7 @@ constructor(
                         id: String,
                         errorCode: Int
                     ) {
+                        speaking = false
                         spoken.complete(VoiceOutputResult.Unavailable("tts_utterance_error_$errorCode"))
                         Log.w(TAG, "speak failed id=$id errorCode=$errorCode")
                     }
@@ -109,6 +118,7 @@ constructor(
                     utteranceId
                 )
             if (speakResult == TextToSpeech.ERROR) {
+                speaking = false
                 return@withContext VoiceOutputResult.Unavailable("tts_speak_rejected")
             }
             withTimeoutOrNull(SPEAK_TIMEOUT_MS) { spoken.await() }
@@ -119,6 +129,7 @@ constructor(
         }
 
     override fun stop() {
+        speaking = false
         tts?.stop()
     }
 
@@ -127,6 +138,7 @@ constructor(
         tts = null
         initResult = null
         configured = false
+        speaking = false
     }
 
     private fun ensureEngine(): CompletableDeferred<Int> {
@@ -190,8 +202,37 @@ constructor(
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class VoiceOutputModule {
-    @Binds
+object VoiceOutputModule {
+    @Provides
     @Singleton
-    abstract fun bindVoiceOutput(impl: AndroidTextToSpeechVoiceOutput): VoiceOutput
+    fun provideVoiceOutput(
+        sherpa: SherpaVoiceOutput,
+        android: AndroidTextToSpeechVoiceOutput
+    ): VoiceOutput = FallbackVoiceOutput(primary = sherpa, fallback = android)
+}
+
+private class FallbackVoiceOutput(
+    private val primary: VoiceOutput,
+    private val fallback: VoiceOutput
+) : VoiceOutput {
+    override fun isPlaying(): Boolean = primary.isPlaying() || fallback.isPlaying()
+
+    override suspend fun speak(text: String): VoiceOutputResult =
+        when (val result = primary.speak(text)) {
+            is VoiceOutputResult.Unavailable -> {
+                Log.w(TAG, "primary voice output unavailable: ${result.reason}; falling back")
+                fallback.speak(text)
+            }
+
+            else -> result
+        }
+
+    override fun stop() {
+        primary.stop()
+        fallback.stop()
+    }
+
+    private companion object {
+        const val TAG = "VoiceOutput"
+    }
 }

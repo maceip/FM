@@ -1096,12 +1096,12 @@ deeply Google-internal and replaced with off-the-shelf alternatives.
 
 ---
 
-## 16. Voice output (🟢 Kokoro replacement path)
+## 16. Voice output (🟢 Sherpa replacement path)
 
 **Status: active replacement path.** The Android `TextToSpeech` shim verifies
 that spoken output is wired through the app, but real-device quality is not
-acceptable for the product voice. The launch path is now Kokoro 82M ONNX with
-Android `TextToSpeech` retained as the emergency fallback.
+acceptable for the product voice. The launch path is now Sherpa-ONNX KittenTTS
+mini with Android `TextToSpeech` retained as the emergency fallback.
 
 Cosmo's recovered code includes a full on-device TTS stack. Genesis intentionally
 does not depend on that private stack for launch. This section preserves the
@@ -1133,13 +1133,13 @@ Use the existing `lib/voice/VoiceOutput.kt` contract:
 | Slot | Genesis location |
 |---|---|
 | `VoiceOutput` interface | `app/src/main/kotlin/.../lib/voice/VoiceOutput.kt` |
-| Kokoro implementation | `lib/voice/KokoroVoiceOutput.kt` (new) — wraps Sherpa-ONNX or a direct ONNX Runtime backend |
+| Sherpa implementation | `lib/voice/SherpaVoiceOutput.kt` — wraps the selected Sherpa-ONNX TTS backend |
 | Android fallback | `lib/voice/AndroidTextToSpeechVoiceOutput.kt` (split from the current file) |
 | Playback | `AudioTrack` streaming PCM float32/short buffers, matching Cosmo's `AudioRenderer` shape |
-| Assets | External model bundle/cache, not Git. Candidate bundles: `kokoro-int8-en-v0_19`, `kokoro-int8-multi-lang-v1_1`, and direct E2E `aufklarer/Kokoro-82M-ONNX` for comparison |
+| Assets | External model bundle/cache, not Git. Launch bundle: `kitten-mini-en-v0_1-fp16`; comparison bundles: `kokoro-int8-multi-lang-v1_1` and direct E2E `aufklarer/Kokoro-82M-ONNX` |
 
-The first integration should prefer Sherpa-ONNX because it already exposes the
-right Android/Kotlin TTS abstraction:
+The current integration uses Sherpa-ONNX because it already exposes the right
+Android/Kotlin TTS abstraction:
 
 ```
 OfflineTts.generateWithConfigAndCallback(text, GenerationConfig(...)) { samples ->
@@ -1151,6 +1151,16 @@ That is structurally close to Cosmo's `VoiceLMTTS`: initialize one native
 engine, keep a reusable task/runtime object, submit a text utterance, stream
 audio into an `AudioTrack`, and provide `stop()` by cancelling/flushing the
 active utterance.
+
+The selected launch model is `kitten-mini-en-v0_1-fp16`. Kokoro full and int8
+both passed synthesis on Pixel CPU, but were not interactive enough for
+assistant replies. Kitten mini uses the same Sherpa `OfflineTts` callback shape
+and passed direct Pixel instrumentation with first audio at roughly 1.8s. The
+model lives under `app/src/main/assets/models/tts/kitten-mini-en-v0_1-fp16`
+when hydrated, but that directory is gitignored; rehydrate from the public
+Sherpa-ONNX release with `scripts/download-voice-models.sh`. If later hardware
+acceleration makes Kokoro practical, switch only the model bundle; the
+`VoiceOutput` interface and playback architecture stay unchanged.
 
 ### 16.3 Research-only Cosmo placement
 
@@ -1168,7 +1178,7 @@ If VoiceLM/Vogo becomes viable later:
 
 Nothing in the current code should depend on `lib/tts/` for launch. Fulfillment
 action handlers that produce speakable output should depend only on
-`VoiceOutput`; the backend behind that binding can be Kokoro, platform TTS, or a
+`VoiceOutput`; the backend behind that binding can be Sherpa, platform TTS, or a
 future recovered VoiceLM provider.
 
 ---
