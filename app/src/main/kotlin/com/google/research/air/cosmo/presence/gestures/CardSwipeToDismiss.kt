@@ -71,28 +71,21 @@ fun Modifier.cardSwipeToDismiss(
                 var lastTime = System.currentTimeMillis()
                 var lastPos = down.position
 
-                while (true) {
+                var gestureActive = true
+                while (gestureActive) {
                     val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull() ?: break
+                    val change = event.changes.firstOrNull()
 
-                    if (!change.pressed) {
+                    if (change == null) {
+                        gestureActive = false
+                    } else if (!change.pressed) {
                         val dt = (System.currentTimeMillis() - lastTime).coerceAtLeast(1)
                         val velocity = (change.position - lastPos) / (dt.toFloat() / 1000f)
                         val displacement = offset.value
 
-                        val shouldDismiss = when (axis) {
-                            SwipeAxis.HORIZONTAL ->
-                                displacement.x < -dismissPx || velocity.x < -velocityPx
-                            SwipeAxis.VERTICAL ->
-                                displacement.y > dismissPx || velocity.y > velocityPx
-                        }
-
-                        if (shouldDismiss) {
+                        if (shouldDismiss(axis, displacement, velocity, dismissPx, velocityPx)) {
                             scope.launch {
-                                val target = when (axis) {
-                                    SwipeAxis.HORIZONTAL -> Offset(-size.width.toFloat() * 1.5f, displacement.y)
-                                    SwipeAxis.VERTICAL -> Offset(displacement.x, size.height.toFloat() * 1.5f)
-                                }
+                                val target = dismissTarget(axis, displacement, size.width, size.height)
                                 offset.animateTo(target, tween(200))
                                 onDismiss()
                                 offset.snapTo(Offset.Zero)
@@ -108,19 +101,15 @@ fun Modifier.cardSwipeToDismiss(
                                 )
                             }
                         }
-                        break
-                    }
-
-                    val delta = change.positionChange()
-                    if (delta != Offset.Zero) {
-                        val constrained = when (axis) {
-                            SwipeAxis.HORIZONTAL -> Offset(delta.x.coerceAtMost(0f), 0f)
-                            SwipeAxis.VERTICAL -> Offset(0f, delta.y.coerceAtLeast(0f))
+                        gestureActive = false
+                    } else {
+                        val delta = change.positionChange()
+                        if (delta != Offset.Zero) {
+                            scope.launch { offset.snapTo(offset.value + constrainedDelta(axis, delta)) }
+                            lastPos = change.position
+                            lastTime = System.currentTimeMillis()
+                            change.consume()
                         }
-                        scope.launch { offset.snapTo(offset.value + constrained) }
-                        lastPos = change.position
-                        lastTime = System.currentTimeMillis()
-                        change.consume()
                     }
                 }
             }
@@ -128,3 +117,37 @@ fun Modifier.cardSwipeToDismiss(
 }
 
 private enum class SwipeAxis { HORIZONTAL, VERTICAL }
+
+private fun shouldDismiss(
+    axis: SwipeAxis,
+    displacement: Offset,
+    velocity: Offset,
+    dismissPx: Float,
+    velocityPx: Float
+): Boolean =
+    when (axis) {
+        SwipeAxis.HORIZONTAL -> displacement.x < -dismissPx || velocity.x < -velocityPx
+        SwipeAxis.VERTICAL -> displacement.y > dismissPx || velocity.y > velocityPx
+    }
+
+private fun dismissTarget(
+    axis: SwipeAxis,
+    displacement: Offset,
+    width: Int,
+    height: Int
+): Offset =
+    when (axis) {
+        SwipeAxis.HORIZONTAL -> Offset(-width.toFloat() * DISMISS_DISTANCE_SCALE, displacement.y)
+        SwipeAxis.VERTICAL -> Offset(displacement.x, height.toFloat() * DISMISS_DISTANCE_SCALE)
+    }
+
+private fun constrainedDelta(
+    axis: SwipeAxis,
+    delta: Offset
+): Offset =
+    when (axis) {
+        SwipeAxis.HORIZONTAL -> Offset(delta.x.coerceAtMost(0f), 0f)
+        SwipeAxis.VERTICAL -> Offset(0f, delta.y.coerceAtLeast(0f))
+    }
+
+private const val DISMISS_DISTANCE_SCALE = 1.5f

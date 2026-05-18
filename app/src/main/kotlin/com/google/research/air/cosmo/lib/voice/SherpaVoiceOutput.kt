@@ -1,21 +1,16 @@
 package com.google.research.air.cosmo.lib.voice
 
 import android.content.Context
-import android.content.res.AssetManager
-import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
-import android.media.AudioTrack
 import android.os.SystemClock
 import android.util.Log
+import com.google.research.air.cosmo.lib.tts.AudioRenderer
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsKittenModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsSupertonicModelConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -55,21 +50,20 @@ constructor(
             val startedAt = SystemClock.elapsedRealtime()
             val firstAudioAt = AtomicLong(0L)
             runCatching {
-                activeRuntime.audioTrack.pause()
-                activeRuntime.audioTrack.flush()
-                activeRuntime.audioTrack.play()
+                activeRuntime.audioRenderer.reset()
                 val generated =
                     activeRuntime.tts.generateWithConfigAndCallback(
                         text = utterance,
                         config =
                             GenerationConfig(
+                                silenceScale = SILENCE_SCALE,
                                 sid = DEFAULT_SPEAKER_ID,
                                 speed = DEFAULT_SPEED
                             ),
                         callback =
                             PlaybackCallback(
                                 owner = this@SherpaVoiceOutput,
-                                audioTrack = activeRuntime.audioTrack,
+                                audioRenderer = activeRuntime.audioRenderer,
                                 firstAudioAt = firstAudioAt
                             )
                     )
@@ -77,7 +71,7 @@ constructor(
                 val firstAudioMs = firstAudioAt.get().takeIf { it > 0L }?.let { it - startedAt }
                 Log.i(
                     TAG,
-                    "Sherpa TTS speak completed: chars=${utterance.length} " +
+                    "Sherpa Supertonic TTS speak completed: chars=${utterance.length} " +
                         "firstAudioMs=$firstAudioMs totalMs=${completedAt - startedAt} " +
                         "samples=${generated.samples.size}"
                 )
@@ -97,16 +91,12 @@ constructor(
     override fun stop() {
         stopped = true
         playing = false
-        runtime?.audioTrack?.pause()
-        runtime?.audioTrack?.flush()
+        runtime?.audioRenderer?.reset()
     }
 
     private fun ensureRuntime(): Runtime {
         runtime?.let { return it }
-        requireAsset(MODEL_ASSET_PATH)
-        requireAsset(VOICES_ASSET_PATH)
-        requireAsset(TOKENS_ASSET_PATH)
-        val dataDir = copyAssetDirectoryToFiles(ESPEAK_ASSET_DIR)
+        REQUIRED_ASSETS.forEach(::requireAsset)
         val tts =
             OfflineTts(
                 assetManager = context.assets,
@@ -114,13 +104,15 @@ constructor(
                     OfflineTtsConfig(
                         model =
                             OfflineTtsModelConfig(
-                                kitten =
-                                    OfflineTtsKittenModelConfig(
-                                        model = MODEL_ASSET_PATH,
-                                        voices = VOICES_ASSET_PATH,
-                                        tokens = TOKENS_ASSET_PATH,
-                                        dataDir = dataDir.absolutePath,
-                                        lengthScale = LENGTH_SCALE
+                                supertonic =
+                                    OfflineTtsSupertonicModelConfig(
+                                        durationPredictor = DURATION_PREDICTOR_ASSET_PATH,
+                                        textEncoder = TEXT_ENCODER_ASSET_PATH,
+                                        vectorEstimator = VECTOR_ESTIMATOR_ASSET_PATH,
+                                        vocoder = VOCODER_ASSET_PATH,
+                                        ttsJson = TTS_JSON_ASSET_PATH,
+                                        unicodeIndexer = UNICODE_INDEXER_ASSET_PATH,
+                                        voiceStyle = VOICE_STYLE_ASSET_PATH
                                     ),
                                 numThreads = MODEL_THREADS,
                                 debug = false,
@@ -130,8 +122,13 @@ constructor(
                         silenceScale = SILENCE_SCALE
                     )
             )
-        val audioTrack = createAudioTrack(tts.sampleRate())
-        return Runtime(tts = tts, audioTrack = audioTrack).also { runtime = it }
+        val audioRenderer =
+            AudioRenderer(
+                sampleRate = tts.sampleRate(),
+                channelMask = AudioFormat.CHANNEL_OUT_MONO,
+                encoding = AudioFormat.ENCODING_PCM_FLOAT
+            )
+        return Runtime(tts = tts, audioRenderer = audioRenderer).also { runtime = it }
     }
 
     private fun requireAsset(path: String) {
@@ -142,72 +139,8 @@ constructor(
         }
     }
 
-    private fun copyAssetDirectoryToFiles(assetDir: String): File {
-        val targetDir = File(context.filesDir, "voice/sherpa/$assetDir")
-        if (targetDir.isDirectory && File(targetDir, COPY_COMPLETE_MARKER).isFile) {
-            return targetDir
-        }
-        targetDir.deleteRecursively()
-        targetDir.mkdirs()
-        copyAssetTree(context.assets, assetDir, targetDir)
-        File(targetDir, COPY_COMPLETE_MARKER).writeText("ok")
-        return targetDir
-    }
-
-    private fun copyAssetTree(
-        assets: AssetManager,
-        assetPath: String,
-        targetPath: File
-    ) {
-        val children = assets.list(assetPath).orEmpty()
-        if (children.isEmpty()) {
-            targetPath.parentFile?.mkdirs()
-            assets.open(assetPath).use { input ->
-                FileOutputStream(targetPath).use { output -> input.copyTo(output) }
-            }
-            return
-        }
-
-        targetPath.mkdirs()
-        children.forEach { child ->
-            copyAssetTree(
-                assets = assets,
-                assetPath = "$assetPath/$child",
-                targetPath = File(targetPath, child)
-            )
-        }
-    }
-
-    private fun createAudioTrack(sampleRate: Int): AudioTrack {
-        val minBufferSize =
-            AudioTrack.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_FLOAT
-            )
-        val bufferSize = minBufferSize.coerceAtLeast(sampleRate / 2)
-        val attributes =
-            AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                .build()
-        val format =
-            AudioFormat.Builder()
-                .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                .setSampleRate(sampleRate)
-                .build()
-        return AudioTrack(
-            attributes,
-            format,
-            bufferSize,
-            AudioTrack.MODE_STREAM,
-            AudioManager.AUDIO_SESSION_ID_GENERATE
-        )
-    }
-
     private fun releaseRuntime() {
-        runtime?.audioTrack?.release()
+        runtime?.audioRenderer?.release()
         runtime?.tts?.release()
         runtime = null
         stopped = true
@@ -216,12 +149,12 @@ constructor(
 
     private data class Runtime(
         val tts: OfflineTts,
-        val audioTrack: AudioTrack
+        val audioRenderer: AudioRenderer
     )
 
     private class PlaybackCallback(
         private val owner: SherpaVoiceOutput,
-        private val audioTrack: AudioTrack,
+        private val audioRenderer: AudioRenderer,
         private val firstAudioAt: AtomicLong
     ) : (FloatArray) -> Int {
         override fun invoke(samples: FloatArray): Int {
@@ -229,12 +162,7 @@ constructor(
             if (samples.isNotEmpty()) {
                 firstAudioAt.compareAndSet(0L, SystemClock.elapsedRealtime())
             }
-            audioTrack.write(
-                samples,
-                0,
-                samples.size,
-                AudioTrack.WRITE_BLOCKING
-            )
+            audioRenderer.render(samples)
             return CONTINUE_GENERATION
         }
     }
@@ -246,17 +174,28 @@ constructor(
 
     private companion object {
         const val TAG = "SherpaVoiceOutput"
-        const val MODEL_DIR = "models/tts/kitten-mini-en-v0_1-fp16"
-        const val MODEL_ASSET_PATH = "$MODEL_DIR/model.fp16.onnx"
-        const val VOICES_ASSET_PATH = "$MODEL_DIR/voices.bin"
-        const val TOKENS_ASSET_PATH = "$MODEL_DIR/tokens.txt"
-        const val ESPEAK_ASSET_DIR = "$MODEL_DIR/espeak-ng-data"
-        const val COPY_COMPLETE_MARKER = ".complete"
+        const val MODEL_DIR = "models/tts/supertonic-3"
+        const val DURATION_PREDICTOR_ASSET_PATH = "$MODEL_DIR/onnx/duration_predictor.onnx"
+        const val TEXT_ENCODER_ASSET_PATH = "$MODEL_DIR/onnx/text_encoder.onnx"
+        const val VECTOR_ESTIMATOR_ASSET_PATH = "$MODEL_DIR/onnx/vector_estimator.onnx"
+        const val VOCODER_ASSET_PATH = "$MODEL_DIR/onnx/vocoder.onnx"
+        const val TTS_JSON_ASSET_PATH = "$MODEL_DIR/onnx/tts.json"
+        const val UNICODE_INDEXER_ASSET_PATH = "$MODEL_DIR/onnx/unicode_indexer.bin"
+        const val VOICE_STYLE_ASSET_PATH = "$MODEL_DIR/voice_styles.bin"
+        val REQUIRED_ASSETS =
+            listOf(
+                DURATION_PREDICTOR_ASSET_PATH,
+                TEXT_ENCODER_ASSET_PATH,
+                VECTOR_ESTIMATOR_ASSET_PATH,
+                VOCODER_ASSET_PATH,
+                TTS_JSON_ASSET_PATH,
+                UNICODE_INDEXER_ASSET_PATH,
+                VOICE_STYLE_ASSET_PATH
+            )
         const val MAX_UTTERANCE_CHARS = 500
         const val DEFAULT_SPEAKER_ID = 0
-        const val DEFAULT_SPEED = 1.0f
-        const val LENGTH_SCALE = 1.0f
-        const val SILENCE_SCALE = 0.2f
+        const val DEFAULT_SPEED = 1.05f
+        const val SILENCE_SCALE = 0.3f
         const val MODEL_THREADS = 4
         const val MAX_SENTENCES = 1
         const val CONTINUE_GENERATION = 1

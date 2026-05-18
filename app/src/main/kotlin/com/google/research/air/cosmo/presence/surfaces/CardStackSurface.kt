@@ -153,8 +153,8 @@ private fun PresenceCardPanel(
     card: PresenceCard,
     onAction: (cardId: String, actionId: String) -> Unit,
     onCardSelected: (cardId: String) -> Unit,
-    onDismiss: (cardId: String) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDismiss: (cardId: String) -> Unit = {}
 ) {
     var pressed by remember(card.id) { mutableStateOf(false) }
     var entered by remember(card.id) { mutableStateOf(false) }

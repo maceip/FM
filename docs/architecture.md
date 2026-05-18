@@ -1100,8 +1100,8 @@ deeply Google-internal and replaced with off-the-shelf alternatives.
 
 **Status: active replacement path.** The Android `TextToSpeech` shim verifies
 that spoken output is wired through the app, but real-device quality is not
-acceptable for the product voice. The launch path is now Sherpa-ONNX KittenTTS
-mini with Android `TextToSpeech` retained as the emergency fallback.
+acceptable for the product voice. The launch path is now Sherpa-ONNX
+Supertonic-3 with Android `TextToSpeech` retained as the emergency fallback.
 
 Cosmo's recovered code includes a full on-device TTS stack. Genesis intentionally
 does not depend on that private stack for launch. This section preserves the
@@ -1136,7 +1136,8 @@ Use the existing `lib/voice/VoiceOutput.kt` contract:
 | Sherpa implementation | `lib/voice/SherpaVoiceOutput.kt` — wraps the selected Sherpa-ONNX TTS backend |
 | Android fallback | `lib/voice/AndroidTextToSpeechVoiceOutput.kt` (split from the current file) |
 | Playback | `AudioTrack` streaming PCM float32/short buffers, matching Cosmo's `AudioRenderer` shape |
-| Assets | External model bundle/cache, not Git. Launch bundle: `kitten-mini-en-v0_1-fp16`; comparison bundles: `kokoro-int8-multi-lang-v1_1` and direct E2E `aufklarer/Kokoro-82M-ONNX` |
+| Cosmo facade | `lib/tts/TTS.kt`, `VoiceLMTTS`, `LocalTTS`, `AudioRenderer`, `AudioResampler` |
+| Assets | External model bundle/cache, not Git. Launch bundle: `supertonic-3`; fallback/benchmark bundle: `kitten-mini-en-v0_1-fp16`; comparison bundles: `kokoro-int8-multi-lang-v1_1` and direct E2E `aufklarer/Kokoro-82M-ONNX` |
 
 The current integration uses Sherpa-ONNX because it already exposes the right
 Android/Kotlin TTS abstraction:
@@ -1152,15 +1153,15 @@ engine, keep a reusable task/runtime object, submit a text utterance, stream
 audio into an `AudioTrack`, and provide `stop()` by cancelling/flushing the
 active utterance.
 
-The selected launch model is `kitten-mini-en-v0_1-fp16`. Kokoro full and int8
-both passed synthesis on Pixel CPU, but were not interactive enough for
-assistant replies. Kitten mini uses the same Sherpa `OfflineTts` callback shape
-and passed direct Pixel instrumentation with first audio at roughly 1.8s. The
-model lives under `app/src/main/assets/models/tts/kitten-mini-en-v0_1-fp16`
-when hydrated, but that directory is gitignored; rehydrate from the public
-Sherpa-ONNX release with `scripts/download-voice-models.sh`. If later hardware
-acceleration makes Kokoro practical, switch only the model bundle; the
-`VoiceOutput` interface and playback architecture stay unchanged.
+The selected launch model is `supertonic-3`. Local Sherpa benchmarking across
+20 assistant utterances put Supertonic-3 at aggregate RTF 0.178 and mean
+synthesis 0.728s, compared with Kitten at aggregate RTF 0.441 and mean
+synthesis 2.114s on the same host run. The model lives under
+`app/src/main/assets/models/tts/supertonic-3` when hydrated, but that directory
+is gitignored; rehydrate from Hugging Face with `scripts/download-voice-models.sh`.
+Kitten remains a fallback/benchmark bundle. If later hardware acceleration
+makes another model practical, switch only the model bundle; the `VoiceOutput`
+interface and playback architecture stay unchanged.
 
 ### 16.3 Research-only Cosmo placement
 
@@ -1168,11 +1169,11 @@ If VoiceLM/Vogo becomes viable later:
 
 | Slot | Genesis location |
 |---|---|
-| `TTS` interface | `lib/tts/TTS.kt` (new) |
-| `VoiceLMTTS` impl | `lib/tts/VoiceLMTTS.kt` (new) — wraps Vogo + VoiceLM tflite ensemble |
-| `LocalTTS` impl | `lib/tts/LocalTTS.kt` (new) — wraps `android.speech.tts.TextToSpeech` for the always-available path |
-| `AudioRenderer` | `lib/tts/AudioRenderer.kt` (new) |
-| `AudioResampler` | `lib/tts/AudioResampler.kt` (new) |
+| `TTS` interface | `lib/tts/TTS.kt` — recovered sync API |
+| `VoiceLMTTS` impl | `lib/tts/TTS.kt` — launch replacement delegates to `VoiceOutput`; a future Vogo-backed impl can keep the same binding |
+| `LocalTTS` impl | `lib/tts/TTS.kt` — wraps `android.speech.tts.TextToSpeech` for the always-available path |
+| `AudioRenderer` | `lib/tts/AudioRenderer.kt` |
+| `AudioResampler` | `lib/tts/AudioResampler.kt` |
 | `libvogo_jni.so` | `app/src/main/jniLibs/arm64-v8a/` — recovered binary exists at `~/Downloads/cosmo_recovered_native_libs/`; not bundled |
 | VoiceLM assets | `app/src/main/assets/models/voicelm/` — recovered tflites exist at `~/Downloads/cosmo_recovered_large_assets/`; not bundled. `temporal_decoder` needs re-recovery. |
 
@@ -1289,7 +1290,7 @@ DataStore, Nav3 UI with 25 debug panels, telemetry catalog with provenance,
 aerospace-HUD palette)**, **AppFunctions logic surface (`AmbientAppFunctions`
 methods route through `CosmoController`, `CosmoStateManager`, `ContextStore`,
 `FulfillmentOrchestrator`, `TaskMonitorNavigationBridge`)**, **voice output
-through `VoiceOutput` using Sherpa-ONNX KittenTTS with Android
+through `VoiceOutput` using Sherpa-ONNX Supertonic-3 with Android
 `TextToSpeech` fallback and streaming `AudioTrack` playback**.
 
 **Partial (⚠️):** EdgeTPU Conformer backend (`isAvailable=false` until Pixel

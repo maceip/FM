@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SherpaVoiceOutputSmokeTest {
     @Test
-    fun sherpaVoiceOutputAcceptsCosmoUtteranceWhenAssetsAreBundled() =
+    fun sherpaSupertonicVoiceOutputAcceptsCosmoUtteranceWhenAssetsAreBundled() =
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             assumeTrue(hasAsset(context.assets, MODEL_ASSET_PATH))
@@ -41,7 +41,7 @@ class SherpaVoiceOutputSmokeTest {
         }.isSuccess
 
     private companion object {
-        const val MODEL_ASSET_PATH = "models/tts/kitten-mini-en-v0_1-fp16/model.fp16.onnx"
+        const val MODEL_ASSET_PATH = "models/tts/supertonic-3/onnx/duration_predictor.onnx"
         const val SMOKE_TIMEOUT_MS = 120_000L
     }
 }

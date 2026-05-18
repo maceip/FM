@@ -110,12 +110,13 @@ Each bar is 5 segments. 🟩 = shipping, 🟨 = partial / gated, ⬜ = planned o
 
 | Subsystem | Progress | Notes |
 |---|---|---|
-| Sherpa KittenTTS `VoiceOutput` | 🟩🟩🟩🟩🟨 | Implemented as the launch voice path; Pixel 10 smoke test produced device audio; listen/latency bakeoff continues |
+| Sherpa Supertonic-3 `VoiceOutput` | 🟩🟩🟩🟩🟨 | Launch voice path; host Sherpa benchmark passes at aggregate RTF 0.178 vs Kitten 0.441; device smoke pending after the backend swap |
+| Sherpa KittenTTS bundle | 🟩🟩🟩🟨⬜ | Retained as fallback/benchmark asset, no longer the launch voice path |
 | Android `TextToSpeech` fallback | 🟩🟩🟩🟩🟩 | Emergency fallback behind the same `VoiceOutput` interface |
-| AudioTrack streaming renderer | 🟩🟩🟩🟩🟨 | Sherpa callback streams PCM directly to `AudioTrack`; standalone Cosmo-style renderer/resampler remains optional |
+| AudioTrack streaming renderer | 🟩🟩🟩🟩🟨 | Sherpa callback streams PCM through `lib/tts/AudioRenderer`; real-device Supertonic listen pass remains |
 | VoiceLM / SoundStream (generative voice) | ⬜⬜⬜⬜⬜ | Recovered to disk; not bundled; one asset truncated in recovery |
 | Vogo native lib (`libvogo_jni.so`) | ⬜⬜⬜⬜⬜ | Recovered; not bundled |
-| `lib/tts/*` recovered-compatible facade | ⬜⬜⬜⬜⬜ | Not ported. Launch code uses `lib/voice/VoiceOutput`; exact VoiceLM/Vogo facade remains research-only |
+| `lib/tts/*` recovered-compatible facade | 🟩🟩🟩🟨⬜ | `TTS`, `VoiceLMTTS`, `LocalTTS`, `AudioRenderer`, and `AudioResampler` surfaces exist; launch implementation delegates to `VoiceOutput`, exact Vogo task API remains research-only |
 
 ---
 
@@ -140,6 +141,7 @@ binaries (TFLites, SODA packs, JNI `.so`) from the private S3 binary store:
 ```bash
 scripts/runtime-binaries.sh download
 scripts/download-models.sh --verify-only
+scripts/download-voice-models.sh --verify-only
 scripts/verify-soda-assets.sh
 ```
 

@@ -350,7 +350,7 @@ dependencies {
     // production wiring keeps the binding on UnavailableSodaCapability until on-device
     // verification on Pixel 9/10 lands.
     implementation(files("libs/recovered-soda.jar"))
-    // Official Sherpa-ONNX Android runtime for Kokoro TTS. The implementation
+    // Official Sherpa-ONNX Android runtime for Supertonic/Kokoro TTS. The implementation
     // keeps the same engine/update/playback shape as recovered VoiceLM/Vogo.
     implementation(files("libs/sherpa-onnx-static-link-onnxruntime-1.13.2.aar"))
 
