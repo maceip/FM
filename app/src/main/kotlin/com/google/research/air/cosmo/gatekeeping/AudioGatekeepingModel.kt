@@ -105,7 +105,7 @@ class ConformerEncoderImpl internal constructor(
         }
         audioInputBuffer.fill(0f, validSamples, MAX_SAMPLES)
 
-        val validFrames = minOf((validSamples + FRAME_STRIDE_SAMPLES - 1) / FRAME_STRIDE_SAMPLES, MAX_FRAMES)
+        val validFrames = AudioGatekeepingContract.frameCountForPcm16Bytes(validSamples * PCM16_BYTES_PER_SAMPLE)
         paddingMaskBuffer.fill(true, 0, validFrames)
         paddingMaskBuffer.fill(false, validFrames, MAX_FRAMES)
     }
@@ -115,13 +115,13 @@ class ConformerEncoderImpl internal constructor(
     companion object {
         private const val TAG = "COSMO-ConformerEncoder"
 
-        const val SAMPLE_RATE: Int = 16_000
-        const val MEL_BINS: Int = 128
-        const val MAX_FRAMES: Int = 3_000
-        const val MAX_SAMPLES: Int = 960_000
-        const val NUM_INTENTS: Int = 13
-        private const val FRAME_STRIDE_SAMPLES: Int = 320
-        private const val PCM_16BIT_SCALE: Float = 32_768.0f
+        const val SAMPLE_RATE: Int = AudioGatekeepingContract.SAMPLE_RATE_HZ
+        const val MEL_BINS: Int = AudioGatekeepingContract.MEL_BINS
+        const val MAX_FRAMES: Int = AudioGatekeepingContract.MAX_FRAMES
+        const val MAX_SAMPLES: Int = AudioGatekeepingContract.MAX_SAMPLES
+        const val NUM_INTENTS: Int = AudioGatekeepingContract.NUM_HEADS
+        private const val PCM16_BYTES_PER_SAMPLE: Int = AudioGatekeepingContract.PCM16_BYTES_PER_SAMPLE
+        private const val PCM_16BIT_SCALE: Float = AudioGatekeepingContract.PCM_16BIT_SCALE
     }
 }
 
@@ -257,35 +257,13 @@ class AudioGatekeepingModel internal constructor(
         )
 
     private fun mapScores(scores: FloatArray): Map<String, Float> =
-        AUDIO_INDEX_TO_SKILLS.entries
-            .filter { (index, _) -> index < scores.size && scores[index] >= AUDIO_THRESHOLDS[index] }
-            .flatMap { (index, skills) -> skills.map { it to scores[index] } }
-            .toMap()
+        AudioGatekeepingContract.mapScoresToSkills(scores, AUDIO_THRESHOLDS)
 
     private companion object {
         const val TAG = "COSMO-RawAudioGatekeeper"
 
-        val AUDIO_THRESHOLDS =
-            floatArrayOf(
-                0.57f, 0.65f, 0.90f, 0.90f, 0.90f, 0.90f, 0.56f, 0.74f, 0.90f, 0.90f, 0.90f, 0.90f, 0.90f
-            )
-
-        val AUDIO_INDEX_TO_SKILLS =
-            mapOf(
-                0 to listOf("add_to_memory"),
-                1 to listOf("add_to_list"),
-                2 to listOf("define_term", "web_search"),
-                3 to listOf("query_photos"),
-                4 to listOf("create_calendar_event"),
-                5 to listOf("create_doc"),
-                6 to listOf("provide_person_context"),
-                7 to listOf("provide_event_context"),
-                8 to listOf("deep_research"),
-                9 to listOf("provide_insight"),
-                10 to listOf("browsing_agent"),
-                11 to listOf("call_agent"),
-                12 to listOf("add_timer")
-            )
+        val AUDIO_THRESHOLDS: FloatArray
+            get() = AudioGatekeepingContract.DEFAULT_THRESHOLDS
     }
 }
 

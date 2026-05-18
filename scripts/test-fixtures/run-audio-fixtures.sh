@@ -20,6 +20,7 @@ ACTIVITY="$PACKAGE/.ui.mainscreen.MainActivity"
 TMP_DIR="/data/local/tmp/cosmo-test"
 DEVICE_DIR="/data/data/$PACKAGE/files/cosmo-test"
 PER_FIXTURE_WAIT_SEC="${PER_FIXTURE_WAIT_SEC:-25}"
+APP_RELAUNCH_WAIT_SEC="${APP_RELAUNCH_WAIT_SEC:-2}"
 
 case "$TARGET" in ambient|soda|both|conformer) ;; *) echo "target must be one of ambient|soda|both|conformer" >&2; exit 64 ;; esac
 
@@ -93,6 +94,9 @@ logcat_pid=$!
 
 for wav in "$AUDIO_DIR"/*.wav; do
   name=$(basename "$wav")
+  echo "==> ensuring app receiver is registered for $name"
+  "${ADB[@]}" shell am start -n "$ACTIVITY" >/dev/null
+  sleep "$APP_RELAUNCH_WAIT_SEC"
   echo "==> inject $name target=$TARGET"
   "${ADB[@]}" shell am broadcast \
     -a com.google.research.air.cosmo.DEBUG_INJECT_AUDIO \

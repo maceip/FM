@@ -17,6 +17,7 @@ import com.google.research.air.cosmo.lib.soda.SodaPrepareResult
 import com.google.research.air.cosmo.lib.soda.SodaSession
 import com.google.research.air.cosmo.lib.soda.SodaStartResult
 import com.google.research.air.cosmo.lib.soda.SodaTranscriptCallback
+import com.google.research.air.cosmo.lib.voice.VoiceOutput
 import com.google.research.air.cosmo.setting.CosmoSettingStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -67,6 +68,7 @@ constructor(
     @AmbientAudioBytesEphemeralBuffer private val ambientBuffer: InMemoryEphemeralBuffer<ByteArray>,
     @ApplicationContext private val appContext: Context,
     private val sodaCapability: JniSodaCapability,
+    private val voiceOutput: VoiceOutput,
     private val clock: Clock,
     private val settings: CosmoSettingStore
 ) : BroadcastReceiver() {
@@ -78,6 +80,7 @@ constructor(
             addAction(ACTION_TEXT)
             addAction(ACTION_AUDIO)
             addAction(ACTION_SET_SETTING)
+            addAction(ACTION_SPEAK)
         }
         // RECEIVER_EXPORTED is required for `adb shell am broadcast` to reach this receiver:
         // adb runs from uid 2000 (shell), which is outside the app's uid. NOT_EXPORTED would
@@ -94,6 +97,7 @@ constructor(
             ACTION_TEXT -> handleText(intent)
             ACTION_AUDIO -> handleAudio(intent)
             ACTION_SET_SETTING -> handleSetSetting(intent)
+            ACTION_SPEAK -> handleSpeak(intent)
         }
     }
 
@@ -123,6 +127,14 @@ constructor(
         val path = intent.getStringExtra(EXTRA_PATH)?.takeIf { it.isNotBlank() } ?: return
         val target = intent.getStringExtra(EXTRA_TARGET)?.lowercase() ?: TARGET_BOTH
         scope.launch { injectAudioFile(path, target) }
+    }
+
+    private fun handleSpeak(intent: Intent) {
+        val text = intent.getStringExtra(EXTRA_TEXT)?.takeIf { it.isNotBlank() } ?: return
+        scope.launch {
+            val result = voiceOutput.speak(text)
+            Log.i(TAG, "voice output: result=$result")
+        }
     }
 
     private suspend fun injectAudioFile(
@@ -309,6 +321,7 @@ constructor(
         const val ACTION_TEXT = "com.google.research.air.cosmo.DEBUG_GATEKEEPER"
         const val ACTION_AUDIO = "com.google.research.air.cosmo.DEBUG_INJECT_AUDIO"
         const val ACTION_SET_SETTING = "com.google.research.air.cosmo.DEBUG_SET_SETTING"
+        const val ACTION_SPEAK = "com.google.research.air.cosmo.DEBUG_SPEAK"
         const val EXTRA_TEXT = "text"
         const val EXTRA_PATH = "path"
         const val EXTRA_TARGET = "target"

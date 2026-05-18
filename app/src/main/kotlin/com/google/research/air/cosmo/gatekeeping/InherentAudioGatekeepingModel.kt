@@ -174,10 +174,7 @@ class InherentAudioGatekeepingModel internal constructor(
         return output
     }
 
-    private fun frameCountForPcmBytes(pcmBytes: Int): Int {
-        val samples = (pcmBytes / PCM16_BYTES_PER_SAMPLE).coerceIn(1, MAX_SAMPLES)
-        return ((samples + HOP_SAMPLES - 1) / HOP_SAMPLES).coerceAtMost(MAX_FRAMES)
-    }
+    private fun frameCountForPcmBytes(pcmBytes: Int): Int = AudioGatekeepingContract.frameCountForPcm16Bytes(pcmBytes)
 
     private fun zeroMelTail(
         melBuffer: FloatBuffer,
@@ -191,16 +188,12 @@ class InherentAudioGatekeepingModel internal constructor(
     }
 
     private fun mapScores(scores: FloatArray): Map<String, Float> =
-        INDEX_TO_SKILLS.entries
-            .filter { (index, _) -> index < scores.size && scores[index] >= thresholds[index] }
-            .associate { (index, skill) -> skill to scores[index] }
+        AudioGatekeepingContract.mapScoresToSkills(scores, thresholds)
 
     private fun scoreSignals(scores: FloatArray): Map<String, Float> {
         val topIndex = scores.indices.maxByOrNull { scores[it] } ?: return emptyMap()
         return buildMap {
-            scores.forEachIndexed { index, score ->
-                put("inherent_head_$index", score)
-            }
+            putAll(AudioGatekeepingContract.scoreSignals("inherent", scores))
             put("inherent_top_index", topIndex.toFloat())
             put("inherent_top_score", scores[topIndex])
         }
@@ -215,8 +208,10 @@ class InherentAudioGatekeepingModel internal constructor(
         val keys = json.optJSONArray("threshold_keys_in_order")
         val thresholdsByKey = json.optJSONObject("default_thresholds")
         if (keys == null || thresholdsByKey == null || keys.length() != NUM_INTENTS) return DEFAULT_THRESHOLDS
+        val actualKeys = List(NUM_INTENTS) { index -> keys.optString(index) }
+        if (actualKeys != AudioGatekeepingContract.THRESHOLD_KEYS) return DEFAULT_THRESHOLDS
         return FloatArray(NUM_INTENTS) { index ->
-            val key = keys.optString(index)
+            val key = actualKeys[index]
             thresholdsByKey.optDouble(key, DEFAULT_THRESHOLDS[index].toDouble()).toFloat()
         }
     }
@@ -236,32 +231,13 @@ class InherentAudioGatekeepingModel internal constructor(
 
     companion object {
         const val METADATA_ASSET_PATH = "models/inherent.metadata.json"
-        const val MEL_BINS: Int = 128
-        const val MAX_FRAMES: Int = 3_000
-        const val MAX_SAMPLES: Int = 960_000
-        const val NUM_INTENTS: Int = 13
-        private const val HOP_SAMPLES: Int = 320
-        private const val PCM16_BYTES_PER_SAMPLE: Int = 2
-        private const val PCM_16BIT_SCALE: Float = 32_768.0f
+        const val MEL_BINS: Int = AudioGatekeepingContract.MEL_BINS
+        const val MAX_FRAMES: Int = AudioGatekeepingContract.MAX_FRAMES
+        const val MAX_SAMPLES: Int = AudioGatekeepingContract.MAX_SAMPLES
+        const val NUM_INTENTS: Int = AudioGatekeepingContract.NUM_HEADS
+        private const val PCM_16BIT_SCALE: Float = AudioGatekeepingContract.PCM_16BIT_SCALE
 
-        private val DEFAULT_THRESHOLDS = FloatArray(NUM_INTENTS) { 0.5f }
-
-        private val INDEX_TO_SKILLS =
-            mapOf(
-                0 to "add_to_memory",
-                1 to "add_to_list",
-                2 to "define_term",
-                3 to "query_photos",
-                4 to "create_calendar_event",
-                5 to "create_doc",
-                6 to "provide_person_context",
-                7 to "provide_event_context",
-                8 to "deep_research",
-                9 to "provide_insight",
-                10 to "browsing_agent",
-                11 to "call_agent",
-                12 to "add_timer"
-            )
+        private val DEFAULT_THRESHOLDS = AudioGatekeepingContract.DEFAULT_THRESHOLDS
     }
 }
 

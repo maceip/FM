@@ -189,6 +189,59 @@ class GatekeepingModelTest {
     }
 
     @Test
+    fun recoveredAudioContractPinsHeadOrderAndFrameMath() {
+        assertEquals(16_000, AudioGatekeepingContract.SAMPLE_RATE_HZ)
+        assertEquals(60, AudioGatekeepingContract.MAX_AUDIO_LENGTH_SEC)
+        assertEquals(960_000, AudioGatekeepingContract.MAX_SAMPLES)
+        assertEquals(320, AudioGatekeepingContract.FRAME_STRIDE_SAMPLES)
+        assertEquals(3_000, AudioGatekeepingContract.MAX_FRAMES)
+        assertEquals(128, AudioGatekeepingContract.MEL_BINS)
+        assertEquals(13, AudioGatekeepingContract.NUM_HEADS)
+        assertEquals("isInteresting", AudioGatekeepingContract.HEADS[0].modelName)
+        assertTrue(AudioGatekeepingContract.HEADS[0].skillIds.isEmpty())
+        assertEquals(listOf("add_to_list"), AudioGatekeepingContract.HEADS[1].skillIds)
+        assertEquals(listOf("define_term", "web_search"), AudioGatekeepingContract.HEADS[2].skillIds)
+        assertEquals(listOf("add_timer"), AudioGatekeepingContract.HEADS[12].skillIds)
+        assertArrayEquals(
+            floatArrayOf(
+                0.57f, 0.65f, 0.90f, 0.90f, 0.90f, 0.90f, 0.56f, 0.74f, 0.90f, 0.90f, 0.90f, 0.90f, 0.90f
+            ),
+            AudioGatekeepingContract.DEFAULT_THRESHOLDS,
+            0.0f
+        )
+
+        assertEquals(0, AudioGatekeepingContract.frameCountForPcm16Bytes(0))
+        assertEquals(1, AudioGatekeepingContract.frameCountForPcm16Bytes(2))
+        assertEquals(1, AudioGatekeepingContract.frameCountForPcm16Bytes(320 * 2))
+        assertEquals(2, AudioGatekeepingContract.frameCountForPcm16Bytes(321 * 2))
+        assertEquals(3_000, AudioGatekeepingContract.frameCountForPcm16Bytes(960_000 * 2))
+        assertEquals(3_000, AudioGatekeepingContract.frameCountForPcm16Bytes(960_320 * 2))
+    }
+
+    @Test
+    fun recoveredAudioContractMapsInterestingHeadAsExplicitMemoryBridge() {
+        val interestingOnly = FloatArray(AudioGatekeepingContract.NUM_HEADS)
+        interestingOnly[0] = 0.57f
+
+        assertEquals(
+            mapOf("add_to_memory" to 0.57f),
+            AudioGatekeepingContract.mapScoresToSkills(interestingOnly)
+        )
+        assertEquals(
+            emptyMap<String, Float>(),
+            AudioGatekeepingContract.mapScoresToSkills(interestingOnly, bridgeInterestingToMemory = false)
+        )
+
+        val intentOnly = FloatArray(AudioGatekeepingContract.NUM_HEADS)
+        intentOnly[2] = 0.90f
+
+        assertEquals(
+            mapOf("define_term" to 0.90f, "web_search" to 0.90f),
+            AudioGatekeepingContract.mapScoresToSkills(intentOnly)
+        )
+    }
+
+    @Test
     fun rawAudioGatekeeperFailsClosedWhenFrontendAssetIsMissing() = runTest {
         val model = audioModel(fakeBufferLoader(emptyMap()))
 
@@ -380,7 +433,7 @@ class GatekeepingModelTest {
         val result = model.predict(byteArrayOf(0, 0))
 
         assertEquals(listOf(false, false), createRequests)
-        assertEquals(mapOf("define_term" to 0.12f), result.detectedSkills)
+        assertEquals(mapOf("define_term" to 0.12f, "web_search" to 0.12f), result.detectedSkills)
     }
 
     @Test
