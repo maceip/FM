@@ -101,6 +101,7 @@ class InherentAudioGatekeepingModel internal constructor(
         if (!nativeRun(ensureFrontend(), frontendInput, melBuffer)) {
             failUnavailable("inherent_frontend_run_failed")
         }
+        zeroMelTail(melBuffer, frameCountForPcmBytes(pcm.size))
 
         val output =
             ByteBuffer
@@ -173,6 +174,22 @@ class InherentAudioGatekeepingModel internal constructor(
         return output
     }
 
+    private fun frameCountForPcmBytes(pcmBytes: Int): Int {
+        val samples = (pcmBytes / PCM16_BYTES_PER_SAMPLE).coerceIn(1, MAX_SAMPLES)
+        return ((samples + HOP_SAMPLES - 1) / HOP_SAMPLES).coerceAtMost(MAX_FRAMES)
+    }
+
+    private fun zeroMelTail(
+        melBuffer: FloatBuffer,
+        frameCount: Int
+    ) {
+        val start = (frameCount.coerceIn(0, MAX_FRAMES)) * MEL_BINS
+        for (index in start until melBuffer.capacity()) {
+            melBuffer.put(index, 0f)
+        }
+        melBuffer.position(0)
+    }
+
     private fun mapScores(scores: FloatArray): Map<String, Float> =
         INDEX_TO_SKILLS.entries
             .filter { (index, _) -> index < scores.size && scores[index] >= thresholds[index] }
@@ -223,6 +240,8 @@ class InherentAudioGatekeepingModel internal constructor(
         const val MAX_FRAMES: Int = 3_000
         const val MAX_SAMPLES: Int = 960_000
         const val NUM_INTENTS: Int = 13
+        private const val HOP_SAMPLES: Int = 320
+        private const val PCM16_BYTES_PER_SAMPLE: Int = 2
         private const val PCM_16BIT_SCALE: Float = 32_768.0f
 
         private val DEFAULT_THRESHOLDS = FloatArray(NUM_INTENTS) { 0.5f }

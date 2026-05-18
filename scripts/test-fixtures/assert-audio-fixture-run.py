@@ -63,11 +63,28 @@ def parse_inherent_heads(signals: dict[str, float]) -> dict[int, float]:
     return heads
 
 
+def positive_fixture_pass(
+    heads: dict[int, float],
+    expected_index: int,
+    *,
+    interesting_threshold: float,
+) -> bool:
+    if not heads:
+        return False
+    if expected_index == 0:
+        return max(heads, key=heads.get) == 0
+    intent_scores = {index: score for index, score in heads.items() if index > 0}
+    if not intent_scores:
+        return False
+    return heads.get(0, 0.0) >= interesting_threshold and max(intent_scores, key=intent_scores.get) == expected_index
+
+
 def ambient_quality_report(fixtures: list[dict], ambient_results: dict[str, str]) -> dict:
     rows: list[dict] = []
     positive_total = 0
     positive_scored = 0
-    positive_top1 = 0
+    positive_passed = 0
+    positive_all_head_top1 = 0
     negative_total = 0
     negative_clean = 0
 
@@ -105,21 +122,34 @@ def ambient_quality_report(fixtures: list[dict], ambient_results: dict[str, str]
             expected_score = heads.get(expected_index)
             other_scores = [score for index, score in heads.items() if index != expected_index]
             max_other = max(other_scores) if other_scores else None
-            top1 = top_index == expected_index if top_index is not None else False
+            all_head_top1 = top_index == expected_index if top_index is not None else False
+            fixture_passed = positive_fixture_pass(
+                heads,
+                expected_index,
+                interesting_threshold=0.5,
+            )
             if heads:
                 positive_scored += 1
-            if top1:
-                positive_top1 += 1
+            if fixture_passed:
+                positive_passed += 1
+            if all_head_top1:
+                positive_all_head_top1 += 1
             row.update(
                 {
                     "expected_score": expected_score,
                     "max_other_score": max_other,
+                    "intent_top_index": max(
+                        (index for index in heads if index > 0),
+                        key=heads.get,
+                    ) if any(index > 0 for index in heads) else None,
+                    "is_interesting_score": heads.get(0),
                     "expected_margin": (
                         expected_score - max_other
                         if expected_score is not None and max_other is not None
                         else None
                     ),
-                    "top1": top1,
+                    "top1": all_head_top1,
+                    "fixture_passed": fixture_passed,
                 }
             )
         rows.append(row)
@@ -127,7 +157,8 @@ def ambient_quality_report(fixtures: list[dict], ambient_results: dict[str, str]
     return {
         "positive_total": positive_total,
         "positive_scored": positive_scored,
-        "positive_top1": positive_top1,
+        "positive_passed": positive_passed,
+        "positive_all_head_top1": positive_all_head_top1,
         "negative_total": negative_total,
         "negative_clean": negative_clean,
         "rows": rows,
@@ -205,12 +236,14 @@ def main() -> int:
             )
         if quality["positive_total"]:
             if quality["positive_scored"]:
-                top1_text = f"top1={quality['positive_top1']}/{quality['positive_scored']}"
+                pass_text = f"pass={quality['positive_passed']}/{quality['positive_scored']}"
+                top1_text = f"all_head_top1={quality['positive_all_head_top1']}/{quality['positive_scored']}"
             else:
+                pass_text = "pass=n/a"
                 top1_text = "top1=n/a"
             print(
                 "Inherent ambient quality: "
-                f"{top1_text} "
+                f"{pass_text} {top1_text} "
                 f"scored={quality['positive_scored']}/{quality['positive_total']} "
                 f"negative_clean={quality['negative_clean']}/{quality['negative_total']}"
             )
@@ -220,11 +253,11 @@ def main() -> int:
                     "ambient quality below gate: "
                     f"scored={quality['positive_scored']}/{quality['positive_total']}"
                 )
-            top1_rate = quality["positive_top1"] / quality["positive_total"]
-            if top1_rate < args.min_ambient_top1:
+            pass_rate = quality["positive_passed"] / quality["positive_total"]
+            if pass_rate < args.min_ambient_top1:
                 failures.append(
                     "ambient quality below gate: "
-                    f"top1={top1_rate:.3f} min={args.min_ambient_top1:.3f}"
+                    f"pass={pass_rate:.3f} min={args.min_ambient_top1:.3f}"
                 )
             if quality["negative_clean"] != quality["negative_total"]:
                 failures.append(

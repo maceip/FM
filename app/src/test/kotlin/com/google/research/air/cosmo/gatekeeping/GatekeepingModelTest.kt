@@ -356,6 +356,9 @@ class GatekeepingModelTest {
                             InherentAudioGatekeepingModel.MAX_FRAMES * InherentAudioGatekeepingModel.MEL_BINS,
                             output.capacity()
                         )
+                        for (index in 0 until output.capacity()) {
+                            output.put(index, -6.9077554f)
+                        }
                         output.put(0, 0.5f)
                     } else {
                         assertEquals(42L, handle)
@@ -363,6 +366,8 @@ class GatekeepingModelTest {
                             InherentAudioGatekeepingModel.MAX_FRAMES * InherentAudioGatekeepingModel.MEL_BINS,
                             input.capacity()
                         )
+                        assertEquals(0.5f, input.get(0))
+                        assertEquals(0f, input.get(InherentAudioGatekeepingModel.MEL_BINS))
                         assertEquals(InherentAudioGatekeepingModel.NUM_INTENTS, output.capacity())
                         output.put(2, 0.12f)
                         output.put(12, 0.09f)
