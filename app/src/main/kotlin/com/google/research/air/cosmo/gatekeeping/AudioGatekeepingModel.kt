@@ -140,6 +140,9 @@ private class TensorFlowLiteSplitConformerRuntime(
         try {
             frontend = Interpreter(frontendModel, Interpreter.Options())
             delegate = DarwinnDelegate(context, enableTachyonBackend = false)
+            val delegateHandle = delegate.getNativeHandle()
+            Log.i("COSMO-ConformerEncoder", "Darwinn delegate created handle=$delegateHandle tachyon=false")
+            check(delegateHandle != 0L) { "edgetpu_delegate_unavailable_or_unauthorized" }
             val backendOptions = Interpreter.Options().addDelegate(delegate)
             frontendInterpreter = frontend
             darwinnDelegate = delegate
