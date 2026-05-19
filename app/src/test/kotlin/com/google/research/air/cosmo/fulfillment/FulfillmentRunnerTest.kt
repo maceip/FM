@@ -8,6 +8,7 @@ import com.google.research.air.cosmo.lib.llm.SimulationLLM
 import com.google.research.air.cosmo.logging.CosmosTelemetry
 import com.google.research.air.cosmo.logging.TelemetryEvent
 import com.google.research.air.cosmo.setting.CosmoSettingStore
+import com.google.research.air.cosmo.skills.SkillAssetCatalog
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -57,9 +58,19 @@ class FulfillmentRunnerTest {
         )
     }
 
+    private fun allSkillsConfig(): FulfillmentConfig {
+        val ids = SkillAssetCatalog(ApplicationProvider.getApplicationContext()).loadDescriptors().map { it.id }
+        return FulfillmentConfig(enabledSkillIds = ids.toSet())
+    }
+
     @Test
     fun `fulfill with SimulationLLM produces at least one actionable response`() = runTest {
-        val actions = runner().fulfill("Play some music for focus", FulfillmentTriggerType.USER_QUERY)
+        val actions =
+            runner().fulfill(
+                config = allSkillsConfig(),
+                userQuery = "Play some music for focus",
+                trigger = FulfillmentTriggerType.USER_QUERY,
+            )
 
         assertTrue("SimulationLLM should return at least one action", actions.isNotEmpty())
         assertTrue(actions.none { it is FulfillmentAction.Unsupported })
@@ -69,9 +80,10 @@ class FulfillmentRunnerTest {
     fun `user timer query produces ten minute add timer action`() = runTest {
         val actions =
             runner().fulfill(
-                prompt = "Reactive fulfillment. Conversation:",
+                config = allSkillsConfig(),
                 trigger = FulfillmentTriggerType.USER_QUERY,
-                userQuery = "set a timer for 10 minutes"
+                conversationHistory = "",
+                userQuery = "set a timer for 10 minutes",
             )
 
         val timer = actions.single() as FulfillmentAction.AddTimer
@@ -86,9 +98,9 @@ class FulfillmentRunnerTest {
             val repository = ActionsRepository()
             val actions =
                 runner(repository).fulfill(
-                    prompt = "Reactive fulfillment. Conversation:",
+                    config = allSkillsConfig(),
                     trigger = FulfillmentTriggerType.USER_QUERY,
-                    userQuery = fixture.query
+                    userQuery = fixture.query,
                 )
             val action = actions.single()
 
@@ -140,9 +152,9 @@ class FulfillmentRunnerTest {
             notificationBuffer = notificationBuffer,
             intentBuffer = intentBuffer
         ).fulfill(
-            prompt = "Reactive fulfillment. Conversation:",
+            config = allSkillsConfig(),
             trigger = FulfillmentTriggerType.USER_QUERY,
-            userQuery = "privacy check"
+            userQuery = "privacy check",
         )
 
         val prompt = llm.prompts.single()

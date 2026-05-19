@@ -33,12 +33,23 @@ constructor(
     private val telemetry: CosmosTelemetry
 ) {
     suspend fun fulfill(
-        prompt: String,
+        config: FulfillmentConfig,
+        userQuery: String = "",
         trigger: FulfillmentTriggerType,
-        userQuery: String? = null
+        conversationHistory: String = "",
+        gatekeeperContext: com.google.research.air.cosmo.gatekeeping.GatekeepingResult? = null,
+        gatekeeperIntentNames: List<String> = emptyList(),
     ): List<FulfillmentAction> {
         val started = clock.millis()
-        val renderedPrompt = buildPrompt(prompt, trigger, userQuery)
+        val renderedPrompt =
+            buildPrompt(
+                config = config,
+                trigger = trigger,
+                userQuery = userQuery,
+                conversationHistory = conversationHistory,
+                gatekeeperContext = gatekeeperContext,
+                gatekeeperIntentNames = gatekeeperIntentNames,
+            )
         val result = llm.generateText(renderedPrompt)
         val actions = parseResponse(result)
         val fulfillmentId = UUID.randomUUID().toString()
@@ -55,15 +66,12 @@ constructor(
                 numUpdatedActions = actions.count { it.status == FulfillmentAction.Status.UPDATED },
                 numRemovedActions = actions.count { it.status == FulfillmentAction.Status.REMOVED },
                 fulfillmentTriggerType = trigger,
-                userQuery = userQuery,
+                userQuery = userQuery.ifBlank { null },
                 actionIds = actions.map { it.id },
-                sourceBufferCounts =
-                    mapOf(
-                        "ambient_audio" to enabledBufferSize(settings.isAmbientAudioEnabled(), audioBuffer),
-                        "screen" to enabledBufferSize(settings.isScreenContextEnabled(), screenBuffer),
-                        "notification" to enabledBufferSize(settings.isNotificationCaptureEnabled(), notificationBuffer),
-                        "intent" to enabledBufferSize(settings.isIntentExtractionEnabled(), intentBuffer)
-                    ),
+                sourceBufferCounts = bufferCounts(config),
+                gatekeeperModelId = gatekeeperContext?.modelId,
+                gatekeeperDetectedBy = gatekeeperContext?.detectedBy,
+                gatekeeperSkills = gatekeeperContext?.detectedSkills.orEmpty(),
                 llmModelPath = llmRouteState?.activePath?.value,
                 llmRouteReason = llmRouteState?.routeDecision?.value?.reason
             )
@@ -72,24 +80,69 @@ constructor(
     }
 
     private fun buildPrompt(
-        systemPrompt: String,
+        config: FulfillmentConfig,
         trigger: FulfillmentTriggerType,
-        userQuery: String?
-    ): String =
-        buildString {
-            appendLine(assetPromptFor(trigger))
-            appendLine(systemPrompt)
-            if (userQuery != null) appendLine("User query: $userQuery")
+        userQuery: String,
+        conversationHistory: String,
+        gatekeeperContext: com.google.research.air.cosmo.gatekeeping.GatekeepingResult?,
+        gatekeeperIntentNames: List<String>,
+    ): String {
+        val fullSchema = readAsset("filtered_skill_schema.textproto")
+        val filteredSchema = SkillSchemaFilter.filterSchema(fullSchema, config.enabledSkillIds)
+        return buildString {
+            appendLine(assetPromptFor(trigger, userQuery))
+            if (conversationHistory.isNotBlank()) {
+                appendLine("Conversation history:")
+                appendLine(conversationHistory)
+            }
+            if (userQuery.isNotBlank()) {
+                appendLine("User query: $userQuery")
+            }
+            if (gatekeeperIntentNames.isNotEmpty()) {
+                appendLine("Gatekeeper intents: ${gatekeeperIntentNames.joinToString()}")
+            }
+            gatekeeperContext?.let { context ->
+                if (context.input.isNotBlank()) {
+                    appendLine("Gatekeeper input:")
+                    appendLine(context.input)
+                }
+            }
             appendLine("Allowed action schema:")
-            appendLine(readAsset("filtered_skill_schema.textproto"))
+            appendLine(filteredSchema)
+            appendLine("Enabled skills: ${config.enabledSkillIds.sorted().joinToString()}")
             appendLine("Settings:")
             appendLine(
                 "gatekeeper=${settings.isGatekeeperEnabled()}, rawAudioGatekeeper=${settings.isRawAudioGatekeeperEnabled()}, voiceMatch=${settings.isVoiceMatchEnabled()}"
             )
-            appendContextSection("Audio", settings.isAmbientAudioEnabled(), audioBuffer)
-            appendContextSection("Screens", settings.isScreenContextEnabled(), screenBuffer)
-            appendContextSection("Notifications", settings.isNotificationCaptureEnabled(), notificationBuffer)
-            appendContextSection("Intents", settings.isIntentExtractionEnabled(), intentBuffer)
+            if (FulfillmentBufferKind.AMBIENT_AUDIO in config.enabledBufferKinds) {
+                appendContextSection("Audio", settings.isAmbientAudioEnabled(), audioBuffer)
+            }
+            if (FulfillmentBufferKind.SCREEN in config.enabledBufferKinds) {
+                appendContextSection("Screens", settings.isScreenContextEnabled(), screenBuffer)
+            }
+            if (FulfillmentBufferKind.NOTIFICATION in config.enabledBufferKinds) {
+                appendContextSection("Notifications", settings.isNotificationCaptureEnabled(), notificationBuffer)
+            }
+            if (FulfillmentBufferKind.INTENT in config.enabledBufferKinds) {
+                appendContextSection("Intents", settings.isIntentExtractionEnabled(), intentBuffer)
+            }
+        }
+    }
+
+    private fun bufferCounts(config: FulfillmentConfig): Map<String, Int> =
+        buildMap {
+            if (FulfillmentBufferKind.AMBIENT_AUDIO in config.enabledBufferKinds) {
+                put("ambient_audio", enabledBufferSize(settings.isAmbientAudioEnabled(), audioBuffer))
+            }
+            if (FulfillmentBufferKind.SCREEN in config.enabledBufferKinds) {
+                put("screen", enabledBufferSize(settings.isScreenContextEnabled(), screenBuffer))
+            }
+            if (FulfillmentBufferKind.NOTIFICATION in config.enabledBufferKinds) {
+                put("notification", enabledBufferSize(settings.isNotificationCaptureEnabled(), notificationBuffer))
+            }
+            if (FulfillmentBufferKind.INTENT in config.enabledBufferKinds) {
+                put("intent", enabledBufferSize(settings.isIntentExtractionEnabled(), intentBuffer))
+            }
         }
 
     private fun StringBuilder.appendContextSection(
@@ -107,11 +160,18 @@ constructor(
         buffer: InMemoryEphemeralBuffer<Any>
     ): Int = if (enabled) buffer.size() else 0
 
-    private fun assetPromptFor(trigger: FulfillmentTriggerType): String =
+    private fun assetPromptFor(
+        trigger: FulfillmentTriggerType,
+        userQuery: String
+    ): String =
         readAsset(
             when (trigger) {
-                FulfillmentTriggerType.USER_QUERY -> "reactive_fulfillment_prompt.jinja2"
-                FulfillmentTriggerType.GATEKEEPER_TRIGGER -> "gatekeeper_trigger_prompt.jinja2"
+                FulfillmentTriggerType.USER_QUERY ->
+                    if (userQuery.isBlank()) {
+                        "fulfillment_prompt.jinja2"
+                    } else {
+                        "reactive_fulfillment_prompt.jinja2"
+                    }
                 else -> "fulfillment_prompt.jinja2"
             }
         )

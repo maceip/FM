@@ -62,6 +62,27 @@ object CosmoSettingSerializer : Serializer<CosmoSetting> {
             .setAutoSnoozeEnabled(true)
             .setBatchModeEnabled(true)
             .setCameraEnabled(false)
+            .setUpdateKeepEnabled(true)
+            .setSuggestCalendarEnabled(true)
+            .setSuggestMarinerEnabled(true)
+            .setSuggestCallAgentEnabled(true)
+            .setSuggestPhotosEnabled(true)
+            .setSuggestDeepResearchEnabled(true)
+            .setCosmoInsightsEnabled(true)
+            .setSuggestDocsEnabled(true)
+            .setRecordMemoriesEnabled(true)
+            .setDefineTermsEnabled(true)
+            .setProvidePersonContextEnabled(true)
+            .setProvideEventContextEnabled(true)
+            .setSuggestGoogleSearchesEnabled(true)
+            .setSuggestTimerEnabled(true)
+            .setProvideRecallEnabled(true)
+            .setSuggestNavigationEnabled(true)
+            .setSuggestAddTaskEnabled(true)
+            .setSuggestMailEnabled(true)
+            .setDraftSmsEnabled(true)
+            .setPlayMusicEnabled(true)
+            .setInvokeAgentQEnabled(true)
             .setProcessingMode(ProcessingMode.PROCESSING_MODE_HYBRID)
             .setFulfillmentModel(FulfillmentModel.FULFILLMENT_MODEL_NETWORK_AWARE)
             .build()
@@ -262,6 +283,12 @@ constructor() {
     val isTeamfood: Boolean = true
 
     fun isCosmoSkillsEnabled(): Boolean = true
+
+    fun isRecordMemoriesToggleEnabled(): Boolean = true
+
+    fun isProvidePersonContextToggleConfigured(settingHasField: Boolean): Boolean = settingHasField || isCosmoSkillsEnabled()
+
+    fun isProvideEventContextToggleConfigured(settingHasField: Boolean): Boolean = settingHasField || isCosmoSkillsEnabled()
 
     fun isAnalyticsSettingsVisible(): Boolean = true
 

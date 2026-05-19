@@ -1304,11 +1304,39 @@ private fun SettingsScreen(
         }
         item {
             StackPanel(label = "INTELLIGENCE", title = "Gatekeeping") {
+                StackToggleRow("Gatekeeper", "Ambient intent detection", setting.gatekeeperEnabled) {
+                    settingStore.launchUpdate { gatekeeperEnabled = it }
+                }
                 StackToggleRow("Raw audio gatekeeper", "Classify low-level audio frames", setting.rawAudioGatekeeperEnabled) {
                     settingStore.launchUpdate { rawAudioGatekeeperEnabled = it }
                 }
                 StackToggleRow("Voice match", "Prefer voice-authenticated triggers", setting.voiceMatchEnabled) {
                     settingStore.launchUpdate { voiceMatchEnabled = it }
+                }
+            }
+        }
+        item {
+            StackPanel(label = "SKILLS", title = "Suggestions") {
+                StackToggleRow("Timers", "Suggest timers from ambient audio", setting.suggestTimerEnabled) {
+                    settingStore.launchUpdate { suggestTimerEnabled = it }
+                }
+                StackToggleRow("Web search", "Suggest searches and lookups", setting.suggestGoogleSearchesEnabled) {
+                    settingStore.launchUpdate { suggestGoogleSearchesEnabled = it }
+                }
+                StackToggleRow("Define terms", "Suggest definitions for jargon", setting.defineTermsEnabled) {
+                    settingStore.launchUpdate { defineTermsEnabled = it }
+                }
+                StackToggleRow("Calendar", "Suggest calendar events", setting.suggestCalendarEnabled) {
+                    settingStore.launchUpdate { suggestCalendarEnabled = it }
+                }
+                StackToggleRow("Lists", "Suggest Keep list updates", setting.updateKeepEnabled) {
+                    settingStore.launchUpdate { updateKeepEnabled = it }
+                }
+                StackToggleRow("Memories", "Record interesting moments", setting.recordMemoriesEnabled) {
+                    settingStore.launchUpdate { recordMemoriesEnabled = it }
+                }
+                StackToggleRow("Browsing agent", "Suggest Mariner-style browsing tasks", setting.suggestMarinerEnabled) {
+                    settingStore.launchUpdate { suggestMarinerEnabled = it }
                 }
             }
         }

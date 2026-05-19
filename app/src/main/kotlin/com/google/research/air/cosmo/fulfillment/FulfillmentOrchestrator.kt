@@ -1,12 +1,16 @@
 package com.google.research.air.cosmo.fulfillment
 
+import android.util.Log
 import com.google.research.air.cosmo.di.ApplicationScope
 import com.google.research.air.cosmo.gatekeeping.GatekeeperOutputSource
+import com.google.research.air.cosmo.gatekeeping.util.GatekeeperResultUtils
 import com.google.research.air.cosmo.logging.CosmosTelemetry
 import com.google.research.air.cosmo.logging.TelemetryEvent
+import com.google.research.air.cosmo.setting.CosmoSettingStore
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 interface FulfillmentOrchestrator {
@@ -27,56 +31,134 @@ class FulfillmentOrchestratorImpl
 constructor(
     private val runner: FulfillmentRunner,
     private val gatekeeperOutput: GatekeeperOutputSource,
+    private val gatekeeperResultUtils: GatekeeperResultUtils,
+    private val configRegistry: FulfillmentConfigRegistry,
+    private val settings: CosmoSettingStore,
     @ApplicationScope private val scope: CoroutineScope,
     private val telemetry: CosmosTelemetry
 ) : FulfillmentOrchestrator {
+    private val taskQueue = Channel<FulfillmentTask>(Channel.UNLIMITED)
+
     init {
-        scope.launch {
-            gatekeeperOutput.results.collectLatest { result ->
-                if (result.triggeredFulfillment) {
-                    fulfillAndLog(
-                        prompt = "Gatekeeper trigger: ${result.detectedSkills.keys.joinToString()}",
-                        trigger = FulfillmentTriggerType.GATEKEEPER_TRIGGER
-                    )
-                }
-            }
-        }
+        scope.launch { startFulfillmentConsumer() }
+        scope.launch { startGatekeeperListener() }
     }
 
     override suspend fun handleBatchRun() {
-        fulfillAndLog("Batch pipeline run", FulfillmentTriggerType.BATCH_PIPELINE)
+        enqueue(
+            FulfillmentTask(
+                triggerType = FulfillmentTriggerType.BATCH_PIPELINE,
+                userQuery = "",
+            )
+        )
     }
 
     override suspend fun handleDoubleTap() {
-        fulfillAndLog("Pixel phone double tap", FulfillmentTriggerType.PIXEL_PHONE_DOUBLE_TAP)
+        enqueue(
+            FulfillmentTask(
+                triggerType = FulfillmentTriggerType.PIXEL_PHONE_DOUBLE_TAP,
+                userQuery = "",
+            )
+        )
     }
 
     override suspend fun handleUserQuery(
         query: String,
         conversationHistory: String
     ) {
-        fulfillAndLog("Reactive fulfillment. Conversation: $conversationHistory", FulfillmentTriggerType.USER_QUERY, query)
+        enqueue(
+            FulfillmentTask(
+                triggerType = FulfillmentTriggerType.USER_QUERY,
+                userQuery = query,
+                conversationHistory = conversationHistory,
+            )
+        )
     }
 
     override suspend fun handleWatchDoublePinch() {
-        fulfillAndLog("Pixel Watch double pinch", FulfillmentTriggerType.PIXEL_WATCH_DOUBLE_PINCH)
+        enqueue(
+            FulfillmentTask(
+                triggerType = FulfillmentTriggerType.PIXEL_WATCH_DOUBLE_PINCH,
+                userQuery = "",
+            )
+        )
     }
 
-    private suspend fun fulfillAndLog(
-        prompt: String,
-        trigger: FulfillmentTriggerType,
-        userQuery: String? = null
-    ) {
+    private suspend fun startGatekeeperListener() {
+        gatekeeperOutput.results.collect { result ->
+            val intents = gatekeeperResultUtils.getIntents(result)
+            if (intents.isEmpty()) {
+                Log.d(TAG, "No enabled intents found for fulfillment.")
+                return@collect
+            }
+            if (!settings.isGatekeeperEnabled()) return@collect
+            enqueue(
+                FulfillmentTask(
+                    triggerType = FulfillmentTriggerType.GATEKEEPER_TRIGGER,
+                    userQuery = "",
+                    gatekeeperResultString = intents.joinToString(","),
+                    conversationHistory = "",
+                    gatekeepingResult = result,
+                )
+            )
+        }
+    }
+
+    private suspend fun startFulfillmentConsumer() {
+        for (task in taskQueue) {
+            runCatching { doFulfillment(task) }
+                .onFailure { error ->
+                    Log.e(TAG, "Fulfillment failed for ${task.triggerType}", error)
+                }
+        }
+    }
+
+    private suspend fun enqueue(task: FulfillmentTask) {
+        taskQueue.send(task)
+    }
+
+    private suspend fun doFulfillment(task: FulfillmentTask) {
+        if (task.triggerType == FulfillmentTriggerType.GATEKEEPER_TRIGGER &&
+            !settings.isRealtimeProcessingEnabled()
+        ) {
+            Log.d(TAG, "Skipping gatekeeper fulfillment: batch processing mode.")
+            return
+        }
+
+        val intentNames =
+            task.gatekeeperResultString
+                .split(',')
+                .map(String::trim)
+                .filter(String::isNotBlank)
+        val config =
+            configRegistry.getConfigFor(
+                trigger = task.triggerType,
+                gatekeeperIntentNames = intentNames,
+                useLocalLlm = false,
+            )
+        if (task.triggerType == FulfillmentTriggerType.GATEKEEPER_TRIGGER && config.enabledSkillIds.isEmpty()) {
+            Log.d(TAG, "No enabled skills remain after gatekeeper filtering.")
+            return
+        }
+
         val actions =
             try {
-                runner.fulfill(prompt, trigger, userQuery)
+                runner.fulfill(
+                    config = config,
+                    userQuery = task.userQuery,
+                    trigger = task.triggerType,
+                    conversationHistory = task.conversationHistory,
+                    gatekeeperContext = task.gatekeepingResult,
+                    gatekeeperIntentNames = intentNames,
+                )
             } catch (e: com.google.research.air.cosmo.lib.llm.LlmUnavailableException) {
-                // Fail closed without killing the process. Genesis on a device with no LLM
-                // provisioned still needs to exercise the upstream gatekeeper / SODA paths
-                // during smoke testing; an LLM crash here would mask those signals.
-                android.util.Log.w("FulfillmentOrchestrator", "LLM unavailable, skipping fulfillment: ${e.message}")
+                Log.w(TAG, "LLM unavailable, skipping fulfillment: ${e.message}")
                 emptyList()
             }
-        telemetry.log(TelemetryEvent.FulfillmentRun(trigger.name, actions.size))
+        telemetry.log(TelemetryEvent.FulfillmentRun(task.triggerType.name, actions.size))
+    }
+
+    private companion object {
+        const val TAG = "FulfillmentOrchestrator"
     }
 }

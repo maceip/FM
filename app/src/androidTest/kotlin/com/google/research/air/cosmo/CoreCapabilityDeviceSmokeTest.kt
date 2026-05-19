@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.research.air.cosmo.fulfillment.ActionsRepositoryContract
 import com.google.research.air.cosmo.fulfillment.FulfillmentAction
 import com.google.research.air.cosmo.fulfillment.FulfillmentActionHandler
+import com.google.research.air.cosmo.fulfillment.FulfillmentConfigRegistry
 import com.google.research.air.cosmo.fulfillment.FulfillmentRunner
 import com.google.research.air.cosmo.fulfillment.FulfillmentTriggerType
 import com.google.research.air.cosmo.gatekeeping.Gatekeeper
@@ -43,6 +44,8 @@ class CoreCapabilityDeviceSmokeTest {
     @Inject lateinit var gatekeeperOutput: GatekeeperOutputSource
 
     @Inject lateinit var fulfillmentRunner: FulfillmentRunner
+
+    @Inject lateinit var fulfillmentConfigRegistry: FulfillmentConfigRegistry
 
     @Inject lateinit var actionsRepository: ActionsRepositoryContract
 
@@ -88,11 +91,12 @@ class CoreCapabilityDeviceSmokeTest {
 
             FEATURE_EXPECTATIONS.forEach { expectation ->
                 actionsRepository.clearAllActions()
+                val config = fulfillmentConfigRegistry.getConfigFor(FulfillmentTriggerType.USER_QUERY)
                 val actions =
                     fulfillmentRunner.fulfill(
-                        prompt = "Core capability smoke user-query run",
+                        config = config,
                         trigger = FulfillmentTriggerType.USER_QUERY,
-                        userQuery = expectation.prompt
+                        userQuery = expectation.prompt,
                     )
                 val action = actions.first(expectation.matches)
                 Log.i(
@@ -103,9 +107,9 @@ class CoreCapabilityDeviceSmokeTest {
 
             actionsRepository.clearAllActions()
             fulfillmentRunner.fulfill(
-                prompt = "Core capability smoke presence run",
+                config = fulfillmentConfigRegistry.getConfigFor(FulfillmentTriggerType.USER_QUERY),
                 trigger = FulfillmentTriggerType.USER_QUERY,
-                userQuery = "set a timer for 10 minutes"
+                userQuery = "set a timer for 10 minutes",
             )
             val timer = waitForUserFacingAction { it is FulfillmentAction.AddTimer }
             assertEquals(600, (timer as FulfillmentAction.AddTimer).durationSeconds)
