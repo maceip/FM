@@ -205,34 +205,5 @@ constructor(
 object VoiceOutputModule {
     @Provides
     @Singleton
-    fun provideVoiceOutput(
-        sherpa: SherpaVoiceOutput,
-        android: AndroidTextToSpeechVoiceOutput
-    ): VoiceOutput = FallbackVoiceOutput(primary = sherpa, fallback = android)
-}
-
-private class FallbackVoiceOutput(
-    private val primary: VoiceOutput,
-    private val fallback: VoiceOutput
-) : VoiceOutput {
-    override fun isPlaying(): Boolean = primary.isPlaying() || fallback.isPlaying()
-
-    override suspend fun speak(text: String): VoiceOutputResult =
-        when (val result = primary.speak(text)) {
-            is VoiceOutputResult.Unavailable -> {
-                Log.w(TAG, "primary voice output unavailable: ${result.reason}; falling back")
-                fallback.speak(text)
-            }
-
-            else -> result
-        }
-
-    override fun stop() {
-        primary.stop()
-        fallback.stop()
-    }
-
-    private companion object {
-        const val TAG = "VoiceOutput"
-    }
+    fun provideVoiceOutput(sherpa: SherpaVoiceOutput): VoiceOutput = sherpa
 }
