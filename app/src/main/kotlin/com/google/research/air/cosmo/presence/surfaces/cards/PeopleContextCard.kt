@@ -14,7 +14,7 @@ import com.google.research.air.cosmo.presence.PresenceTokens
 @Composable
 internal fun PeopleContextContent(data: CardPayload.PeopleContext) {
     Column(Modifier.testTag("peopleContextCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "PEOPLE", title = "CONTACT")
+        CardHeader(categoryLabel = "CONTEXT", title = "CONTACT PROFILE")
         ContactRow(name = data.name, initials = data.initials, detail = data.detail)
         data.role?.let {
             MonoLabel("ROLE")

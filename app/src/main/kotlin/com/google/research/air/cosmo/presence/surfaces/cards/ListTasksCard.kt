@@ -11,7 +11,7 @@ import com.google.research.air.cosmo.presence.CardPayload
 @Composable
 internal fun ListTasksContent(data: CardPayload.ListTasks, onToggle: (Int, Boolean) -> Unit = { _, _ -> }) {
     Column(Modifier.testTag("listTasksCard"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        CardHeader(categoryLabel = "TASKS", title = data.title)
+        CardHeader(categoryLabel = "LISTING", title = data.title)
         data.items.forEachIndexed { index, item ->
             CheckItemRow(item = item, onToggle = { checked -> onToggle(index, checked) })
         }

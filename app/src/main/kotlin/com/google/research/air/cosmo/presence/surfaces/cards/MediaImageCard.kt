@@ -14,7 +14,7 @@ import com.google.research.air.cosmo.presence.PresenceTokens
 @Composable
 internal fun MediaImageContent(data: CardPayload.MediaImage) {
     Column(Modifier.testTag("mediaImageCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "MEDIA", title = "IMAGE SEARCH")
+        CardHeader(categoryLabel = "SEARCHING", title = "IMAGE EXPLORER")
         if (data.thumbnails.isNotEmpty()) {
             ThumbnailGrid(data.thumbnails)
         }

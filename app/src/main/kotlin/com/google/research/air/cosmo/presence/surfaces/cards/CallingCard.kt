@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.research.air.cosmo.presence.CallStatus
 import com.google.research.air.cosmo.presence.CardPayload
 import com.google.research.air.cosmo.presence.PresenceTokens
 import com.google.research.air.cosmo.presence.surfaces.InnerPanel
@@ -19,7 +20,8 @@ import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 @Composable
 internal fun CallingContent(data: CardPayload.Calling) {
     Column(Modifier.testTag("callingCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "CALLING", title = "CALLING AGENT")
+        val title = if (data.status == CallStatus.RINGING) "AGENT CONTACT" else "CALLING AGENT"
+        CardHeader(categoryLabel = if (data.status == CallStatus.RINGING) "LIVE CALL" else "CALLING", title = title)
         ContactRow(name = data.contactName, initials = data.contactInitials, detail = data.status.name)
         MonoLabel("STATUS: ${data.status.name}")
         data.transcript?.let { transcript ->

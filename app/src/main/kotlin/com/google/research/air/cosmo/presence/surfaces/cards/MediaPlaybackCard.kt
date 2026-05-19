@@ -25,7 +25,7 @@ import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 @Composable
 internal fun MediaPlaybackContent(data: CardPayload.MediaPlayback) {
     Column(Modifier.testTag("mediaPlaybackCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "MEDIA", title = "PLAYBACK")
+        CardHeader(categoryLabel = if (data.queue.isNotEmpty()) "PLAYING" else "MEDIA", title = if (data.queue.isNotEmpty()) "MEDIA QUEUE" else "PLAYBACK")
         InnerPanel(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PlaybackGlyph(Modifier.size(72.dp))

@@ -15,7 +15,7 @@ import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 @Composable
 internal fun CalendarTimeContent(data: CardPayload.CalendarTime) {
     Column(Modifier.testTag("calendarTimeCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "CALENDAR", title = data.eventTitle ?: "CALENDAR / TIMER")
+        CardHeader(categoryLabel = if (data.eventTitle != null) "UPCOMING" else "CALENDAR", title = data.eventTitle ?: "CALENDAR / TIMER")
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             InnerPanel(Modifier.weight(1f)) {
                 Column {

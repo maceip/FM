@@ -13,13 +13,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.research.air.cosmo.presence.CardPayload
+import com.google.research.air.cosmo.presence.DocumentType
 import com.google.research.air.cosmo.presence.PresenceTokens
 import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 
 @Composable
 internal fun DocumentContent(data: CardPayload.Document) {
     Column(Modifier.testTag("documentCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "DOCUMENT", title = data.docType.name)
+        val title = if (data.docType == DocumentType.REPORT) "DOCUMENT OVERVIEW" else data.docType.name
+        CardHeader(categoryLabel = if (data.docType == DocumentType.REPORT) "REVIEWING" else "DOCUMENT", title = title)
         MonoLabel(data.title)
         if (data.preview.isNotBlank()) {
             InnerPanel {

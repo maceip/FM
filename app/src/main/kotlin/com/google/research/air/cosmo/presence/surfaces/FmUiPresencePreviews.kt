@@ -3,10 +3,15 @@
 package com.google.research.air.cosmo.presence.surfaces
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -392,12 +397,123 @@ internal fun FmUiCardOnboardingPreview() {
     FmUiWideOnboardingCardPreview()
 }
 
+@Preview(
+    name = "fm_ui/cards/reference_grid.png",
+    widthDp = 1122,
+    heightDp = 1402,
+    showBackground = false
+)
+@Composable
+internal fun FmUiCardReferenceGridPreview() {
+    FmUiCanvas(widthDp = 1122, heightDp = 1402) {
+        Column(
+            modifier = Modifier.padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
+        ) {
+            referenceMockCards.chunked(4).forEach { rowCards ->
+                Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                    rowCards.forEach { card ->
+                        CardStackSurface(
+                            cards = listOf(card),
+                            maxWidth = 250.dp,
+                            modifier = Modifier.width(250.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Preview(name = "fm_ui/cards/mock_deep_research.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockDeepResearchPreview() {
+    FmUiMockCardPreview(mockDeepResearchCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_agent_contact.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockAgentContactPreview() {
+    FmUiMockCardPreview(mockAgentContactCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_message_compose.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockMessageComposePreview() {
+    FmUiMockCardPreview(mockMessageComposeCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_document_overview.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockDocumentOverviewPreview() {
+    FmUiMockCardPreview(mockDocumentOverviewCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_action_items.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockActionItemsPreview() {
+    FmUiMockCardPreview(mockActionItemsCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_event_scheduler.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockEventSchedulerPreview() {
+    FmUiMockCardPreview(mockEventSchedulerCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_route_assist.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockRouteAssistPreview() {
+    FmUiMockCardPreview(mockRouteAssistCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_media_queue.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockMediaQueuePreview() {
+    FmUiMockCardPreview(mockMediaQueueCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_contact_profile.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockContactProfilePreview() {
+    FmUiMockCardPreview(mockContactProfileCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_image_explorer.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockImageExplorerPreview() {
+    FmUiMockCardPreview(mockImageExplorerCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_citation_generator.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockCitationGeneratorPreview() {
+    FmUiMockCardPreview(mockCitationGeneratorCard)
+}
+
+@Preview(name = "fm_ui/cards/mock_action_permission.png", widthDp = 360, heightDp = 460, showBackground = false)
+@Composable
+internal fun FmUiMockActionPermissionPreview() {
+    FmUiMockCardPreview(mockActionPermissionCard)
+}
+
 @Composable
 private fun FmUiSingleCardPreview(card: PresenceCard) {
     FmUiCanvas(widthDp = 1122, heightDp = 1402) {
         CardStackSurface(
             cards = listOf(card),
             modifier = Modifier.offset(x = 386.dp, y = 132.dp)
+        )
+    }
+}
+
+@Composable
+private fun FmUiMockCardPreview(card: PresenceCard) {
+    FmUiCanvas(widthDp = 360, heightDp = 460) {
+        CardStackSurface(
+            cards = listOf(card),
+            maxWidth = 328.dp,
+            modifier = Modifier.offset(x = 0.dp, y = 0.dp)
         )
     }
 }
@@ -675,6 +791,229 @@ private val onboardingCard =
                         OnboardingCheckpoint("First Task")
                     )
             )
+    )
+
+private val mockDeepResearchCard =
+    browserCard.copy(id = "mock-deep-research")
+
+private val mockAgentContactCard =
+    PresenceCard(
+        id = "mock-agent-contact",
+        payload =
+            CardPayload.Calling(
+                contactName = "Sarah J.",
+                contactInitials = "SJ",
+                status = CallStatus.RINGING,
+                transcript = "Live call 03:45\nVolume ready. Hold and transfer controls available."
+            ),
+        actions =
+            listOf(
+                CardAction("end", "End", "Call", CardActionType.DESTRUCTIVE),
+                CardAction("hold", "Hold", "Call"),
+                CardAction("transfer", "Transfer", null)
+            )
+    )
+
+private val mockMessageComposeCard =
+    PresenceCard(
+        id = "mock-message-compose",
+        payload =
+            CardPayload.Messaging(
+                body = "To: [contact]\nSubject: [text]\n\nJust wanted to follow up and message the team while you're starting about contact.",
+                recipients = emptyList(),
+                channel = MessageChannel.EMAIL
+            ),
+        actions =
+            listOf(
+                CardAction("send", "Send", "Now", CardActionType.PRIMARY),
+                CardAction("save", "Save", "Draft"),
+                CardAction("attach", "Attachments", null)
+            )
+    )
+
+private val mockDocumentOverviewCard =
+    PresenceCard(
+        id = "mock-document-overview",
+        payload =
+            CardPayload.Document(
+                title = "Project_Alpha_Spec.pdf",
+                docType = DocumentType.REPORT,
+                preview = "Key features are:\n- Key features are: Stetosed.\n- Schedule highlights: Open texts\n- Risk analysis: Controction.",
+                outline = listOf("Project_Alpha_Spec", "Sommesary", "Outline")
+            ),
+        actions =
+            listOf(
+                CardAction("read", "Read", "Full"),
+                CardAction("export", "Export", "PDF"),
+                CardAction("note", "Add", "Note")
+            )
+    )
+
+private val mockActionItemsCard =
+    PresenceCard(
+        id = "mock-action-items",
+        payload =
+            CardPayload.ListTasks(
+                title = "ACTION ITEMS",
+                items =
+                    listOf(
+                        CheckItem("Finalize report"),
+                        CheckItem("Schedule meeting", checked = true),
+                        CheckItem("Send follow-up email")
+                    )
+            ),
+        actions =
+            listOf(
+                CardAction("complete", "Mark", "Complete"),
+                CardAction("edit", "Edit", "Items"),
+                CardAction("archive", "Archive", "List")
+            )
+    )
+
+private val mockEventSchedulerCard =
+    PresenceCard(
+        id = "mock-event-scheduler",
+        payload =
+            CardPayload.CalendarTime(
+                focusMinutes = 15,
+                focusSeconds = 0,
+                reminders = listOf(Reminder("2:00 PM - 3:00 PM", "Product Launch Sync"), Reminder("Reminders:", "3")),
+                eventTitle = "EVENT SCHEDULER"
+            ),
+        actions =
+            listOf(
+                CardAction("add", "Add", "Event", CardActionType.PRIMARY),
+                CardAction("set", "Set", "Reminder"),
+                CardAction("week", "View", "Week")
+            )
+    )
+
+private val mockRouteAssistCard =
+    PresenceCard(
+        id = "mock-route-assist",
+        payload =
+            CardPayload.Navigation(
+                destination = "Product Launch Sync",
+                routeSummary = "Turn left in 0.2 mi. Live map and alternatives are ready.",
+                eta = "14 MIN"
+            ),
+        actions =
+            listOf(
+                CardAction("start", "Start", "Nav", CardActionType.PRIMARY),
+                CardAction("traffic", "Show", "Traffic"),
+                CardAction("alt", "Alternative", null)
+            )
+    )
+
+private val mockMediaQueueCard =
+    PresenceCard(
+        id = "mock-media-queue",
+        payload =
+            CardPayload.MediaPlayback(
+                query = "Quantum Resonance",
+                provider = "AI echoes",
+                queue = listOf("Now playing", "Playback", "Lyrics")
+            ),
+        actions =
+            listOf(
+                CardAction("shuffle", "Shuffle", null),
+                CardAction("queue", "View", "Queue"),
+                CardAction("lyrics", "Lyrics", null)
+            )
+    )
+
+private val mockContactProfileCard =
+    PresenceCard(
+        id = "mock-contact-profile",
+        payload =
+            CardPayload.PeopleContext(
+                name = "James L.",
+                initials = "JL",
+                detail = "Full name\nemail1, email2\n(338) 353-8777",
+                role = "Recent interactions: Tivesaomp app"
+            ),
+        actions =
+            listOf(
+                CardAction("call", "Call", "Now"),
+                CardAction("message", "Message", null),
+                CardAction("edit", "Edit", "Contact")
+            )
+    )
+
+private val mockImageExplorerCard =
+    PresenceCard(
+        id = "mock-image-explorer",
+        payload =
+            CardPayload.MediaImage(
+                thumbnails =
+                    listOf(
+                        Thumbnail("ABSTRACT"),
+                        Thumbnail("ART"),
+                        Thumbnail("4300")
+                    ),
+                caption = "Abstract Art - 4,300 results"
+            ),
+        actions =
+            listOf(
+                CardAction("save", "Save", "Search"),
+                CardAction("filters", "Filters", null),
+                CardAction("view", "View", "Full")
+            )
+    )
+
+private val mockCitationGeneratorCard =
+    PresenceCard(
+        id = "mock-citation-generator",
+        payload =
+            CardPayload.SourceCitation(
+                citations =
+                    listOf(
+                        CitationEntry(
+                            "Adoowh, A. Elastonne. Appa, contact of citation.",
+                            "paper formats in IEEE / MLA",
+                            95,
+                            "Source verified"
+                        )
+                    )
+            ),
+        actions =
+            listOf(
+                CardAction("copy", "Copy", "Clipboard"),
+                CardAction("bib", "Biblography", null),
+                CardAction("export", "Export", "Citation")
+            )
+    )
+
+private val mockActionPermissionCard =
+    PresenceCard(
+        id = "mock-action-permission",
+        payload =
+            CardPayload.PermissionConfirmation(
+                prompt = "ALLOW 'APPX' TO ACCESS LOCATION?\n\nThis allows AppX to show local services.",
+                actionLabel = "Grant Access"
+            ),
+        actions =
+            listOf(
+                CardAction("approve", "Approve", null, CardActionType.PRIMARY),
+                CardAction("undo", "Undo", "Last"),
+                CardAction("permissions", "Permissions", null)
+            )
+    )
+
+private val referenceMockCards =
+    listOf(
+        mockDeepResearchCard,
+        mockAgentContactCard,
+        mockMessageComposeCard,
+        mockDocumentOverviewCard,
+        mockActionItemsCard,
+        mockEventSchedulerCard,
+        mockRouteAssistCard,
+        mockMediaQueueCard,
+        mockContactProfileCard,
+        mockImageExplorerCard,
+        mockCitationGeneratorCard,
+        mockActionPermissionCard
     )
 
 private val previewStack = listOf(browserCard, messagingCard, calendarCard)

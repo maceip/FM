@@ -28,7 +28,7 @@ import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 @Composable
 internal fun PermissionConfirmationContent(data: CardPayload.PermissionConfirmation) {
     Column(Modifier.testTag("permissionCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "CONFIRM", title = "PERMISSION")
+        CardHeader(categoryLabel = "PENDING", title = "ACTION PERMISSION")
         InnerPanel(Modifier.fillMaxWidth()) {
             Text(
                 data.prompt,

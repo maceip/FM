@@ -21,7 +21,8 @@ import com.google.research.air.cosmo.presence.surfaces.InnerPanel
 @Composable
 internal fun MessagingContent(data: CardPayload.Messaging) {
     Column(Modifier.testTag("messagingCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "MESSAGING", title = "SEND RESULTS")
+        val isComposeMock = data.recipients.isEmpty()
+        CardHeader(categoryLabel = if (isComposeMock) "DRAFTING" else "MESSAGING", title = if (isComposeMock) "MESSAGE COMPOSE" else "SEND RESULTS")
         MonoLabel("DRAFT REPLY")
         InnerPanel {
             Text(data.body, color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, fontFamily = FontFamily.Monospace, lineHeight = 18.sp)

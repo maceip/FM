@@ -11,7 +11,7 @@ import com.google.research.air.cosmo.presence.CardPayload
 @Composable
 internal fun SourceCitationContent(data: CardPayload.SourceCitation) {
     Column(Modifier.testTag("sourceCitationCard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CardHeader(categoryLabel = "SOURCES", title = "CITATIONS")
+        CardHeader(categoryLabel = "CITING", title = "CITATION GENERATOR")
         MonoLabel("PROVENANCE")
         data.citations.forEach { CitationRow(it) }
     }
