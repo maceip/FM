@@ -42,43 +42,72 @@ fun GlassPanel(
     Box(
         modifier = modifier
             .shadow(
-                elevation = 18.dp,
+                elevation = 26.dp,
                 shape = shape,
-                ambientColor = Color.Black.copy(alpha = 0.55f),
-                spotColor = glowColor.copy(alpha = if (showGlowEdge) 0.22f else 0.08f)
+                ambientColor = Color.Black.copy(alpha = 0.72f),
+                spotColor = glowColor.copy(alpha = if (showGlowEdge) 0.42f else 0.16f)
             )
             .clip(shape)
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.08f),
-                        fill.copy(alpha = 0.92f),
-                        Color.Black.copy(alpha = 0.42f)
+                        Color.White.copy(alpha = 0.075f),
+                        fill.copy(alpha = 0.94f),
+                        Color(0xF4050914)
                     )
                 ),
                 shape
             )
-            .border(1.dp, if (showGlowEdge) PresenceTokens.Palette.BorderBright else borderColor, shape)
+            .border(1.dp, if (showGlowEdge) PresenceTokens.Palette.BorderBright.copy(alpha = 0.92f) else borderColor, shape)
             .drawBehind {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.055f),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width * 0.22f, 0f),
+                        radius = size.width * 0.78f
+                    ),
+                    size = size
+                )
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = if (showGlowEdge) 0.12f else 0.045f),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width, size.height * 0.42f),
+                        radius = size.height * 0.72f
+                    ),
+                    size = size
+                )
                 // Top and bottom edge highlights create the machined glass outline from the comps.
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.72f), Color.Transparent)
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.90f), Color.Transparent)
                     ),
                     topLeft = Offset.Zero,
                     size = Size(size.width, 1.dp.toPx())
                 )
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.32f), Color.Transparent)
+                        colors = listOf(Color.White.copy(alpha = 0.48f), Color.Transparent)
                     ),
                     topLeft = Offset.Zero,
+                    size = Size(1.dp.toPx(), size.height)
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.34f), Color.Transparent)
+                    ),
+                    topLeft = Offset(size.width - 1.dp.toPx(), 0f),
                     size = Size(1.dp.toPx(), size.height)
                 )
                 // bottom-edge subtle line
                 drawRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(Color.Transparent, PresenceTokens.Palette.BorderBright.copy(alpha = 0.28f), Color.Transparent)
+                        colors = listOf(Color.Transparent, PresenceTokens.Palette.BorderBright.copy(alpha = 0.42f), Color.Transparent)
                     ),
                     topLeft = Offset(0f, size.height - 1.dp.toPx()),
                     size = Size(size.width, 1.dp.toPx())
@@ -106,8 +135,8 @@ fun InnerPanel(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(PresenceTokens.Size.cardInnerCorner))
-            .background(Color.Black.copy(alpha = 0.3f))
-            .border(1.dp, PresenceTokens.Palette.BorderDim, RoundedCornerShape(PresenceTokens.Size.cardInnerCorner))
+            .background(Color.Black.copy(alpha = 0.36f))
+            .border(1.dp, PresenceTokens.Palette.BorderDim.copy(alpha = 0.88f), RoundedCornerShape(PresenceTokens.Size.cardInnerCorner))
             .padding(PresenceTokens.Spacing.sectionGap),
         content = content
     )
@@ -121,18 +150,18 @@ private fun GlowEdgeStrip(
     Box(
         modifier = modifier
             .width(PresenceTokens.Glow.cardEdgeGlowWidth)
-            .height(104.dp)
+            .height(126.dp)
             .drawBehind {
                 drawRoundRect(
-                    color = color,
+                    color = color.copy(alpha = 0.95f),
                     cornerRadius = CornerRadius(4f),
                     size = Size(size.width, size.height)
                 )
                 // glow halo
                 drawRoundRect(
-                    color = color.copy(alpha = 0.3f),
-                    topLeft = Offset(-4.dp.toPx(), -4.dp.toPx()),
-                    size = Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()),
+                    color = color.copy(alpha = 0.46f),
+                    topLeft = Offset(-7.dp.toPx(), -8.dp.toPx()),
+                    size = Size(size.width + 14.dp.toPx(), size.height + 16.dp.toPx()),
                     cornerRadius = CornerRadius(8f)
                 )
             }

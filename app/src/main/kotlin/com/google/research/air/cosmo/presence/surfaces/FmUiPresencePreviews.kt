@@ -26,6 +26,7 @@ import com.google.research.air.cosmo.presence.MessageChannel
 import com.google.research.air.cosmo.presence.OnboardingCheckpoint
 import com.google.research.air.cosmo.presence.OrbActivity
 import com.google.research.air.cosmo.presence.PresenceCard
+import com.google.research.air.cosmo.presence.PresenceTokens
 import com.google.research.air.cosmo.presence.Recipient
 import com.google.research.air.cosmo.presence.Reminder
 import com.google.research.air.cosmo.presence.SettingItem
@@ -215,7 +216,8 @@ internal fun FmUiStackFoldableContextPreview() {
     FmUiCanvas(widthDp = 1448, heightDp = 1086) {
         CardStackSurface(
             cards = previewStack,
-            modifier = Modifier.offset(x = 670.dp, y = 96.dp)
+            maxWidth = PresenceTokens.Size.cardStackWideWidth,
+            modifier = Modifier.offset(x = 650.dp, y = 96.dp)
         )
     }
 }
@@ -376,7 +378,7 @@ internal fun FmUiCardPermissionPreview() {
 )
 @Composable
 internal fun FmUiCardSettingsPreview() {
-    FmUiSingleCardPreview(settingsCard)
+    FmUiWideSettingsCardPreview()
 }
 
 @Preview(
@@ -387,7 +389,7 @@ internal fun FmUiCardSettingsPreview() {
 )
 @Composable
 internal fun FmUiCardOnboardingPreview() {
-    FmUiSingleCardPreview(onboardingCard)
+    FmUiWideOnboardingCardPreview()
 }
 
 @Composable
@@ -396,6 +398,28 @@ private fun FmUiSingleCardPreview(card: PresenceCard) {
         CardStackSurface(
             cards = listOf(card),
             modifier = Modifier.offset(x = 386.dp, y = 132.dp)
+        )
+    }
+}
+
+@Composable
+private fun FmUiWideSettingsCardPreview() {
+    FmUiCanvas(widthDp = 904, heightDp = 514) {
+        CardStackSurface(
+            cards = listOf(settingsCard),
+            maxWidth = 876.dp,
+            modifier = Modifier.offset(x = 0.dp, y = 0.dp)
+        )
+    }
+}
+
+@Composable
+private fun FmUiWideOnboardingCardPreview() {
+    FmUiCanvas(widthDp = 904, heightDp = 572) {
+        CardStackSurface(
+            cards = listOf(onboardingCard),
+            maxWidth = 876.dp,
+            modifier = Modifier.offset(x = 0.dp, y = 0.dp)
         )
     }
 }
@@ -631,14 +655,9 @@ private val settingsCard =
                         SettingItem("Accent Color", enabled = true, value = "Blue"),
                         SettingItem("UI Animation", enabled = true),
                         SettingItem("Source Cache", enabled = false),
+                        SettingItem("Anon. Diagnostics", enabled = false),
                         SettingItem("Location Access", enabled = false)
                     )
-            ),
-        actions =
-            listOf(
-                CardAction("search", "Search", "Settings"),
-                CardAction("reset", "Reset", "Defaults"),
-                CardAction("collapse", "Collapse", "To Edge", CardActionType.COLLAPSE)
             )
     )
 
@@ -655,12 +674,6 @@ private val onboardingCard =
                         OnboardingCheckpoint("Settings", complete = true),
                         OnboardingCheckpoint("First Task")
                     )
-            ),
-        actions =
-            listOf(
-                CardAction("open", "Open", "Browser"),
-                CardAction("sources", "Better", "Sources"),
-                CardAction("collapse", "Collapse", "To Edge", CardActionType.COLLAPSE)
             )
     )
 

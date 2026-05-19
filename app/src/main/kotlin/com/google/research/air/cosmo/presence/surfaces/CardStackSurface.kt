@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.research.air.cosmo.presence.CardPayload
@@ -58,6 +59,7 @@ import com.google.research.air.cosmo.presence.surfaces.cards.SourceCitationConte
 fun CardStackSurface(
     cards: List<PresenceCard>,
     modifier: Modifier = Modifier,
+    maxWidth: Dp = PresenceTokens.Size.cardStackMaxWidth,
     onAction: (cardId: String, actionId: String) -> Unit = { _, _ -> },
     onCardSelected: (cardId: String) -> Unit = {},
     onDismiss: (cardId: String) -> Unit = {}
@@ -66,12 +68,18 @@ fun CardStackSurface(
         Column(
             modifier = modifier
                 .padding(horizontal = PresenceTokens.Spacing.cardPadding)
-                .widthIn(max = PresenceTokens.Size.cardStackMaxWidth)
+                .widthIn(max = maxWidth)
                 .testTag("cardStack"),
             verticalArrangement = Arrangement.spacedBy(PresenceTokens.Spacing.cardGap)
         ) {
             cards.forEach { card ->
-                PresenceCardPanel(card = card, onAction = onAction, onCardSelected = onCardSelected, onDismiss = onDismiss)
+                PresenceCardPanel(
+                    card = card,
+                    onAction = onAction,
+                    onCardSelected = onCardSelected,
+                    onDismiss = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
         return
@@ -81,7 +89,7 @@ fun CardStackSurface(
         cards = cards,
         modifier = modifier
             .padding(horizontal = PresenceTokens.Spacing.cardPadding)
-            .widthIn(max = PresenceTokens.Size.cardStackMaxWidth)
+            .widthIn(max = maxWidth)
             .testTag("cardStack"),
         onAction = onAction,
         onCardSelected = onCardSelected,

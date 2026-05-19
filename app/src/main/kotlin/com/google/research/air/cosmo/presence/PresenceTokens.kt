@@ -57,6 +57,7 @@ object PresenceTokens {
 
         val cardCorner: Dp = 16.dp
         val cardStackMaxWidth: Dp = 360.dp
+        val cardStackWideWidth: Dp = 680.dp
         val cardGlowStripWidth: Dp = 2.dp
         val cardInnerCorner: Dp = 8.dp
         val cardIconSize: Dp = 32.dp

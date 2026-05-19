@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.google.research.air.cosmo.presence.CardActionType
 import com.google.research.air.cosmo.presence.OrbActivity
 import com.google.research.air.cosmo.presence.PresenceState
+import com.google.research.air.cosmo.presence.PresenceTokens
 import com.google.research.air.cosmo.presence.surfaces.CardStackSurface
 import com.google.research.air.cosmo.presence.surfaces.OrbSurface
 import com.google.research.air.cosmo.presence.surfaces.TabSurface
@@ -37,7 +39,13 @@ fun PresenceOverlayContent(
             translationX = progress * 34f
             alpha = 1f - progress * 0.22f
         }
-    Box(modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val cardStackMaxWidth =
+            if (maxWidth >= 700.dp) {
+                PresenceTokens.Size.cardStackWideWidth
+            } else {
+                PresenceTokens.Size.cardStackMaxWidth
+            }
         AnimatedContent(
             targetState = uiState.route,
             transitionSpec = {
@@ -85,6 +93,7 @@ fun PresenceOverlayContent(
                 if (ready != null) {
                     CardStackSurface(
                         cards = ready.cards,
+                        maxWidth = cardStackMaxWidth,
                         modifier =
                             Modifier
                                 .align(Alignment.CenterEnd)
