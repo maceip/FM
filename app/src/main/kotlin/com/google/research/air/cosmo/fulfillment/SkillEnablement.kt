@@ -20,38 +20,43 @@ constructor(
     fun isSkillEnabled(skillId: String): Boolean {
         if (!configuration.isCosmoSkillsEnabled()) return false
         val setting = settings.currentSetting
-        return when (skillId) {
-            "add_to_list" -> setting.updateKeepEnabled
-            "define_term" -> setting.defineTermsEnabled
-            "web_search" -> setting.suggestGoogleSearchesEnabled
-            "query_photos" -> setting.suggestPhotosEnabled
-            "create_calendar_event" -> setting.suggestCalendarEnabled
-            "create_doc" -> setting.suggestDocsEnabled
-            "provide_person_context" ->
-                configuration.isProvidePersonContextToggleConfigured(setting.providePersonContextEnabled) &&
-                    setting.providePersonContextEnabled
-            "provide_event_context" ->
-                configuration.isProvideEventContextToggleConfigured(setting.provideEventContextEnabled) &&
-                    setting.provideEventContextEnabled
-            "deep_research" -> setting.suggestDeepResearchEnabled
-            "provide_insight" -> setting.cosmoInsightsEnabled
-            "browsing_agent" -> setting.suggestMarinerEnabled
-            "call_agent" -> setting.suggestCallAgentEnabled
-            "add_timer" -> setting.suggestTimerEnabled
-            "add_to_memory" ->
-                configuration.isRecordMemoriesToggleEnabled() && setting.recordMemoriesEnabled
-            "add_task" -> setting.suggestAddTaskEnabled
-            "draft_email" -> setting.suggestMailEnabled
-            "draft_sms" -> setting.draftSmsEnabled
-            "navigation" -> setting.suggestNavigationEnabled
-            "play_music" -> setting.playMusicEnabled
-            "provide_recall" -> setting.provideRecallEnabled
-            "invoke_agent_q" -> setting.invokeAgentQEnabled && settings.isInvokeAgentQEnabled()
-            "active_data_plan" -> true
-            else -> true
-        }
+        return skillChecks[skillId]?.invoke(this, setting) ?: true
     }
 
     fun enabledSkillIds(allSkillIds: Collection<String>): Set<String> =
         allSkillIds.filter(::isSkillEnabled).toSet()
+
+    private companion object {
+        val skillChecks: Map<String, SkillEnablement.(CosmoSetting) -> Boolean> =
+            mapOf(
+                "add_to_list" to { it.updateKeepEnabled },
+                "define_term" to { it.defineTermsEnabled },
+                "web_search" to { it.suggestGoogleSearchesEnabled },
+                "query_photos" to { it.suggestPhotosEnabled },
+                "create_calendar_event" to { it.suggestCalendarEnabled },
+                "create_doc" to { it.suggestDocsEnabled },
+                "provide_person_context" to {
+                    configuration.isProvidePersonContextToggleConfigured(it.providePersonContextEnabled) &&
+                        it.providePersonContextEnabled
+                },
+                "provide_event_context" to {
+                    configuration.isProvideEventContextToggleConfigured(it.provideEventContextEnabled) &&
+                        it.provideEventContextEnabled
+                },
+                "deep_research" to { it.suggestDeepResearchEnabled },
+                "provide_insight" to { it.cosmoInsightsEnabled },
+                "browsing_agent" to { it.suggestMarinerEnabled },
+                "call_agent" to { it.suggestCallAgentEnabled },
+                "add_timer" to { it.suggestTimerEnabled },
+                "add_to_memory" to { configuration.isRecordMemoriesToggleEnabled() && it.recordMemoriesEnabled },
+                "add_task" to { it.suggestAddTaskEnabled },
+                "draft_email" to { it.suggestMailEnabled },
+                "draft_sms" to { it.draftSmsEnabled },
+                "navigation" to { it.suggestNavigationEnabled },
+                "play_music" to { it.playMusicEnabled },
+                "provide_recall" to { it.provideRecallEnabled },
+                "invoke_agent_q" to { it.invokeAgentQEnabled && settings.isInvokeAgentQEnabled() },
+                "active_data_plan" to { true },
+            )
+    }
 }

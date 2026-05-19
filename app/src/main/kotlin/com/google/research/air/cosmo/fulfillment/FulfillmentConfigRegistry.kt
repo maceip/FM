@@ -19,70 +19,78 @@ constructor(
         gatekeeperIntentNames: List<String> = emptyList(),
         useLocalLlm: Boolean = false,
     ): FulfillmentConfig {
-        val allEnabled =
-            skillEnablement.enabledSkillIds(skills.list().map { it.id })
-        val gatekeeperSkills =
-            if (gatekeeperIntentNames.isEmpty()) {
-                emptySet()
-            } else {
-                GatekeeperResultUtils.intentNamesToSkillIds(gatekeeperIntentNames)
-            }
-        val enabledSkillIds =
-            when (trigger) {
-                FulfillmentTriggerType.GATEKEEPER_TRIGGER -> {
-                    if (gatekeeperSkills.isEmpty()) {
-                        allEnabled
-                    } else {
-                        allEnabled.intersect(gatekeeperSkills)
-                    }
-                }
-                else -> allEnabled
-            }
-        val buffers = mutableSetOf<FulfillmentBufferKind>()
-        if (settings.isAmbientAudioEnabled()) buffers += FulfillmentBufferKind.AMBIENT_AUDIO
-        if (settings.isMediaAudioEnabled()) buffers += FulfillmentBufferKind.DEVICE_AUDIO
-        if (settings.isWatchAudioEnabled()) buffers += FulfillmentBufferKind.WATCH_AUDIO
-        if (settings.isBudsAudioEnabled()) buffers += FulfillmentBufferKind.BUDS_AUDIO
-        if (settings.isScreenContextEnabled()) buffers += FulfillmentBufferKind.SCREEN
-        if (settings.isNotificationCaptureEnabled()) buffers += FulfillmentBufferKind.NOTIFICATION
-        if (settings.isIntentExtractionEnabled()) buffers += FulfillmentBufferKind.INTENT
-
-        val (temperature, maxMemoryQueries, memoryTopK) =
-            when (trigger) {
-                FulfillmentTriggerType.USER_QUERY -> Triple(0.5f, 0, 0)
-                FulfillmentTriggerType.BATCH_PIPELINE -> Triple(0.5f, 0, 0)
-                FulfillmentTriggerType.GATEKEEPER_TRIGGER -> Triple(1.0f, 0, 0)
-                FulfillmentTriggerType.PIXEL_PHONE_DOUBLE_TAP -> Triple(1.0f, 5, 20)
-                FulfillmentTriggerType.PIXEL_WATCH_DOUBLE_PINCH -> Triple(0.8f, 0, 0)
-                FulfillmentTriggerType.PIXEL_PHONE_PICK_UP -> Triple(1.0f, 0, 0)
-            }
-
-        val gatekeeperBuffers =
-            if (trigger == FulfillmentTriggerType.GATEKEEPER_TRIGGER) {
-                setOf(
-                    FulfillmentBufferKind.AMBIENT_AUDIO,
-                    FulfillmentBufferKind.WATCH_AUDIO,
-                    FulfillmentBufferKind.BUDS_AUDIO,
-                    FulfillmentBufferKind.DEVICE_AUDIO,
-                )
-            } else {
-                emptySet()
-            }
-        val enabledBuffers =
-            if (gatekeeperBuffers.isEmpty()) {
-                buffers
-            } else {
-                buffers.intersect(gatekeeperBuffers).ifEmpty { gatekeeperBuffers.intersect(buffers) }
-            }
+        val params = triggerParams.getValue(trigger)
 
         return FulfillmentConfig(
-            enabledSkillIds = enabledSkillIds,
-            enabledBufferKinds = enabledBuffers,
-            temperature = temperature,
-            maxMemoryRetrievalQueries = maxMemoryQueries,
-            memorySearchTopK = memoryTopK,
+            enabledSkillIds = enabledSkillIds(trigger, gatekeeperIntentNames),
+            enabledBufferKinds = enabledBufferKinds(trigger),
+            temperature = params.temperature,
+            maxMemoryRetrievalQueries = params.maxMemoryQueries,
+            memorySearchTopK = params.memoryTopK,
             maxRawAudioInFulfillmentSec = settings.getMaxRawAudioInFulfillmentSec(),
             useLocalLlm = useLocalLlm,
         )
+    }
+
+    private fun enabledSkillIds(
+        trigger: FulfillmentTriggerType,
+        gatekeeperIntentNames: List<String>,
+    ): Set<String> {
+        val allEnabled = skillEnablement.enabledSkillIds(skills.list().map { it.id })
+        if (trigger != FulfillmentTriggerType.GATEKEEPER_TRIGGER) return allEnabled
+
+        val gatekeeperSkills = GatekeeperResultUtils.intentNamesToSkillIds(gatekeeperIntentNames)
+        return if (gatekeeperSkills.isEmpty()) allEnabled else allEnabled.intersect(gatekeeperSkills)
+    }
+
+    private fun enabledBufferKinds(trigger: FulfillmentTriggerType): Set<FulfillmentBufferKind> {
+        val buffers = enabledBufferSwitches.mapNotNull { it.enabledKind(settings) }.toSet()
+        if (trigger != FulfillmentTriggerType.GATEKEEPER_TRIGGER) return buffers
+        return buffers.intersect(gatekeeperBufferKinds)
+    }
+
+    private data class TriggerParams(
+        val temperature: Float,
+        val maxMemoryQueries: Int,
+        val memoryTopK: Int,
+    )
+
+    private data class BufferSwitch(
+        val kind: FulfillmentBufferKind,
+        val isEnabled: CosmoSettingStore.() -> Boolean,
+    ) {
+        fun enabledKind(settings: CosmoSettingStore): FulfillmentBufferKind? =
+            kind.takeIf { settings.isEnabled() }
+    }
+
+    private companion object {
+        val triggerParams =
+            mapOf(
+                FulfillmentTriggerType.USER_QUERY to TriggerParams(0.5f, 0, 0),
+                FulfillmentTriggerType.BATCH_PIPELINE to TriggerParams(0.5f, 0, 0),
+                FulfillmentTriggerType.GATEKEEPER_TRIGGER to TriggerParams(1.0f, 0, 0),
+                FulfillmentTriggerType.PIXEL_PHONE_DOUBLE_TAP to TriggerParams(1.0f, 5, 20),
+                FulfillmentTriggerType.PIXEL_WATCH_DOUBLE_PINCH to TriggerParams(0.8f, 0, 0),
+                FulfillmentTriggerType.PIXEL_PHONE_PICK_UP to TriggerParams(1.0f, 0, 0),
+            )
+
+        val enabledBufferSwitches =
+            listOf(
+                BufferSwitch(FulfillmentBufferKind.AMBIENT_AUDIO, CosmoSettingStore::isAmbientAudioEnabled),
+                BufferSwitch(FulfillmentBufferKind.DEVICE_AUDIO, CosmoSettingStore::isMediaAudioEnabled),
+                BufferSwitch(FulfillmentBufferKind.WATCH_AUDIO, CosmoSettingStore::isWatchAudioEnabled),
+                BufferSwitch(FulfillmentBufferKind.BUDS_AUDIO, CosmoSettingStore::isBudsAudioEnabled),
+                BufferSwitch(FulfillmentBufferKind.SCREEN, CosmoSettingStore::isScreenContextEnabled),
+                BufferSwitch(FulfillmentBufferKind.NOTIFICATION, CosmoSettingStore::isNotificationCaptureEnabled),
+                BufferSwitch(FulfillmentBufferKind.INTENT, CosmoSettingStore::isIntentExtractionEnabled),
+            )
+
+        val gatekeeperBufferKinds =
+            setOf(
+                FulfillmentBufferKind.AMBIENT_AUDIO,
+                FulfillmentBufferKind.WATCH_AUDIO,
+                FulfillmentBufferKind.BUDS_AUDIO,
+                FulfillmentBufferKind.DEVICE_AUDIO,
+            )
     }
 }

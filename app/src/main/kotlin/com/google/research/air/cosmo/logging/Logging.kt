@@ -283,7 +283,7 @@ private val TELEMETRY_EVENT_PROVENANCE: List<TelemetryEventProvenance> =
             owner = CosmoLogTag.FULFILLMENT,
             privacyClass = TelemetryPrivacyClass.OPERATIONAL_METADATA,
             sourcePath = "app/src/main/kotlin/com/google/research/air/cosmo/fulfillment/FulfillmentOrchestrator.kt",
-            emittedFrom = "FulfillmentOrchestratorImpl.fulfillAndLog"
+            emittedFrom = "FulfillmentOrchestratorImpl.doFulfillment"
         ),
         TelemetryEventProvenance(
             eventName = "fulfillment_action_execution",

@@ -14,7 +14,6 @@ import com.google.research.air.cosmo.logging.TelemetryEvent
 import com.google.research.air.cosmo.setting.CosmoConfiguration
 import com.google.research.air.cosmo.setting.CosmoSettingSerializer
 import com.google.research.air.cosmo.setting.CosmoSettingStore
-import com.google.research.air.cosmo.setting.proto.CosmoSetting
 import com.google.research.air.cosmo.setting.proto.ProcessingMode
 import com.google.research.air.cosmo.skills.SkillsRepositoryImpl
 import io.mockk.every
@@ -23,7 +22,9 @@ import io.mockk.verify
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -71,6 +72,7 @@ class GatekeeperFulfillmentGoldenTest {
                 clock = clock,
                 telemetry = telemetry,
             )
+        val orchestratorScope = CoroutineScope(coroutineContext + SupervisorJob())
         val orchestrator =
             FulfillmentOrchestratorImpl(
                 runner = runner,
@@ -78,7 +80,7 @@ class GatekeeperFulfillmentGoldenTest {
                 gatekeeperResultUtils = gatekeeperResultUtils,
                 configRegistry = configRegistry,
                 settings = settings,
-                scope = this,
+                scope = orchestratorScope,
                 telemetry = telemetry,
             )
 
@@ -94,8 +96,9 @@ class GatekeeperFulfillmentGoldenTest {
         val userFacing = actionsRepository.userFacingActions.value
         assertEquals(1, userFacing.size)
         val timer = userFacing.single() as AddTimer
+        assertEquals("sim-timer", timer.id)
         assertEquals(600, timer.durationSeconds)
-        assertTrue(timer.title.contains("10", ignoreCase = true) || timer.title.contains("minute", ignoreCase = true))
+        assertEquals("Set 10 minute timer", timer.title)
 
         val history = actionsRepository.fulfillmentHistory.value.single()
         assertEquals(FulfillmentTriggerType.GATEKEEPER_TRIGGER, history.fulfillmentTriggerType)
@@ -145,7 +148,11 @@ class GatekeeperFulfillmentGoldenTest {
     }
 
     private class FakeGatekeeperOutputSource : GatekeeperOutputSource {
-        private val mutable = MutableSharedFlow<GatekeepingResult>(extraBufferCapacity = 16)
+        private val mutable =
+            MutableSharedFlow<GatekeepingResult>(
+                replay = 1,
+                extraBufferCapacity = 16,
+            )
         override val results: SharedFlow<GatekeepingResult> = mutable
 
         suspend fun emit(result: GatekeepingResult) {
