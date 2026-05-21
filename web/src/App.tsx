@@ -16,9 +16,9 @@ import { StackScene } from "./three/StackScene";
 /**
  * Photographic backdrop behind the transparent Canvas.
  *
- * The dune photo lives at /background.jpg (public/). Until that file is
- * present the gradient fallback approximates its mood — near-black sky with
- * a cool rim-light glow low-left — so the page never looks broken.
+ * The dune photo lives at /background.webp (public/). The gradient fallback
+ * approximates its mood — near-black sky, cool rim-light glow low-left — and
+ * shows if the image ever fails to load.
  */
 function Background() {
   const [hasPhoto, setHasPhoto] = useState(true);
@@ -27,7 +27,7 @@ function Background() {
       <div className="scene-bg-gradient absolute inset-0" />
       {hasPhoto && (
         <img
-          src="/background.jpg"
+          src="/background.webp"
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           onError={() => setHasPhoto(false)}
