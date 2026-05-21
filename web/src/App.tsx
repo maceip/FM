@@ -18,6 +18,7 @@ import { OrbShowcase } from "./three/OrbShowcase";
 import { TabShowcase } from "./three/TabShowcase";
 import { PhoneShowcase } from "./three/PhoneShowcase";
 import { IntroScene } from "./three/IntroScene";
+import { Explainer } from "./explainer/Explainer";
 
 function Loader() {
   return (
@@ -109,6 +110,7 @@ export default function App() {
   if (window.location.hash === "#tab") return <TabShowcase />;
   if (window.location.hash === "#phone") return <PhoneShowcase />;
   if (window.location.hash === "#intro") return <IntroScene />;
+  if (window.location.hash === "#explainer") return <Explainer />;
   return (
     <CardTextureProvider fallback={<Loader />}>
       <Experience />
