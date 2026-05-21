@@ -2,12 +2,14 @@
  * Explainer — page 1. A full-viewport hero: the 3D card deck floating over
  * the dune backdrop, with the AgentV positioning copy.
  */
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { CARDS } from "../cards/registry";
 import { useCardTextures } from "../three/CardTextures";
 import { CardMesh } from "../three/CardMesh";
+import { DealWithIt } from "./DealWithIt";
 
 /** The 12 cards fanned into a leaned-back cascade with a slow idle drift. */
 function HeroDeck() {
@@ -45,6 +47,7 @@ function HeroDeck() {
 }
 
 export function HeroPage() {
+  const [dealWithIt, setDealWithIt] = useState(false);
   return (
     <section className="relative h-screen w-full overflow-hidden">
       <Canvas
@@ -69,7 +72,10 @@ export function HeroPage() {
           <div className="font-mono text-[12px] uppercase tracking-[0.34em] text-[var(--color-accent)]">
             Ambient Intelligence
           </div>
-          <h1 className="mt-5 text-[88px] font-semibold leading-[0.95] tracking-[-0.03em] text-[var(--color-text-primary)]">
+          <h1
+            onClick={() => setDealWithIt(true)}
+            className="pointer-events-auto mt-5 inline-block cursor-pointer select-none text-[88px] font-semibold leading-[0.95] tracking-[-0.03em] text-[var(--color-text-primary)]"
+          >
             AgentV
           </h1>
           <h2 className="mt-4 font-mono text-[16px] uppercase leading-snug tracking-[0.16em] text-[var(--color-text-secondary)]">
@@ -92,6 +98,12 @@ export function HeroPage() {
           </div>
         </div>
       </div>
+
+      {dealWithIt &&
+        createPortal(
+          <DealWithIt onClose={() => setDealWithIt(false)} />,
+          document.body,
+        )}
     </section>
   );
 }

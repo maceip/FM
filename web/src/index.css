@@ -124,3 +124,63 @@ body {
 .fm-rise {
   animation: fm-rise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
+
+/* --- "deal with it" easter egg --------------------------------------- */
+
+@keyframes dwi-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* sunglasses fall from the sky and bounce onto the face */
+@keyframes dwi-drop {
+  0% {
+    transform: translateY(-130vh);
+  }
+  66% {
+    transform: translateY(0);
+  }
+  79% {
+    transform: translateY(-16px);
+  }
+  89% {
+    transform: translateY(0);
+  }
+  95% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* "DEAL WITH IT" snaps in once the shades land */
+@keyframes dwi-text {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  76% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dwi-overlay {
+  animation: dwi-fade 0.22s ease both;
+}
+.dwi-glasses {
+  animation: dwi-drop 1.15s cubic-bezier(0.5, 0.04, 0.5, 1) both;
+}
+.dwi-text {
+  animation: dwi-text 1.6s ease both;
+}
