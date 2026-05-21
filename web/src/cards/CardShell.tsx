@@ -122,6 +122,7 @@ export function Tabs({
       {tabs.map((t, i) => (
         <span
           key={t}
+          data-hot
           className={
             "font-mono text-[11px] uppercase tracking-[0.12em] " +
             (i === active

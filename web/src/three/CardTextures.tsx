@@ -19,9 +19,47 @@ import { toCanvas } from "html-to-image";
 import * as THREE from "three";
 import { CARDS } from "../cards/registry";
 
+/**
+ * An interactive region inside a card, expressed in the mesh's UV space
+ * (0..1, y measured from the bottom edge to match THREE plane UVs). Used to
+ * raycast pointer hits against individual buttons for the hover glow.
+ */
+export interface Hotspot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface CardTexture {
   texture: THREE.Texture;
   aspect: number;
+  hotspots: Hotspot[];
+}
+
+/**
+ * Measures every interactive element in a rendered card and converts its
+ * bounding box into the card's UV space. Buttons, links and inputs are
+ * picked up automatically; anything else can opt in with a `data-hot` attr.
+ */
+function collectHotspots(node: HTMLElement): Hotspot[] {
+  const card = node.getBoundingClientRect();
+  if (card.width < 2 || card.height < 2) return [];
+  const hotspots: Hotspot[] = [];
+  node
+    .querySelectorAll<HTMLElement>("button, a, input, [data-hot]")
+    .forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width < 3 || r.height < 3) return;
+      hotspots.push({
+        x: (r.left - card.left) / card.width,
+        // THREE plane UVs put v=0 at the bottom, so flip the DOM y axis.
+        y: 1 - (r.bottom - card.top) / card.height,
+        w: r.width / card.width,
+        h: r.height / card.height,
+      });
+    });
+  return hotspots;
 }
 
 const TextureContext = createContext<Map<string, CardTexture> | null>(null);
@@ -57,6 +95,8 @@ export function CardTextureProvider({
           `[data-card="${card.id}"]`,
         );
         if (!node) continue;
+        // Measure hotspots before snapshotting — same live layout.
+        const hotspots = collectHotspots(node);
         const canvas = await toCanvas(node, {
           pixelRatio: 2,
           // keep the area outside the card's border-radius transparent
@@ -66,7 +106,11 @@ export function CardTextureProvider({
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.anisotropy = 8;
         texture.needsUpdate = true;
-        result.set(card.id, { texture, aspect: card.width / card.height });
+        result.set(card.id, {
+          texture,
+          aspect: card.width / card.height,
+          hotspots,
+        });
       }
       if (!cancelled) setTextures(result);
     }

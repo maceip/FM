@@ -109,16 +109,20 @@ export function StackScene({
 
   return (
     <group ref={group} position={[0, 0.1, 0]}>
-      {deck.map((card, i) => (
-        <CardMesh
-          key={card.id}
-          ref={(m) => {
-            cards.current[i] = m;
-          }}
-          card={card}
-          texture={textures.get(card.id)!.texture}
-        />
-      ))}
+      {deck.map((card, i) => {
+        const ct = textures.get(card.id)!;
+        return (
+          <CardMesh
+            key={card.id}
+            ref={(m) => {
+              cards.current[i] = m;
+            }}
+            card={card}
+            texture={ct.texture}
+            hotspots={ct.hotspots}
+          />
+        );
+      })}
     </group>
   );
 }
