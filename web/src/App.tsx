@@ -16,6 +16,7 @@ import { CardTextureProvider, useCardTextures } from "./three/CardTextures";
 import { StackScene } from "./three/StackScene";
 import { OrbShowcase } from "./three/OrbShowcase";
 import { TabShowcase } from "./three/TabShowcase";
+import { PhoneShowcase } from "./three/PhoneShowcase";
 
 function Loader() {
   return (
@@ -83,6 +84,7 @@ function Experience() {
 export default function App() {
   if (window.location.hash === "#orbs") return <OrbShowcase />;
   if (window.location.hash === "#tab") return <TabShowcase />;
+  if (window.location.hash === "#phone") return <PhoneShowcase />;
   return (
     <CardTextureProvider fallback={<Loader />}>
       <Experience />
