@@ -170,12 +170,16 @@ export const CardMesh = forwardRef<THREE.Group, CardMeshProps>(
 
     return (
       <group ref={ref}>
-        {/* card body — gives the slab its thickness */}
+        {/* card body — gives the slab its thickness; translucent so the
+            background and the cards behind read through the glass */}
         <mesh geometry={bodyGeometry}>
           <meshStandardMaterial
             color="#0e1626"
             roughness={0.62}
             metalness={0.12}
+            transparent
+            opacity={0.42}
+            userData={{ baseOpacity: 0.42 }}
           />
         </mesh>
         {/* card face — the rasterised UI, parked just proud of the body */}

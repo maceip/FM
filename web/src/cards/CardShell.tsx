@@ -39,7 +39,7 @@ export function CardShell({
 }: CardShellProps) {
   return (
     <div
-      className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--color-stroke)] bg-gradient-to-b from-[var(--color-card-top)] to-[var(--color-card-bottom)]"
+      className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--color-stroke)] bg-gradient-to-b from-[#0e1626]/62 to-[#080c16]/68"
       style={{ width, height }}
     >
       {/* faint inner top highlight, mirrors the screenshots */}

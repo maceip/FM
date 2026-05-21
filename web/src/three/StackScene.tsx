@@ -94,11 +94,14 @@ export function StackScene({
       card.scale.setScalar(scale);
 
       // Fade the whole card — body and face — when it's pushed aside.
+      // baseOpacity lets a translucent material keep its glassiness while
+      // still riding the push-aside fade.
       card.traverse((o) => {
         const mat = (o as THREE.Mesh).material as THREE.Material | undefined;
         if (mat && "opacity" in mat) {
           mat.transparent = true;
-          mat.opacity = opacity;
+          const base = (mat.userData.baseOpacity as number | undefined) ?? 1;
+          mat.opacity = opacity * base;
         }
       });
     });

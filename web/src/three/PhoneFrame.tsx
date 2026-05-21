@@ -62,8 +62,10 @@ export const PhoneFrame = forwardRef<THREE.Group, ComponentProps<"group">>(
         >
           <meshStandardMaterial
             color="#2b2f3a"
-            metalness={0.78}
+            metalness={0.6}
             roughness={0.32}
+            transparent
+            opacity={0.62}
           />
         </RoundedBox>
 
@@ -78,6 +80,8 @@ export const PhoneFrame = forwardRef<THREE.Group, ComponentProps<"group">>(
             color="#070a12"
             metalness={0.45}
             roughness={0.1}
+            transparent
+            opacity={0.5}
           />
         </RoundedBox>
 
@@ -85,7 +89,13 @@ export const PhoneFrame = forwardRef<THREE.Group, ComponentProps<"group">>(
             inside the glass's rounded corners */}
         <mesh position={[0, 0, SURFACE]}>
           <planeGeometry args={[PHONE.screenW - 0.24, PHONE.screenH - 0.24]} />
-          <meshBasicMaterial map={screenTexture} toneMapped={false} />
+          <meshBasicMaterial
+            map={screenTexture}
+            transparent
+            opacity={0.5}
+            depthWrite={false}
+            toneMapped={false}
+          />
         </mesh>
 
         {/* foldable centre crease — a faint vertical reflection line */}

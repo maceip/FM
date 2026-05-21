@@ -252,6 +252,8 @@ export const OrbMesh = forwardRef<THREE.Group, OrbMeshProps>(
             color="#0b111d"
             roughness={0.58}
             metalness={0.16}
+            transparent
+            opacity={0.4}
           />
         </RoundedBox>
         <OrbGauge state={state} position={[0, 0, TILE_DEPTH / 2]} />

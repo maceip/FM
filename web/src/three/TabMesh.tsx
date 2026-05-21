@@ -100,6 +100,8 @@ export const TabMesh = forwardRef<THREE.Group, TabMeshProps>(
             color="#0b111d"
             roughness={0.58}
             metalness={0.16}
+            transparent
+            opacity={0.4}
           />
         </RoundedBox>
 
