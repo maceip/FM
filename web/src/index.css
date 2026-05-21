@@ -33,8 +33,8 @@ body {
   overflow: hidden;
 }
 
-/* Fallback backdrop — approximates the dune photo until /background.jpg
-   is added: deep navy sky over near-black, cool rim-light glow low-left. */
+/* Fallback backdrop — approximates the dune photo (/background.webp):
+   deep navy sky over near-black, cool rim-light glow low-left. */
 .scene-bg-gradient {
   background-color: var(--color-ink);
   background-image:
@@ -56,4 +56,71 @@ body {
       rgba(4, 6, 12, 0.55) 100%
     ),
     linear-gradient(180deg, rgba(4, 6, 12, 0.35) 0%, rgba(4, 6, 12, 0.6) 100%);
+}
+
+/* --- loading + entrance motion --------------------------------------- */
+
+/* the loader's monogram breathes while cards rasterise */
+@keyframes fm-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* a light sweeps along the loader's progress hairline */
+@keyframes fm-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+/* the scene eases up + in once it is ready to show */
+@keyframes fm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fm-loader-mark {
+  animation: fm-breathe 2s ease-in-out infinite;
+}
+
+.fm-loader-track {
+  position: relative;
+  overflow: hidden;
+  width: 96px;
+  height: 1px;
+  background: rgba(231, 236, 246, 0.12);
+}
+
+.fm-loader-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-accent),
+    transparent
+  );
+  animation: fm-sweep 1.4s ease-in-out infinite;
+}
+
+.fm-rise {
+  animation: fm-rise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }

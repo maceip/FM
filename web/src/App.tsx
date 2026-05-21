@@ -17,6 +17,7 @@ import { StackScene } from "./three/StackScene";
 import { OrbShowcase } from "./three/OrbShowcase";
 import { TabShowcase } from "./three/TabShowcase";
 import { PhoneShowcase } from "./three/PhoneShowcase";
+import { IntroScene } from "./three/IntroScene";
 
 function Loader() {
   return (
@@ -24,23 +25,44 @@ function Loader() {
       style={{
         position: "fixed",
         inset: 0,
-        display: "grid",
-        placeItems: "center",
-        color: "var(--color-text-secondary)",
-        fontFamily: "var(--font-mono)",
-        fontSize: 12,
-        letterSpacing: "0.2em",
-        textTransform: "uppercase",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 18,
       }}
     >
-      Rendering cards…
+      <div
+        className="fm-loader-mark"
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 28,
+          fontWeight: 700,
+          letterSpacing: "0.34em",
+          color: "var(--color-text-primary)",
+        }}
+      >
+        FM
+      </div>
+      <div className="fm-loader-track" />
+      <div
+        style={{
+          color: "var(--color-text-faint)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.24em",
+          textTransform: "uppercase",
+        }}
+      >
+        Rendering cards
+      </div>
     </div>
   );
 }
 
 function Overlay() {
   return (
-    <div className="pointer-events-none fixed inset-0">
+    <div className="fm-rise pointer-events-none fixed inset-0">
       <div className="absolute left-8 top-7">
         <div className="font-mono text-[13px] font-bold tracking-[0.3em] text-[var(--color-text-primary)]">
           FM
@@ -62,6 +84,7 @@ function Experience() {
     <>
       <Background />
       <Canvas
+        className="fm-rise"
         camera={{ position: [0, 1.6, 5.2], fov: 40 }}
         gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
@@ -85,6 +108,7 @@ export default function App() {
   if (window.location.hash === "#orbs") return <OrbShowcase />;
   if (window.location.hash === "#tab") return <TabShowcase />;
   if (window.location.hash === "#phone") return <PhoneShowcase />;
+  if (window.location.hash === "#intro") return <IntroScene />;
   return (
     <CardTextureProvider fallback={<Loader />}>
       <Experience />
