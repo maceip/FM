@@ -6,38 +6,16 @@
  *    hands them to the scene as a plain prop — React context does not cross
  *    the R3F renderer boundary, so the prop bridge is deliberate.
  * 3. StackScene drives the scroll animation.
+ *
+ * /#orbs and /#tab swap in showcases for reviewing those core components.
  */
-import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ScrollControls } from "@react-three/drei";
+import { Background } from "./Background";
 import { CardTextureProvider, useCardTextures } from "./three/CardTextures";
 import { StackScene } from "./three/StackScene";
-
-/**
- * Photographic backdrop behind the transparent Canvas.
- *
- * The dune photo lives at /background.webp (public/). The gradient fallback
- * approximates its mood — near-black sky, cool rim-light glow low-left — and
- * shows if the image ever fails to load.
- */
-function Background() {
-  const [hasPhoto, setHasPhoto] = useState(true);
-  return (
-    <div className="fixed inset-0 -z-10" aria-hidden>
-      <div className="scene-bg-gradient absolute inset-0" />
-      {hasPhoto && (
-        <img
-          src="/background.webp"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={() => setHasPhoto(false)}
-        />
-      )}
-      {/* vignette + floor lift so the card deck keeps its contrast */}
-      <div className="scene-bg-veil absolute inset-0" />
-    </div>
-  );
-}
+import { OrbShowcase } from "./three/OrbShowcase";
+import { TabShowcase } from "./three/TabShowcase";
 
 function Loader() {
   return (
@@ -103,6 +81,8 @@ function Experience() {
 }
 
 export default function App() {
+  if (window.location.hash === "#orbs") return <OrbShowcase />;
+  if (window.location.hash === "#tab") return <TabShowcase />;
   return (
     <CardTextureProvider fallback={<Loader />}>
       <Experience />
