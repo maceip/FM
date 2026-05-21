@@ -32,3 +32,28 @@ body {
   font-family: var(--font-sans);
   overflow: hidden;
 }
+
+/* Fallback backdrop — approximates the dune photo until /background.jpg
+   is added: deep navy sky over near-black, cool rim-light glow low-left. */
+.scene-bg-gradient {
+  background-color: var(--color-ink);
+  background-image:
+    radial-gradient(
+      130% 95% at 6% 96%,
+      rgba(126, 156, 208, 0.26),
+      transparent 52%
+    ),
+    linear-gradient(180deg, #0a1018 0%, #060912 48%, var(--color-ink) 100%);
+}
+
+/* Sits over the backdrop (photo or gradient) to hold deck contrast:
+   a centre lift plus an edge vignette. */
+.scene-bg-veil {
+  background:
+    radial-gradient(
+      70% 60% at 50% 46%,
+      rgba(4, 6, 12, 0) 0%,
+      rgba(4, 6, 12, 0.55) 100%
+    ),
+    linear-gradient(180deg, rgba(4, 6, 12, 0.35) 0%, rgba(4, 6, 12, 0.6) 100%);
+}

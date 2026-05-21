@@ -7,10 +7,37 @@
  *    the R3F renderer boundary, so the prop bridge is deliberate.
  * 3. StackScene drives the scroll animation.
  */
+import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ScrollControls } from "@react-three/drei";
 import { CardTextureProvider, useCardTextures } from "./three/CardTextures";
 import { StackScene } from "./three/StackScene";
+
+/**
+ * Photographic backdrop behind the transparent Canvas.
+ *
+ * The dune photo lives at /background.jpg (public/). Until that file is
+ * present the gradient fallback approximates its mood — near-black sky with
+ * a cool rim-light glow low-left — so the page never looks broken.
+ */
+function Background() {
+  const [hasPhoto, setHasPhoto] = useState(true);
+  return (
+    <div className="fixed inset-0 -z-10" aria-hidden>
+      <div className="scene-bg-gradient absolute inset-0" />
+      {hasPhoto && (
+        <img
+          src="/background.jpg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={() => setHasPhoto(false)}
+        />
+      )}
+      {/* vignette + floor lift so the card deck keeps its contrast */}
+      <div className="scene-bg-veil absolute inset-0" />
+    </div>
+  );
+}
 
 function Loader() {
   return (
@@ -54,12 +81,13 @@ function Experience() {
   const textures = useCardTextures();
   return (
     <>
+      <Background />
       <Canvas
         camera={{ position: [0, 1.6, 5.2], fov: 40 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, alpha: true }}
         dpr={[1, 2]}
+        style={{ position: "relative" }}
       >
-        <color attach="background" args={["#04060c"]} />
         {/* Lights shade the card bodies so their thickness reads; the
             textured faces are unlit (meshBasicMaterial) and stay crisp. */}
         <ambientLight intensity={1.1} />
