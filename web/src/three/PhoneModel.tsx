@@ -1,13 +1,13 @@
 /**
  * The Pixel 10 Fold GLB model.
  *
- * Drop the supplied file at public/models/pixel-fold.glb. The model is
- * expected to carry a fold/unfold animation clip; this component parks every
- * clip paused and scrubs it by `openRef` (0 = folded shut, 1 = fully open)
- * so the unfold is driven by scroll rather than playing on its own.
+ * The model carries two hinge clips (hinge_LAction / hinge_RAction) that
+ * swing the left/right wings open. Every clip is parked paused and scrubbed
+ * by `openRef` (0 = folded shut, 1 = fully open) so the unfold is driven by
+ * scroll rather than playing on its own.
  *
- * If the GLB has no clips the component still renders the static mesh — the
- * intro's spin, bounce and settle still work; only the unfold needs the clip.
+ * The mesh is authored lying flat (screen up, +Y); a base X rotation stands
+ * it upright so the screen faces the camera.
  */
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { useGLTF, useAnimations } from "@react-three/drei";
@@ -40,11 +40,20 @@ export function PhoneModel({ openRef }: PhoneModelProps) {
     let scrubbed = false;
     Object.values(actions).forEach((action) => {
       if (!action) return;
-      action.time = action.getClip().duration * open;
+      // the clips run open (t=0) → folded (t=duration), so invert
+      action.time = action.getClip().duration * (1 - open);
       scrubbed = true;
     });
     if (scrubbed) mixer.update(0);
   });
 
-  return <primitive ref={group} object={gltf.scene} />;
+  // authored lying flat — stand it upright with the inner display facing
+  // the camera (the cameras/cover screen are on the far face)
+  return (
+    <primitive
+      ref={group}
+      object={gltf.scene}
+      rotation={[-Math.PI / 2, 0, 0]}
+    />
+  );
 }

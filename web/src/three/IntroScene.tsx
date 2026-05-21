@@ -52,9 +52,10 @@ const SPIN_END = 0.3;
 const OPEN_END = 0.62;
 const SETTLE_END = 0.86;
 
-/* placeholders — calibrate to the real GLB once supplied */
-const MODEL_SCALE = 1.4;
-const OUTLINE_SCALE = 1;
+/* Open, the model measures ~0.97 wide in its own units; this scale sizes
+   it to overlay the outline (PHONE.width ≈ 3.74) so the unfold itself is
+   the "transition to the outline" — no separate scale move needed. */
+const MODEL_SCALE = 3.85;
 
 const clamp01 = (v: number) => THREE.MathUtils.clamp(v, 0, 1);
 const easeInOut = (t: number) =>
@@ -95,9 +96,7 @@ function IntroSequence() {
       const bounce =
         Math.sin(time * 3.4) * 0.1 * (1 - clamp01(t / OPEN_END));
       g.position.set(0, bounce, 0);
-      g.scale.setScalar(
-        THREE.MathUtils.lerp(MODEL_SCALE, OUTLINE_SCALE, easeInOut(settle)),
-      );
+      g.scale.setScalar(MODEL_SCALE);
       const opacity = 1 - vanish;
       g.visible = opacity > 0.001;
       if (g.visible) setOpacity(g, opacity);
