@@ -1,5 +1,6 @@
 package com.google.research.air.cosmo.presence.surfaces
 
+import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
@@ -20,7 +21,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], qualifiers = "mdpi")
+@Config(sdk = [34], qualifiers = "mdpi", application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FmUiPresenceScreenshotCaptureTest {
 
