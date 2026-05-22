@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.research.air.cosmo.presence.OrbActivity
 import com.google.research.air.cosmo.presence.PresenceTokens
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * The Orb — a 36-48dp squircle that shows the agent's current state via spinning rings and
@@ -151,6 +154,37 @@ fun OrbSurface(
                     topLeft = Offset(size.width * 0.18f, size.height - 1.5.dp.toPx()),
                     size = Size(size.width * 0.64f, 1.5.dp.toPx())
                 )
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val side = size.minDimension
+                val ringColor = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = 0.18f)
+                listOf(0.21f, 0.31f, 0.41f).forEach { fraction ->
+                    drawCircle(
+                        color = ringColor,
+                        radius = side * fraction,
+                        center = center,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                }
+                repeat(48) { marker ->
+                    val angle = (Math.PI * 2.0 * marker / 48.0).toFloat()
+                    val innerRadius = side * if (marker % 4 == 0) 0.405f else 0.425f
+                    val outerRadius = side * 0.445f
+                    val alpha = if (marker % 4 == 0) 0.30f else 0.14f
+                    drawLine(
+                        color = PresenceTokens.Palette.OnSurfaceDim.copy(alpha = alpha),
+                        start = Offset(center.x + cos(angle) * innerRadius, center.y + sin(angle) * innerRadius),
+                        end = Offset(center.x + cos(angle) * outerRadius, center.y + sin(angle) * outerRadius),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+                repeat(4) { marker ->
+                    val angle = (Math.PI * 2.0 * marker / 4.0).toFloat()
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.22f),
+                        radius = 1.dp.toPx(),
+                        center = Offset(center.x + cos(angle) * side * 0.43f, center.y + sin(angle) * side * 0.43f)
+                    )
+                }
             }
             .border(1.dp, PresenceTokens.Palette.BorderBright, shape),
         contentAlignment = Alignment.Center
@@ -162,9 +196,9 @@ fun OrbSurface(
                 spec = state.tickSpec,
                 glyph = state.glyph,
                 glyphColor = state.accent.copy(alpha = pulseAlpha),
-                modifier = Modifier.size(orbSize * 0.86f),
+                modifier = Modifier.size(orbSize * 0.78f),
                 animationPhase = tickPhase,
-                glyphSize = orbSize * 0.07f
+                glyphSize = orbSize * 0.06f
             )
         }
     }
@@ -195,42 +229,42 @@ private val OrbVisualState.tickSpec: TacticalTickRingSpec
                 )
             OrbVisualState.LISTENING ->
                 TacticalTickRingSpec(
-                    tickCount = 64,
+                    tickCount = 72,
                     radiusFraction = 0.38f,
-                    tickLengthFraction = 0.09f,
-                    tickWidthFraction = 0.024f,
+                    tickLengthFraction = 0.078f,
+                    tickWidthFraction = 0.019f,
                     baseColor = Color(0xFF2C3443).copy(alpha = 0.72f),
                     segments =
                         listOf(
-                            TacticalTickSegment(3, 24, PresenceTokens.Palette.AcidGreen),
-                            TacticalTickSegment(39, 8, PresenceTokens.Palette.CyanDim.copy(alpha = 0.62f))
+                            TacticalTickSegment(4, 28, PresenceTokens.Palette.AcidGreen),
+                            TacticalTickSegment(45, 9, PresenceTokens.Palette.CyanDim.copy(alpha = 0.62f))
                         )
                 )
             OrbVisualState.WORKING ->
                 TacticalTickRingSpec(
-                    tickCount = 64,
+                    tickCount = 72,
                     radiusFraction = 0.38f,
-                    tickLengthFraction = 0.086f,
-                    tickWidthFraction = 0.024f,
+                    tickLengthFraction = 0.076f,
+                    tickWidthFraction = 0.019f,
                     baseColor = Color(0xFF193545).copy(alpha = 0.72f),
                     segments =
                         listOf(
-                            TacticalTickSegment(0, 46, PresenceTokens.Palette.Cyan),
-                            TacticalTickSegment(49, 6, PresenceTokens.Palette.CyanDim.copy(alpha = 0.50f))
+                            TacticalTickSegment(0, 52, PresenceTokens.Palette.Cyan),
+                            TacticalTickSegment(56, 7, PresenceTokens.Palette.CyanDim.copy(alpha = 0.50f))
                         )
                 )
             OrbVisualState.NEEDS_INPUT ->
                 TacticalTickRingSpec(
-                    tickCount = 64,
+                    tickCount = 72,
                     radiusFraction = 0.38f,
-                    tickLengthFraction = 0.09f,
-                    tickWidthFraction = 0.024f,
+                    tickLengthFraction = 0.078f,
+                    tickWidthFraction = 0.019f,
                     baseColor = Color(0xFF2E3240).copy(alpha = 0.72f),
                     segments =
                         listOf(
-                            TacticalTickSegment(0, 33, PresenceTokens.Palette.AcidYellow),
-                            TacticalTickSegment(38, 8, PresenceTokens.Palette.Magenta),
-                            TacticalTickSegment(51, 5, PresenceTokens.Palette.CyanDim.copy(alpha = 0.44f))
+                            TacticalTickSegment(0, 37, PresenceTokens.Palette.AcidYellow),
+                            TacticalTickSegment(43, 9, PresenceTokens.Palette.Magenta),
+                            TacticalTickSegment(58, 6, PresenceTokens.Palette.CyanDim.copy(alpha = 0.44f))
                         )
                 )
         }

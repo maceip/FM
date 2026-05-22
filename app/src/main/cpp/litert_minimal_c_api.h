@@ -24,20 +24,43 @@ enum LiteRtElementType {
   kLiteRtElementTypeFloat32 = 1,
 };
 
+enum LiteRtAnyType {
+  kLiteRtAnyTypeNone = 0,
+  kLiteRtAnyTypeBool = 1,
+  kLiteRtAnyTypeInt = 2,
+  kLiteRtAnyTypeReal = 3,
+  kLiteRtAnyTypeString = 8,
+  kLiteRtAnyTypeVoidPtr = 9,
+};
+
+enum LiteRtEnvOptionTag {
+  kLiteRtEnvOptionTagCompilerPluginLibraryDir = 0,
+  kLiteRtEnvOptionTagDispatchLibraryDir = 1,
+  kLiteRtEnvOptionTagAutoRegisterAccelerators = 24,
+};
+
 enum LiteRtTensorTypeId {
   kLiteRtRankedTensorType = 0,
   kLiteRtUnrankedTensorType = 1,
 };
 
+enum LiteRtTensorBufferLockMode {
+  kLiteRtTensorBufferLockModeRead = 0,
+  kLiteRtTensorBufferLockModeWrite = 1,
+  kLiteRtTensorBufferLockModeReadWrite = 2,
+};
+
 using LiteRtHwAcceleratorSet = int;
 using LiteRtParamIndex = size_t;
 using LiteRtHostMemoryDeallocator = void (*)(void* addr);
+using LiteRtLogger = void*;
 
 class LiteRtEnvironmentT;
 class LiteRtModelT;
 class LiteRtOptionsT;
 class LiteRtCompiledModelT;
 class LiteRtTensorBufferT;
+class LiteRtTensorBufferRequirementsT;
 class LiteRtSubgraphT;
 class LiteRtTensorT;
 
@@ -46,8 +69,25 @@ using LiteRtModel = LiteRtModelT*;
 using LiteRtOptions = LiteRtOptionsT*;
 using LiteRtCompiledModel = LiteRtCompiledModelT*;
 using LiteRtTensorBuffer = LiteRtTensorBufferT*;
+using LiteRtTensorBufferRequirements = LiteRtTensorBufferRequirementsT*;
 using LiteRtSubgraph = LiteRtSubgraphT*;
 using LiteRtTensor = LiteRtTensorT*;
+
+struct LiteRtAny {
+  LiteRtAnyType type;
+  union {
+    bool bool_value;
+    int64_t int_value;
+    double real_value;
+    const char* str_value;
+    const void* ptr_value;
+  };
+};
+
+struct LiteRtEnvOption {
+  LiteRtEnvOptionTag tag;
+  LiteRtAny value;
+};
 
 struct LiteRtLayout {
   unsigned int rank : 7;
@@ -62,7 +102,7 @@ struct LiteRtRankedTensorType {
 };
 
 struct LiteRtApi {
-  LiteRtStatus (*CreateEnvironment)(int, const void*, LiteRtEnvironment*) = nullptr;
+  LiteRtStatus (*CreateEnvironment)(int, const LiteRtEnvOption*, LiteRtEnvironment*) = nullptr;
   void (*DestroyEnvironment)(LiteRtEnvironment) = nullptr;
   LiteRtStatus (*CreateModelFromBuffer)(const void*, size_t, LiteRtModel*) = nullptr;
   void (*DestroyModel)(LiteRtModel) = nullptr;
@@ -81,13 +121,27 @@ struct LiteRtApi {
   LiteRtStatus (*CreateCompiledModel)(LiteRtEnvironment, LiteRtModel, LiteRtOptions,
                                       LiteRtCompiledModel*) = nullptr;
   void (*DestroyCompiledModel)(LiteRtCompiledModel) = nullptr;
+  LiteRtStatus (*GetCompiledModelInputBufferRequirements)(
+      LiteRtCompiledModel, LiteRtParamIndex, LiteRtParamIndex,
+      LiteRtTensorBufferRequirements*) = nullptr;
+  LiteRtStatus (*GetCompiledModelOutputBufferRequirements)(
+      LiteRtCompiledModel, LiteRtParamIndex, LiteRtParamIndex,
+      LiteRtTensorBufferRequirements*) = nullptr;
   LiteRtStatus (*CreateTensorBufferFromHostMemory)(const LiteRtRankedTensorType*, void*,
                                                    size_t, LiteRtHostMemoryDeallocator,
                                                    LiteRtTensorBuffer*) = nullptr;
+  LiteRtStatus (*CreateManagedTensorBufferFromRequirements)(
+      LiteRtEnvironment, const LiteRtRankedTensorType*, LiteRtTensorBufferRequirements,
+      LiteRtTensorBuffer*) = nullptr;
+  LiteRtStatus (*LockTensorBuffer)(LiteRtTensorBuffer, void**,
+                                   LiteRtTensorBufferLockMode) = nullptr;
+  LiteRtStatus (*UnlockTensorBuffer)(LiteRtTensorBuffer) = nullptr;
   void (*DestroyTensorBuffer)(LiteRtTensorBuffer) = nullptr;
   LiteRtStatus (*RunCompiledModel)(LiteRtCompiledModel, LiteRtParamIndex, size_t,
                                    LiteRtTensorBuffer*, size_t, LiteRtTensorBuffer*) = nullptr;
   const char* (*GetStatusString)(LiteRtStatus) = nullptr;
+  LiteRtLogger (*GetDefaultLogger)() = nullptr;
+  LiteRtStatus (*SetMinLoggerSeverity)(LiteRtLogger, int8_t) = nullptr;
 };
 
 inline LiteRtRankedTensorType MakeRankedTensorType(

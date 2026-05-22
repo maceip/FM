@@ -5,78 +5,6 @@
   "description": "Private S3-backed source of truth for runtime binary assets that are too large or too variable to rely on local developer laptops.",
   "artifacts": [
     {
-      "id": "gatekeeper_audio_frontend",
-      "path": "app/src/main/assets/models/audio_frontend.tflite",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/f1dbb89e2f585093515de68e873d2beb7a5058e25a76b932fc6628937d13b457/audio_frontend.tflite",
-      "sha256": "f1dbb89e2f585093515de68e873d2beb7a5058e25a76b932fc6628937d13b457",
-      "sizeBytes": 3018776,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": true
-    },
-    {
-      "id": "gatekeeper_audio_gatekeeper_edgetpu",
-      "path": "app/src/main/assets/models/audio_gatekeeper_edgetpu.tflite",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/a1388e523b7786800e0fdd8da4c2a7e4400aeb6781824ea234064e03844206f2/audio_gatekeeper_edgetpu.tflite",
-      "sha256": "a1388e523b7786800e0fdd8da4c2a7e4400aeb6781824ea234064e03844206f2",
-      "sizeBytes": 48156352,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": true
-    },
-    {
-      "id": "gatekeeper_bert_v0_cpu",
-      "path": "app/src/main/assets/models/bert_v0_cpu.tflite",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/1c6da7858a1cccd9ac6cd5c323d26ef99d962761e34d3f65871762123f95af34/bert_v0_cpu.tflite",
-      "sha256": "1c6da7858a1cccd9ac6cd5c323d26ef99d962761e34d3f65871762123f95af34",
-      "sizeBytes": 71935326,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": true
-    },
-    {
-      "id": "gatekeeper_bert_v0_p24",
-      "path": "app/src/main/assets/models/bert_v0_p24.tflite",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/95142cbaaf2102c62e095c16a352cb19c8c05369859922fcbddc5699a8c903c8/bert_v0_p24.tflite",
-      "sha256": "95142cbaaf2102c62e095c16a352cb19c8c05369859922fcbddc5699a8c903c8",
-      "sizeBytes": 44995072,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": false
-    },
-    {
-      "id": "gatekeeper_bert_v0_p25",
-      "path": "app/src/main/assets/models/bert_v0_p25.tflite",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/f9099cd4b718b64e78ee021fb59a2c1a5581e918bcaff965665f0591de2b6e80/bert_v0_p25.tflite",
-      "sha256": "f9099cd4b718b64e78ee021fb59a2c1a5581e918bcaff965665f0591de2b6e80",
-      "sizeBytes": 46246528,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": false
-    },
-    {
-      "id": "gatekeeper_bert_vocab",
-      "path": "app/src/main/assets/models/bert_vocab.txt",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3/bert_vocab.txt",
-      "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
-      "sizeBytes": 231508,
-      "mediaType": "text/plain",
-      "required": true
-    },
-    {
-      "id": "gatekeeper_inherent_v0_metadata",
-      "path": "app/src/main/assets/models/inherent.metadata.json",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/c123cdaed47377c9d411e51cee388f4a549d80ee8f413575315e7bd518a4655e/inherent.metadata.json",
-      "sha256": "c123cdaed47377c9d411e51cee388f4a549d80ee8f413575315e7bd518a4655e",
-      "sizeBytes": 3895,
-      "mediaType": "application/json",
-      "required": true
-    },
-    {
-      "id": "gatekeeper_inherent_v0",
-      "path": "app/src/main/assets/models/inherent.tflite",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/b44af13a3f0b3683a46b65f790853d6aa6e709d14da3fab164eb1efa0f375065/inherent.tflite",
-      "sha256": "b44af13a3f0b3683a46b65f790853d6aa6e709d14da3fab164eb1efa0f375065",
-      "sizeBytes": 254368,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": true
-    },
-    {
       "id": "soda_lp_cpu",
       "path": "app/src/main/assets/soda/lp_cpu.zip",
       "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/fac23ca956f473c5025621784a1657a1663a16b0754886b975f3cde3f1345f04/lp_cpu.zip",
@@ -138,15 +66,6 @@
       "sizeBytes": 3400245,
       "mediaType": "application/java-archive",
       "required": true
-    },
-    {
-      "id": "google_gemma_4_e2b_litertlm",
-      "path": "artifacts/models/google-gemma-4-E2B-it-litertlm-165e6fc4354294a0/model.litertlm",
-      "s3Uri": "s3://fm-runtime-assets-095713295645-euc1-20260518/neural/runtime-binaries/ab7838cdfc8f77e54d8ca45eadceb20452d9f01e4bfade03e5dce27911b27e42/model.litertlm",
-      "sha256": "ab7838cdfc8f77e54d8ca45eadceb20452d9f01e4bfade03e5dce27911b27e42",
-      "sizeBytes": 2583085056,
-      "mediaType": "application/x-litertlm",
-      "required": false
     }
   ]
 }

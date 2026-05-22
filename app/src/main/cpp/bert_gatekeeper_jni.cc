@@ -33,6 +33,59 @@ constexpr int kSepId = 102;
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, kLogTag, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, kLogTag, __VA_ARGS__)
 
+void LogGoogleTensorLibraryLoad(const char* library_name) {
+  dlerror();
+  void* handle = dlopen(library_name, RTLD_NOW | RTLD_GLOBAL);
+  if (handle == nullptr) {
+    LOGW("Google Tensor dependency dlopen failed: %s: %s", library_name, dlerror());
+    return;
+  }
+  LOGW("Google Tensor dependency dlopen ok: %s", library_name);
+}
+
+bool CanInitializeGoogleTensorSouthBound() {
+  static std::once_flag init_once;
+  static bool initialized = false;
+  std::call_once(init_once, [] {
+    LogGoogleTensorLibraryLoad("libedgetpu_util.so");
+    LogGoogleTensorLibraryLoad("com.google.edgetpu_vendor_service-V2-ndk.so");
+    LogGoogleTensorLibraryLoad("libedgetpu_client.google.so");
+    LogGoogleTensorLibraryLoad("libedgetpu_tachyon.google.so");
+
+    dlerror();
+    void* south_bound_lib = dlopen("libedgetpu_litert.so", RTLD_NOW | RTLD_GLOBAL);
+    if (south_bound_lib == nullptr) {
+      LOGW("Google Tensor SouthBound dlopen failed: %s", dlerror());
+      return;
+    }
+
+    dlerror();
+    void* thr_initialize = dlsym(south_bound_lib, "thrInitialize");
+    const char* dlsym_error = dlerror();
+    if (thr_initialize == nullptr || dlsym_error != nullptr) {
+      LOGW("Google Tensor SouthBound thrInitialize lookup failed: %s",
+           dlsym_error != nullptr ? dlsym_error : "symbol unavailable");
+      return;
+    }
+    initialized = true;
+
+    using ThrGetStringFn = const char* (*)();
+    dlerror();
+    auto thr_get_vendor_api_version =
+        reinterpret_cast<ThrGetStringFn>(dlsym(south_bound_lib, "thrGetVendorApiVersion"));
+    const char* vendor_api_version =
+        thr_get_vendor_api_version == nullptr ? "(unavailable)" : thr_get_vendor_api_version();
+    dlerror();
+    auto thr_get_vendor_id =
+        reinterpret_cast<ThrGetStringFn>(dlsym(south_bound_lib, "thrGetVendorId"));
+    const char* vendor_id = thr_get_vendor_id == nullptr ? "(unavailable)" : thr_get_vendor_id();
+    LOGW("Google Tensor SouthBound available for BERT LiteRT dispatch: api=%s vendor=%s",
+         vendor_api_version == nullptr ? "(null)" : vendor_api_version,
+         vendor_id == nullptr ? "(null)" : vendor_id);
+  });
+  return initialized;
+}
+
 std::optional<std::vector<uint8_t>> CopyByteArray(JNIEnv* env, jbyteArray array) {
   if (array == nullptr) {
     return std::nullopt;
@@ -402,16 +455,18 @@ struct BertInputs {
 
 class BertModelBackend {
  public:
-  bool Initialize(JNIEnv* env, const std::vector<uint8_t>& model_bytes, bool accelerator_requested) {
+  bool Initialize(JNIEnv* env, const std::vector<uint8_t>& model_bytes, bool accelerator_requested,
+                  std::string dispatch_library_dir) {
     (void)env;
     model_size_ = model_bytes.size();
     accelerator_requested_ = accelerator_requested;
+    dispatch_library_dir_ = std::move(dispatch_library_dir);
 
     if (!LoadLiteRtSymbols()) {
       return false;
     }
 
-    if (!Check(api_.CreateEnvironment(0, nullptr, &environment_), "LiteRtCreateEnvironment") ||
+    if (!CreateEnvironment() ||
         !Check(api_.CreateModelFromBuffer(model_bytes.data(), model_bytes.size(), &model_),
                "LiteRtCreateModelFromBuffer") ||
         !ValidateModelContract() ||
@@ -496,6 +551,22 @@ class BertModelBackend {
   bool accelerator_requested() const { return accelerator_requested_; }
 
  private:
+  bool CreateEnvironment() {
+    LiteRtEnvOption option{};
+    const LiteRtEnvOption* options = nullptr;
+    int option_count = 0;
+    if (!dispatch_library_dir_.empty()) {
+      option.tag = kLiteRtEnvOptionTagDispatchLibraryDir;
+      option.value.type = kLiteRtAnyTypeString;
+      option.value.str_value = dispatch_library_dir_.c_str();
+      options = &option;
+      option_count = 1;
+      LOGW("Using LiteRT dispatch library dir: %s", dispatch_library_dir_.c_str());
+    }
+    return Check(api_.CreateEnvironment(option_count, options, &environment_),
+                 "LiteRtCreateEnvironment");
+  }
+
   bool LoadLiteRtSymbols() {
     if (litert_lib_ != nullptr) {
       return true;
@@ -530,7 +601,10 @@ class BertModelBackend {
                    &api_.CreateTensorBufferFromHostMemory) &&
            Resolve("LiteRtDestroyTensorBuffer", &api_.DestroyTensorBuffer) &&
            Resolve("LiteRtRunCompiledModel", &api_.RunCompiledModel) &&
-           ResolveOptional("LiteRtGetStatusString", &api_.GetStatusString);
+           ResolveOptional("LiteRtGetStatusString", &api_.GetStatusString) &&
+           ResolveOptional("LiteRtGetDefaultLogger", &api_.GetDefaultLogger) &&
+           ResolveOptional("LiteRtSetMinLoggerSeverity", &api_.SetMinLoggerSeverity) &&
+           EnableVerboseLiteRtLogging();
   }
 
   template <typename Fn>
@@ -565,6 +639,25 @@ class BertModelBackend {
     LOGE("%s failed: status=%d%s%s", context, static_cast<int>(status),
          detail == nullptr ? "" : " ", detail == nullptr ? "" : detail);
     return false;
+  }
+
+  bool EnableVerboseLiteRtLogging() const {
+    if (api_.GetDefaultLogger == nullptr || api_.SetMinLoggerSeverity == nullptr) {
+      return true;
+    }
+    constexpr int8_t kLiteRtLogSeverityDebug = -1;
+    LiteRtLogger logger = api_.GetDefaultLogger();
+    if (logger == nullptr) {
+      LOGW("LiteRT default logger is unavailable; keeping default log severity");
+      return true;
+    }
+    const LiteRtStatus status = api_.SetMinLoggerSeverity(logger, kLiteRtLogSeverityDebug);
+    if (status != kLiteRtStatusOk) {
+      LOGW("LiteRT verbose logging setup failed: %d", static_cast<int>(status));
+    } else {
+      LOGW("LiteRT native logger set to debug for Google Tensor dispatch diagnostics");
+    }
+    return true;
   }
 
   bool ValidateTensor(LiteRtTensor tensor, const char* expected_name,
@@ -674,6 +767,7 @@ class BertModelBackend {
 
   size_t model_size_ = 0;
   bool accelerator_requested_ = false;
+  std::string dispatch_library_dir_;
   void* litert_lib_ = nullptr;
   LiteRtApi api_;
   LiteRtEnvironment environment_ = nullptr;
@@ -718,8 +812,13 @@ BertInputs BuildInputs(const BertTokenizer& tokenizer, const std::string& query,
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_google_research_air_cosmo_gatekeeping_models_BertEncoderImpl_nativeCreate(
     JNIEnv* env, jclass clazz, jbyteArray vocab_buffer, jbyteArray model_buffer,
-    jboolean is_tpu_enabled) {
+    jboolean is_tpu_enabled, jstring dispatch_library_dir) {
   (void)clazz;
+
+  if (is_tpu_enabled == JNI_TRUE && !CanInitializeGoogleTensorSouthBound()) {
+    LOGE("nativeCreate cannot initialize Google Tensor SouthBound runtime");
+    return 0;
+  }
 
   auto vocab_bytes = CopyByteArray(env, vocab_buffer);
   auto model_bytes = CopyByteArray(env, model_buffer);
@@ -737,7 +836,8 @@ Java_com_google_research_air_cosmo_gatekeeping_models_BertEncoderImpl_nativeCrea
     return 0;
   }
 
-  if (!handle->backend.Initialize(env, handle->model_bytes, is_tpu_enabled == JNI_TRUE)) {
+  if (!handle->backend.Initialize(env, handle->model_bytes, is_tpu_enabled == JNI_TRUE,
+                                  CopyString(env, dispatch_library_dir))) {
     LOGE("nativeCreate failed to compile LiteRT model; accelerator_requested=%s model_bytes=%zu",
          is_tpu_enabled == JNI_TRUE ? "true" : "false", handle->model_bytes.size());
     return 0;

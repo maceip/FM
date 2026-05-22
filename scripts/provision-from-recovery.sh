@@ -133,8 +133,8 @@ if [[ -x "$REPO_ROOT/scripts/download-models.sh" ]]; then
   if $DRY_RUN || $VERIFY_ONLY; then
     echo "(skipping download-models.sh --verify-only in dry-run/verify mode)"
   else
-    echo "==> Running scripts/download-models.sh --verify-only …"
-    if "$REPO_ROOT/scripts/download-models.sh" --verify-only 2>&1 | sed 's/^/    /'; then
+    echo "==> Running scripts/download-models.sh --verify-only --bundled-only …"
+    if "$REPO_ROOT/scripts/download-models.sh" --verify-only --bundled-only 2>&1 | sed 's/^/    /'; then
       echo "✓ Manifest verification passed."
     else
       echo "✗ Manifest verification failed — check SHA-256 vs model-manifest.json" >&2

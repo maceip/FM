@@ -26,7 +26,7 @@ fi
 
 if [[ ! -r "$LOCAL_MODEL" ]]; then
   echo "Local model is missing or unreadable: $LOCAL_MODEL" >&2
-  echo "Run scripts/provision-local-litertlm.sh first, or set MODEL_ID/LOCAL_MODEL explicitly." >&2
+  echo "Run scripts/download-models.sh --only llm_gemma_4_e2b_litertlm (or scripts/provision-local-litertlm.sh), or set LOCAL_MODEL." >&2
   exit 1
 fi
 

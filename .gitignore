@@ -32,6 +32,7 @@ proguard/
 *.iws
 .vscode/
 .fleet/
+.antigravitycli/
 
 # OS
 .DS_Store
@@ -58,7 +59,9 @@ hs_err_pid*.log
 # scripts/verify-soda-assets.sh. These are not tracked in git because several
 # exceed GitHub's 100 MB limit and the byte source must not be a dev laptop.
 app/src/main/assets/models/*.tflite
+app/src/main/assets/models/*.tar.bz2
 app/src/main/assets/models/tts/
+artifacts/tts-bundles/
 app/src/main/assets/soda/*.zip
 app/src/main/jniLibs/arm64-v8a/*.so
 # recovered-soda.jar is a Kotlin compile-time dep (small, 3.4 MB) — must be tracked.

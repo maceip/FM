@@ -1,88 +1,114 @@
 {
   "version": 1,
+  "modelVersion": "0.0.1",
   "assetRoot": "app/src/main/assets/models",
-  "description": "Authoritative production manifest for large on-device model assets. Bundled entries are packaged directly in app/src/main/assets/models and must match the exact byte size and SHA-256 checksum recorded here.",
   "models": [
     {
       "id": "gatekeeper_bert_vocab",
       "filename": "bert_vocab.txt",
-      "delivery": "bundled",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/bert_vocab.txt",
       "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
       "sizeBytes": 231508,
-      "mediaType": "text/plain",
       "required": true
     },
     {
       "id": "gatekeeper_bert_v0_cpu",
       "filename": "bert_v0_cpu.tflite",
-      "delivery": "bundled",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/bert_v0_cpu.tflite",
       "sha256": "1c6da7858a1cccd9ac6cd5c323d26ef99d962761e34d3f65871762123f95af34",
       "sizeBytes": 71935326,
-      "mediaType": "application/vnd.tensorflow.lite",
       "required": true
+    },
+    {
+      "id": "gatekeeper_bert_v0_google_tensor_g5",
+      "filename": "bert_v0_google_tensor_g5.tflite",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/bert_v0_google_tensor_g5.tflite",
+      "sha256": "35bb8dd34833d7cca3e2d65b61dc095e2998d201b797deaf5e29364ac5514128",
+      "sizeBytes": 46623088,
+      "required": false
     },
     {
       "id": "gatekeeper_bert_v0_p24",
       "filename": "bert_v0_p24.tflite",
-      "delivery": "bundled",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/bert_v0_p24.tflite",
       "sha256": "95142cbaaf2102c62e095c16a352cb19c8c05369859922fcbddc5699a8c903c8",
       "sizeBytes": 44995072,
-      "mediaType": "application/vnd.tensorflow.lite",
       "required": false
     },
     {
       "id": "gatekeeper_bert_v0_p25",
       "filename": "bert_v0_p25.tflite",
-      "delivery": "bundled",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/bert_v0_p25.tflite",
       "sha256": "f9099cd4b718b64e78ee021fb59a2c1a5581e918bcaff965665f0591de2b6e80",
       "sizeBytes": 46246528,
-      "mediaType": "application/vnd.tensorflow.lite",
-      "required": false
-    },
-    {
-      "id": "gatekeeper_bert_v0_mt6989",
-      "filename": "bert_v0_mt6989.tflite",
-      "delivery": "bundled",
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "sizeBytes": 1,
-      "mediaType": "application/vnd.tensorflow.lite",
       "required": false
     },
     {
       "id": "gatekeeper_audio_frontend",
       "filename": "audio_frontend.tflite",
-      "delivery": "bundled",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/audio_frontend.tflite",
       "sha256": "f1dbb89e2f585093515de68e873d2beb7a5058e25a76b932fc6628937d13b457",
       "sizeBytes": 3018776,
-      "mediaType": "application/vnd.tensorflow.lite",
       "required": true
     },
     {
       "id": "gatekeeper_audio_gatekeeper",
       "filename": "audio_gatekeeper_edgetpu.tflite",
-      "delivery": "bundled",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/audio_gatekeeper_edgetpu.tflite",
       "sha256": "a1388e523b7786800e0fdd8da4c2a7e4400aeb6781824ea234064e03844206f2",
       "sizeBytes": 48156352,
-      "mediaType": "application/vnd.tensorflow.lite",
       "required": true
     },
     {
       "id": "gatekeeper_inherent_v0",
       "filename": "inherent.tflite",
-      "delivery": "bundled",
-      "sha256": "b44af13a3f0b3683a46b65f790853d6aa6e709d14da3fab164eb1efa0f375065",
-      "sizeBytes": 254368,
-      "mediaType": "application/vnd.tensorflow.lite",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/inherent.tflite",
+      "sha256": "46e21e0c8b23dfc7bbd05a4c83ca2c44b18feb1986522a0726a9ace0273ad4ea",
+      "sizeBytes": 10554256,
       "required": true
+    },
+    {
+      "id": "gatekeeper_inherent_v0_google_tensor_g5",
+      "filename": "inherent_v0_google_tensor_g5.tflite",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/inherent_v0_google_tensor_g5.tflite",
+      "sha256": "6865820dd117ae9ed36da34c01878154a1f000f41624bbcd9dfd500552940d37",
+      "sizeBytes": 29450816,
+      "required": false
     },
     {
       "id": "gatekeeper_inherent_v0_metadata",
       "filename": "inherent.metadata.json",
-      "delivery": "bundled",
-      "sha256": "c123cdaed47377c9d411e51cee388f4a549d80ee8f413575315e7bd518a4655e",
-      "sizeBytes": 3895,
-      "mediaType": "application/json",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/inherent.metadata.json",
+      "sha256": "3ceb6f5ff2a7553f32ae5e297b3b96659656233815868dd2ca00ef0ee2d3f3cf",
+      "sizeBytes": 3589,
       "required": true
+    },
+    {
+      "id": "tts_supertonic_3",
+      "filename": "tts-supertonic-3.tar.bz2",
+      "extractTo": "tts/supertonic-3",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/tts-supertonic-3.tar.bz2",
+      "sha256": "931ce0fcd11fdc8dc383f4b4b56746637691fe43dec7d98632b124fca53296d4",
+      "sizeBytes": 379304390,
+      "required": true
+    },
+    {
+      "id": "tts_kitten_mini_en_v0_1_fp16",
+      "filename": "tts-kitten-mini-en-v0_1-fp16.tar.bz2",
+      "extractTo": "tts/kitten-mini-en-v0_1-fp16",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/tts-kitten-mini-en-v0_1-fp16.tar.bz2",
+      "sha256": "8db485f0ebd52ef1e7cc72f3eb069ec0d3493b43162f64a52af1ffee97c7983b",
+      "sizeBytes": 156668383,
+      "required": false
+    },
+    {
+      "id": "llm_gemma_4_e2b_litertlm",
+      "filename": "google-gemma-4-E2B-it-litertlm.litertlm",
+      "localPath": "artifacts/models/google-gemma-4-E2B-it-litertlm-165e6fc4354294a0/model.litertlm",
+      "url": "s3://maceip-neural-models-095713295645/v0.0.1/google-gemma-4-E2B-it-litertlm.litertlm",
+      "sha256": "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
+      "sizeBytes": 2588147712,
+      "required": false
     }
   ]
 }

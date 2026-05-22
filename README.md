@@ -135,25 +135,25 @@ scripts/dev-loop.sh --help           # all flags
 Requires an attached device or running emulator (`adb devices` should list
 one). Reads `ANDROID_SERIAL` for targeting if multiple are connected.
 
-**First-time setup on a new machine** — hydrate the gitignored runtime
-binaries (TFLites, SODA packs, JNI `.so`) from the private S3 binary store:
+**First-time setup** — hydrate gitignored binaries from S3 + recovery:
 
 ```bash
-scripts/runtime-binaries.sh download
-scripts/download-models.sh --verify-only
-scripts/download-voice-models.sh --verify-only
+scripts/download-models.sh              # gatekeeper, inherent, TTS (model-manifest → S3)
+scripts/runtime-binaries.sh download    # SODA packs + JNI/libs only
 scripts/verify-soda-assets.sh
+# Optional 2.5GB LiteRT-LM (not in APK):
+scripts/download-models.sh --only llm_gemma_4_e2b_litertlm
 ```
 
-The optional local LiteRT-LM dogfood model is large and stays out of the APK.
-Hydrate it when you need the local LLM fallback:
+**Google Tensor SDK (Pixel EdgeTPU AOT)** — landed notebook + compiler in
+`~/Downloads`: `LiteRT NPU AOT compilation for Google Tensor.ipynb`,
+`litert_plugin_compiler.tar.gz` (`GOOGLE_TENSOR_SDK_BETA`). Compiles portable
+`.tflite` (gatekeeper BERT, `inherent.tflite`) to per-SoC EdgeTPU artifacts.
+Docs: [`docs/google-tensor-sdk.md`](docs/google-tensor-sdk.md),
+[`~/inherent/docs/google-tensor-sdk.md`](../inherent/docs/google-tensor-sdk.md).
+Latency vs STT→intent: [`~/inherent/README.md`](../inherent/README.md#latency-1-s-audio-order-of-magnitude).
 
-```bash
-scripts/runtime-binaries.sh download --include-optional
-```
-
-`scripts/provision-from-recovery.sh` remains a fallback for re-copying from a
-local APK-recovery directory, but it is no longer the source of truth.
+`scripts/provision-from-recovery.sh` is a legacy fallback only.
 
 **Standalone Gradle commands:**
 
@@ -173,6 +173,29 @@ scripts/run-device-core-capability-smoke.sh
 scripts/run-device-core-capability-smoke.sh /path/to/phrase.wav
 ```
 
+**Gatekeeper → fulfillment golden test** (Cosmo-shaped path: head → intents → orchestrator queue → action deck):
+
+```bash
+# Fast loop: JVM only (~10s)
+scripts/run-gatekeeper-golden.sh --unit-only
+
+# Full loop: unit + Pixel/emulator when adb shows a device
+scripts/run-gatekeeper-golden.sh
+
+# All launch proofs (text golden, audio golden, inherent scorecard, release LLM)
+scripts/run-launch-device-proofs.sh
+scripts/run-launch-device-proofs.sh --skip-release-llm   # skip slow releaseInternal LLM step
+```
+
+Individual device proofs:
+
+```bash
+scripts/run-device-gatekeeper-golden-test.sh          # text → deck + presence
+scripts/run-device-gatekeeper-audio-golden-test.sh    # WAV → SODA → deck
+scripts/run-inherent-scorecard.sh                     # ambient head quality report
+scripts/run-device-release-internal-llm-smoke.sh      # non-SimulationLLM on releaseInternal
+```
+
 Convert a phone recording before injection:
 
 ```bash
@@ -182,15 +205,13 @@ ffmpeg -i phrase.m4a -ac 1 -ar 16000 -sample_fmt s16 phrase.wav
 **Dogfood LiteRT-LM fallback:**
 
 ```bash
-scripts/provision-local-litertlm.sh
+scripts/download-models.sh --only llm_gemma_4_e2b_litertlm
 DEPLOY_LITERTLM=1 scripts/run-device-model-routing-smoke.sh fallback
 ```
 
-The launch fallback default is the app-private
-`google-gemma-4-E2B-it-litertlm` bundle. It is not checked into git; the
-provision script copies the local `.litertlm` file into the hashed storage path
-that `LiteRtLmLLM` and the deploy script both use. Test E4B or future bundles
-by passing `LITERTLM_MODEL_ID=...` and `LOCAL_MODEL=...`.
+The bundle is listed in `model-manifest.json` (`llm_gemma_4_e2b_litertlm`) and
+fetched from S3 like other models. Override with `LITERTLM_MODEL_ID=...` and
+`LOCAL_MODEL=...` for E4B or other variants.
 
 **Remote emu smoke:**
 
@@ -212,23 +233,18 @@ relocation safety).
 
 ## Docs
 
-- [`PLAN.md`](PLAN.md) — short operating plan. Read this first for what to work on next.
-- [`LAYOUT.md`](LAYOUT.md) — where everything lives (canonical inside `~/neural`, what's outside and why, consolidation status)
-- [`docs/architecture.md`](docs/architecture.md) — system architecture with status per component, including Presence UX layer (§13), AppFunctions surface (§14), server-side workstreams (§15), CaMeL trust-layer placement (§12), and recovered-but-unwired surface inventory (§17)
-- [`docs/architecture-delta.md`](docs/architecture-delta.md) — C1–C9 contract rules + PR0–PR6 marching orders
-- [`docs/camel-port-notes.md`](docs/camel-port-notes.md) — per-AST-node CaMeL port-fidelity reference (read when the implementing workstream picks up §12)
-- [`docs/fallback-paths.md`](docs/fallback-paths.md) — 3-tier fallback for each deferred subsystem (cosmo-recovered → commercial/OSS → build-it), with effort estimates + triage
-- [`reference/`](reference/) — read-only mirrors of cosmo-recovery stack maps + workstream interface contracts + inherent contracts
-- [`docs/blocker-register.md`](docs/blocker-register.md) — active blockers sorted by release impact
-- [`docs/aicore-api-gap.md`](docs/aicore-api-gap.md) — public AICore feature-selection limits
-- [`docs/remote-inference-contract.md`](docs/remote-inference-contract.md) — issuer + inference HTTP contract
-- [`docs/release-signing-policy.md`](docs/release-signing-policy.md) — production signing inputs
+| Doc | Topic |
+| --- | --- |
+| [`PLAN.md`](PLAN.md) | What to work on next |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture + status |
+| [`docs/google-tensor-sdk.md`](docs/google-tensor-sdk.md) | Pixel AOT notebook + Downloads toolchain |
+| [`docs/architecture-delta.md`](docs/architecture-delta.md) | C1–C9 contracts, PR marching orders |
+| [`docs/blocker-register.md`](docs/blocker-register.md) | Active blockers |
+| [`reference/`](reference/) | Recovery stack maps + contracts |
+| [`~/inherent/contracts/runtime_contract.md`](../inherent/contracts/runtime_contract.md) | Inherent ↔ app integration |
 
-External:
-
-- Recovery-level cosmo internals (smali / proto fields / asset bytes): `$COSMO_DEV_ROOT/repo/docs/*_stack_map.md`
-- Inherent (joint audio→intent training pipeline): `~/inherent/contracts/runtime_contract.md`
-- CaMeL paper: [arxiv 2503.18813](https://arxiv.org/abs/2503.18813) — reference impl: [google-research/camel-prompt-injection](https://github.com/google-research/camel-prompt-injection)
+Also: `LAYOUT.md`, `docs/fallback-paths.md`, `docs/aicore-api-gap.md`,
+`docs/release-signing-policy.md`. Recovery smali maps: `$COSMO_DEV_ROOT/repo/docs/*_stack_map.md`.
 
 ## Provenance
 

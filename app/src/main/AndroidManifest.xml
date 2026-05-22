@@ -233,6 +233,15 @@
             android:name="libedgetpu_client.google.so"
             android:required="false" />
         <uses-native-library
+            android:name="libedgetpu_litert.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libedgetpu_tachyon.google.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="com.google.edgetpu_vendor_service-V2-ndk.so"
+            android:required="false" />
+        <uses-native-library
             android:name="libOpenCL.so"
             android:required="false" />
         <uses-native-library

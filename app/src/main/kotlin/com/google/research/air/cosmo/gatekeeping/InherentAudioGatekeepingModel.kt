@@ -2,6 +2,7 @@ package com.google.research.air.cosmo.gatekeeping
 
 import android.content.Context
 import com.google.research.air.cosmo.BuildConfig
+import com.google.research.air.cosmo.gatekeeping.models.AudioGatekeeperLiteRtImpl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -35,19 +36,23 @@ class InherentAudioGatekeepingModel internal constructor(
     ) : this(
         loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context),
         loadMetadataText = inherentMetadataTextLoader(context),
-        nativeCreate = { modelBuffer, _, expectedInputShape, expectedOutputShape ->
-            TensorFlowLiteInherentRuntimeRegistry.create(
-                modelBuffer,
+        nativeCreate = { modelBytes, useNpu, expectedInputShape, expectedOutputShape ->
+            InherentRuntimeBridge.create(
+                modelBytes,
+                useNpu,
                 expectedInputShape,
-                expectedOutputShape
+                expectedOutputShape,
+                context.applicationInfo.nativeLibraryDir
             )
         },
-        nativeRun = { handle, input, output -> TensorFlowLiteInherentRuntimeRegistry.run(handle, input, output) },
-        nativeDestroy = { handle -> TensorFlowLiteInherentRuntimeRegistry.destroy(handle) }
+        nativeRun = InherentRuntimeBridge::run,
+        nativeDestroy = InherentRuntimeBridge::destroy
     )
 
     private var frontendHandle: Long = 0L
     private var backendHandle: Long = 0L
+    private var backendModelId: String = MODEL_ID_CPU
+    private var skipGoogleTensorBackend: Boolean = false
     private val thresholds: FloatArray by lazy { loadThresholds() }
 
     override suspend fun predict(input: String): GatekeepingResult =
@@ -72,7 +77,7 @@ class InherentAudioGatekeepingModel internal constructor(
         val detected = mapScores(scores)
         return GatekeepingResult(
             detectedSkills = detected,
-            modelId = "inherent_v0",
+            modelId = backendModelId,
             detectedBy = if (detected.isEmpty()) "none" else "audio_gatekeeper",
             triggeredFulfillment = detected.isNotEmpty(),
             input = "Ambient raw audio: latest buffered PCM window",
@@ -87,6 +92,7 @@ class InherentAudioGatekeepingModel internal constructor(
         val currentBackend = backendHandle
         frontendHandle = 0L
         backendHandle = 0L
+        backendModelId = MODEL_ID_CPU
         if (currentFrontend != 0L) runCatching { nativeDestroy(currentFrontend) }
         if (currentBackend != 0L) runCatching { nativeDestroy(currentBackend) }
     }
@@ -108,16 +114,58 @@ class InherentAudioGatekeepingModel internal constructor(
                 .allocateDirect(NUM_INTENTS * Float.SIZE_BYTES)
                 .order(ByteOrder.nativeOrder())
                 .asFloatBuffer()
-        melBuffer.position(0)
-        if (!nativeRun(ensureBackend(), melBuffer, output)) {
-            failUnavailable("inherent_native_run_failed")
+        return runBackendWithFallback(melBuffer, output)
+    }
+
+    private fun runBackendWithFallback(
+        melBuffer: FloatBuffer,
+        output: FloatBuffer
+    ): FloatArray {
+        if (!runBackendOnce(melBuffer, output)) {
+            if (!retireGoogleTensorBackend()) failUnavailable("inherent_native_run_failed")
+            clearFloatBuffer(output)
+            if (!runBackendOnce(melBuffer, output)) failUnavailable("inherent_native_run_failed")
         }
-        output.position(0)
-        val scores = FloatArray(NUM_INTENTS) { output.get() }
+        var scores = readScores(output)
         if (scores.any { !it.isFinite() }) {
-            failUnavailable("inherent_invalid_output")
+            if (!retireGoogleTensorBackend()) failUnavailable("inherent_invalid_output")
+            clearFloatBuffer(output)
+            if (!runBackendOnce(melBuffer, output)) failUnavailable("inherent_native_run_failed")
+            scores = readScores(output)
+            if (scores.any { !it.isFinite() }) failUnavailable("inherent_invalid_output")
         }
         return scores
+    }
+
+    private fun runBackendOnce(
+        melBuffer: FloatBuffer,
+        output: FloatBuffer
+    ): Boolean {
+        melBuffer.position(0)
+        output.position(0)
+        return runCatching { nativeRun(ensureBackend(), melBuffer, output) }.getOrDefault(false)
+    }
+
+    private fun readScores(output: FloatBuffer): FloatArray {
+        output.position(0)
+        return FloatArray(NUM_INTENTS) { output.get() }
+    }
+
+    private fun clearFloatBuffer(buffer: FloatBuffer) {
+        for (index in 0 until buffer.capacity()) {
+            buffer.put(index, 0f)
+        }
+        buffer.position(0)
+    }
+
+    private fun retireGoogleTensorBackend(): Boolean {
+        if (backendModelId != MODEL_ID_GOOGLE_TENSOR_G5) return false
+        val currentBackend = backendHandle
+        backendHandle = 0L
+        backendModelId = MODEL_ID_CPU
+        skipGoogleTensorBackend = true
+        if (currentBackend != 0L) runCatching { nativeDestroy(currentBackend) }
+        return true
     }
 
     private fun ensureFrontend(): Long {
@@ -138,19 +186,58 @@ class InherentAudioGatekeepingModel internal constructor(
 
     private fun ensureBackend(): Long {
         if (backendHandle != 0L) return backendHandle
-        val bytes = loadAssetBytes(GatekeeperModelIds.INHERENT_V0)
-            ?: failUnavailable("inherent_asset_unavailable")
-        val created =
-            nativeCreate(
-                bytes,
-                false,
-                intArrayOf(1, MAX_FRAMES, MEL_BINS),
-                intArrayOf(1, NUM_INTENTS)
-            )
-        if (created == 0L) failUnavailable("inherent_litert_cpu_create_failed")
-        backendHandle = created
-        return created
+        val failures = mutableListOf<String>()
+        for (candidate in backendCandidates()) {
+            val bytes = loadAssetBytes(candidate.assetId)
+            if (bytes == null) {
+                failures += "missing:${candidate.assetId}"
+                continue
+            }
+            val created =
+                runCatching {
+                    nativeCreate(
+                        bytes,
+                        candidate.useNpu,
+                        intArrayOf(1, MAX_FRAMES, MEL_BINS),
+                        intArrayOf(1, NUM_INTENTS)
+                    )
+                }.getOrElse { error ->
+                    failures += "create_exception:${candidate.assetId}:${error.javaClass.simpleName}"
+                    0L
+                }
+            if (created != 0L) {
+                backendHandle = created
+                backendModelId = candidate.modelId
+                return created
+            }
+            failures += "create_zero:${candidate.assetId}"
+        }
+        failUnavailable("inherent_litert_all_backends_failed:${failures.joinToString("|")}")
     }
+
+    private fun backendCandidates(): List<BackendCandidate> =
+        if (SocClass.current() == SocClass.GOOGLE_TENSOR && !skipGoogleTensorBackend) {
+            listOf(
+                BackendCandidate(
+                    assetId = GatekeeperModelIds.INHERENT_V0_GOOGLE_TENSOR_G5,
+                    useNpu = true,
+                    modelId = MODEL_ID_GOOGLE_TENSOR_G5
+                ),
+                BackendCandidate(
+                    assetId = GatekeeperModelIds.INHERENT_V0,
+                    useNpu = false,
+                    modelId = MODEL_ID_CPU
+                )
+            )
+        } else {
+            listOf(
+                BackendCandidate(
+                    assetId = GatekeeperModelIds.INHERENT_V0,
+                    useNpu = false,
+                    modelId = MODEL_ID_CPU
+                )
+            )
+        }
 
     private fun pcm16ToFloatBuffer(pcm: ByteArray): FloatBuffer {
         val output =
@@ -231,6 +318,8 @@ class InherentAudioGatekeepingModel internal constructor(
 
     companion object {
         const val METADATA_ASSET_PATH = "models/inherent.metadata.json"
+        const val MODEL_ID_CPU = "inherent_v0"
+        const val MODEL_ID_GOOGLE_TENSOR_G5 = "inherent_v0_google_tensor_g5"
         const val MEL_BINS: Int = AudioGatekeepingContract.MEL_BINS
         const val MAX_FRAMES: Int = AudioGatekeepingContract.MAX_FRAMES
         const val MAX_SAMPLES: Int = AudioGatekeepingContract.MAX_SAMPLES
@@ -239,6 +328,12 @@ class InherentAudioGatekeepingModel internal constructor(
 
         private val DEFAULT_THRESHOLDS = AudioGatekeepingContract.DEFAULT_THRESHOLDS
     }
+
+    private data class BackendCandidate(
+        val assetId: String,
+        val useNpu: Boolean,
+        val modelId: String
+    )
 }
 
 private object TensorFlowLiteInherentRuntimeRegistry {
@@ -265,6 +360,62 @@ private object TensorFlowLiteInherentRuntimeRegistry {
 
     fun destroy(handle: Long) {
         runtimes.remove(handle)?.close()
+    }
+}
+
+private object InherentRuntimeBridge {
+    private val liteRtHandles = ConcurrentHashMap.newKeySet<Long>()
+
+    fun create(
+        modelBytes: ByteArray,
+        useNpu: Boolean,
+        expectedInputShape: IntArray,
+        expectedOutputShape: IntArray,
+        dispatchLibraryDir: String? = null
+    ): Long {
+        if (useNpu) {
+            if (!AudioGatekeeperLiteRtImpl.nativeCanInitializeGoogleTensorNpu()) {
+                return 0L
+            }
+            val handle =
+                runCatching {
+                    AudioGatekeeperLiteRtImpl.nativeCreate(
+                        modelBytes,
+                        true,
+                        expectedInputShape,
+                        expectedOutputShape,
+                        dispatchLibraryDir
+                    )
+                }.getOrDefault(0L)
+            if (handle != 0L) {
+                liteRtHandles += handle
+                return handle
+            }
+        }
+        return TensorFlowLiteInherentRuntimeRegistry.create(
+            modelBytes,
+            expectedInputShape,
+            expectedOutputShape
+        )
+    }
+
+    fun run(
+        handle: Long,
+        input: FloatBuffer,
+        output: FloatBuffer
+    ): Boolean =
+        if (liteRtHandles.contains(handle)) {
+            AudioGatekeeperLiteRtImpl.nativeRun(handle, input, output)
+        } else {
+            TensorFlowLiteInherentRuntimeRegistry.run(handle, input, output)
+        }
+
+    fun destroy(handle: Long) {
+        if (liteRtHandles.remove(handle)) {
+            runCatching { AudioGatekeeperLiteRtImpl.nativeDestroy(handle) }
+        } else {
+            TensorFlowLiteInherentRuntimeRegistry.destroy(handle)
+        }
     }
 }
 

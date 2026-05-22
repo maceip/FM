@@ -13,7 +13,8 @@ class BertEncoderImpl private constructor() {
         external fun nativeCreate(
             vocabBuffer: ByteArray,
             modelBuffer: ByteArray,
-            isTpuEnabled: Boolean
+            isTpuEnabled: Boolean,
+            dispatchLibraryDir: String?
         ): Long
 
         @JvmStatic

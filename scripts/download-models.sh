@@ -1,202 +1,151 @@
 #!/usr/bin/env bash
+# Sync models from model-manifest.json (S3). Missing or stale files are re-fetched.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEFAULT_MANIFEST="${ROOT_DIR}/app/src/main/assets/model-manifest.json"
-MODELS_DIR="${ROOT_DIR}/app/src/main/assets/models"
-
-MANIFEST="${DEFAULT_MANIFEST}"
+MANIFEST="${ROOT_DIR}/app/src/main/assets/model-manifest.json"
+ASSETS="${ROOT_DIR}/app/src/main/assets/models"
 VERIFY_ONLY=0
-ALLOW_EMPTY=0
-ALLOW_MISSING_BINARIES=0
+BUNDLED_ONLY=0
+ONLY=""
+# Skip full SHA on huge artifacts (size match is enough for verify-only).
+MAX_SHA_BYTES=209715200
 
-usage() {
-  cat >&2 <<'EOF'
-usage: scripts/download-models.sh [--manifest path] [--verify-only] [--allow-empty] [--allow-missing-binaries]
-
-Reads app/src/main/assets/model-manifest.json by default. Each manifest entry must
-declare id, filename, delivery, sha256, sizeBytes, mediaType, and required.
-Remote entries must also declare an absolute HTTPS url. Bundled entries are
-verified from app/src/main/assets/models.
-EOF
-}
+[[ -f "${ROOT_DIR}/config/models-s3.env" ]] && source "${ROOT_DIR}/config/models-s3.env"
+S3_REGION="${NEURAL_MODELS_S3_REGION:-eu-central-1}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --manifest)
-      MANIFEST="${2:-}"
-      shift 2
-      ;;
-    --verify-only)
-      VERIFY_ONLY=1
-      shift
-      ;;
-    --allow-empty)
-      ALLOW_EMPTY=1
-      shift
-      ;;
-    --allow-missing-binaries)
-      ALLOW_MISSING_BINARIES=1
-      shift
-      ;;
+    --verify-only) VERIFY_ONLY=1 ;;
+    --bundled-only) BUNDLED_ONLY=1 ;;
+    --only) ONLY="$2"; shift ;;
     -h | --help)
-      usage
+      cat >&2 <<'EOF'
+usage: scripts/download-models.sh [--verify-only] [--bundled-only] [--only id]
+
+  (default)     Download anything missing or checksum/size mismatched from S3.
+  --verify-only Check on-disk artifacts; exit non-zero if a required entry is wrong.
+  --bundled-only  Only APK asset paths (app/src/main/assets/...); skips artifacts/ LLM.
+  --only id     Comma-separated manifest ids.
+EOF
       exit 0
       ;;
-    *)
-      usage
-      exit 64
+    --allow-missing-binaries)
+      # Deprecated: same as --bundled-only for verify (CI compat).
+      BUNDLED_ONLY=1
       ;;
+    *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
+  shift
 done
 
-if [[ ! -f "${MANIFEST}" ]]; then
-  echo "model manifest not found: ${MANIFEST}" >&2
-  exit 65
-fi
+command -v python3 >/dev/null || { echo "python3 required" >&2; exit 69; }
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required to parse the JSON model manifest" >&2
-  exit 69
-fi
+sha256_file() { shasum -a 256 "$1" | awk '{print $1}'; }
+size_file() { wc -c < "$1" | tr -d ' '; }
+
+fetch() {
+  local url="$1" dest="$2"
+  mkdir -p "$(dirname "$dest")"
+  local tmp="${dest}.part"
+  if [[ "$url" == s3://* ]]; then
+    command -v aws >/dev/null || { echo "aws CLI required for $url" >&2; exit 69; }
+    aws s3 cp "$url" "$tmp" --region "$S3_REGION"
+  else
+    curl -fsSL --retry 3 "$url" -o "$tmp"
+  fi
+  mv "$tmp" "$dest"
+}
+
+check_file() {
+  local path="$1" want_sha="$2" want_size="$3" label="$4"
+  [[ -f "$path" ]] || return 1
+  local got_size
+  got_size="$(size_file "$path")"
+  [[ "$got_size" == "$want_size" ]] || {
+    echo "size mismatch $label: want $want_size got $got_size" >&2; return 1; }
+  if [[ "$want_size" -le "$MAX_SHA_BYTES" ]]; then
+    [[ "$(sha256_file "$path")" == "$want_sha" ]] || {
+      echo "sha256 mismatch $label" >&2; return 1; }
+  fi
+}
+
+extract_ok() {
+  local dir="$1"
+  [[ -d "$dir" && -n "$(find "$dir" -type f 2>/dev/null | head -1)" ]]
+}
 
 rows="$(mktemp)"
-trap 'rm -f "${rows}"' EXIT
-
-python3 - "${MANIFEST}" "${ALLOW_EMPTY}" > "${rows}" <<'PY'
-import json
-import re
-import sys
-from pathlib import PurePosixPath
-from urllib.parse import urlparse
-
-manifest_path = sys.argv[1]
-allow_empty = sys.argv[2] == "1"
-
-with open(manifest_path, "r", encoding="utf-8") as handle:
-    manifest = json.load(handle)
-
-def fail(message):
-    print(message, file=sys.stderr)
-    raise SystemExit(65)
-
-if not isinstance(manifest, dict):
-    fail("model manifest must be a JSON object")
-if manifest.get("version") != 1:
-    fail("model manifest version must be 1")
-if manifest.get("assetRoot") != "app/src/main/assets/models":
-    fail("model manifest assetRoot must be app/src/main/assets/models")
-
-models = manifest.get("models")
-if not isinstance(models, list):
-    fail("model manifest models must be an array")
-if not models and not allow_empty:
-    fail("model manifest does not contain any model entries")
-
-seen_ids = set()
-seen_files = set()
-sha_re = re.compile(r"^[0-9a-f]{64}$")
-filename_re = re.compile(r"^[A-Za-z0-9._-]+$")
-
-for index, model in enumerate(models):
-    if not isinstance(model, dict):
-        fail(f"model entry {index} must be an object")
-    model_id = model.get("id")
-    filename = model.get("filename")
-    delivery = model.get("delivery", "remote")
-    url = model.get("url")
-    sha256 = model.get("sha256")
-    size_bytes = model.get("sizeBytes")
-    media_type = model.get("mediaType")
-    required = model.get("required")
-    for field_name, value in (
-        ("id", model_id),
-        ("filename", filename),
-        ("delivery", delivery),
-        ("sha256", sha256),
-        ("mediaType", media_type),
-    ):
-        if not isinstance(value, str) or not value.strip():
-            fail(f"model entry {index} has invalid {field_name}")
-    if not isinstance(size_bytes, int) or size_bytes <= 0:
-        fail(f"model entry {model_id} has invalid sizeBytes")
-    if not isinstance(required, bool):
-        fail(f"model entry {model_id} has invalid required")
-    if model_id in seen_ids:
-        fail(f"duplicate model id: {model_id}")
-    if filename in seen_files:
-        fail(f"duplicate model filename: {filename}")
-    if not filename_re.match(filename) or PurePosixPath(filename).name != filename or filename.startswith("."):
-        fail(f"invalid model filename: {filename}")
-    if not sha_re.match(sha256):
-        fail(f"invalid sha256 for model {model_id}")
-    if delivery not in ("bundled", "remote"):
-        fail(f"model {model_id} has invalid delivery")
-    if delivery == "remote":
-        if not isinstance(url, str) or not url.strip():
-            fail(f"model {model_id} has invalid url")
-        parsed_url = urlparse(url)
-        if parsed_url.scheme != "https" or not parsed_url.netloc:
-            fail(f"model {model_id} url must be absolute HTTPS")
-    elif url is not None:
-        fail(f"bundled model {model_id} must not declare url")
-
-    seen_ids.add(model_id)
-    seen_files.add(filename)
-    print("\t".join([model_id, filename, delivery, url or "-", sha256, str(size_bytes), str(required).lower()]))
+trap 'rm -f "$rows"' EXIT
+python3 - "$MANIFEST" "$ONLY" "$BUNDLED_ONLY" >"$rows" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+only = {x.strip() for x in sys.argv[2].split(",") if x.strip()}
+bundled_only = sys.argv[3] == "1"
+asset_root = manifest.get("assetRoot", "app/src/main/assets/models")
+for m in manifest["models"]:
+    if only and m["id"] not in only:
+        continue
+    local = m.get("localPath", f"{asset_root}/{m['filename']}")
+    if bundled_only and not local.startswith("app/src/main/assets/"):
+        continue
+    extract = m.get("extractTo") or "-"
+    print("\t".join([m["id"], m["filename"], local, extract, m["url"], m["sha256"], str(m["sizeBytes"]), str(m["required"]).lower()]))
 PY
 
-mkdir -p "${MODELS_DIR}"
+failures=0
+synced=0
+while IFS=$'\t' read -r id filename local_path extract_to url sha size required; do
+  [[ "$extract_to" == "-" ]] && extract_to=""
+  [[ -z "$id" ]] && continue
+  target="${ROOT_DIR}/${local_path}"
+  ok=0
 
-downloaded=0
-verified=0
-while IFS=$'\t' read -r model_id filename delivery url sha256 size_bytes required; do
-  [[ -z "${model_id}" ]] && continue
-
-  target="${MODELS_DIR}/${filename}"
-
-  if [[ "${VERIFY_ONLY}" -eq 1 || "${delivery}" == "bundled" ]]; then
-    if [[ ! -f "${target}" ]]; then
-      if [[ "${required}" == "true" ]]; then
-        if [[ "${ALLOW_MISSING_BINARIES}" -eq 1 ]]; then
-          echo "WARNING: required model missing but tolerated (--allow-missing-binaries): ${filename}" >&2
-          continue
-        fi
-        echo "required model is missing: ${filename}" >&2
-        exit 66
-      fi
-      continue
+  if [[ -n "$extract_to" ]]; then
+    dir="${ROOT_DIR}/app/src/main/assets/models/${extract_to}"
+    if extract_ok "$dir"; then
+      ok=1
+    elif [[ "$VERIFY_ONLY" == 1 ]]; then
+      ok=0
+    else
+      archive="${ASSETS}/${filename}"
+      rm -f "$archive"
+      fetch "$url" "$archive"
+      check_file "$archive" "$sha" "$size" "$filename" || exit 66
+      rm -rf "$dir"
+      mkdir -p "$(dirname "$dir")"
+      tar -xjf "$archive" -C "$(dirname "$dir")"
+      extract_ok "$dir" || { echo "extract failed: $dir" >&2; exit 66; }
+      ok=1
+      synced=$((synced + 1))
     fi
   else
-    tmp="${target}.download"
-    curl --proto '=https' --tlsv1.2 --fail --location --retry 3 --retry-delay 2 --output "${tmp}" "${url}"
-    mv "${tmp}" "${target}"
-    downloaded=$((downloaded + 1))
+    if check_file "$target" "$sha" "$size" "$filename" 2>/dev/null; then
+      ok=1
+    elif [[ "$VERIFY_ONLY" == 1 ]]; then
+      ok=0
+    else
+      rm -f "$target"
+      fetch "$url" "$target"
+      check_file "$target" "$sha" "$size" "$filename" || exit 66
+      ok=1
+      synced=$((synced + 1))
+    fi
   fi
 
-  actual_sha="$(shasum -a 256 "${target}" | awk '{print $1}')"
-  if [[ "${actual_sha}" != "${sha256}" ]]; then
-    echo "checksum mismatch for ${filename}: expected ${sha256}, got ${actual_sha}" >&2
-    exit 66
+  if [[ "$ok" == 0 ]]; then
+    if [[ "$required" == "true" ]]; then
+      echo "missing or invalid (required): $id → $local_path" >&2
+      failures=$((failures + 1))
+    fi
   fi
-  actual_size="$(wc -c < "${target}" | tr -d ' ')"
-  if [[ "${actual_size}" != "${size_bytes}" ]]; then
-    echo "size mismatch for ${filename}: expected ${size_bytes}, got ${actual_size}" >&2
-    exit 66
-  fi
-  verified=$((verified + 1))
-done < "${rows}"
+done <"$rows"
 
-if [[ "${VERIFY_ONLY}" -eq 0 && "${downloaded}" -eq 0 && "${verified}" -eq 0 && "${ALLOW_EMPTY}" -eq 0 ]]; then
-  echo "model manifest does not contain any downloadable model entries" >&2
-  exit 65
+if [[ "$failures" -gt 0 ]]; then
+  exit 66
 fi
-
-if [[ "${VERIFY_ONLY}" -eq 0 && "${verified}" -gt 0 ]]; then
-  checksums_tmp="$(mktemp)"
-  (
-    cd "${MODELS_DIR}"
-    find . -maxdepth 1 -type f ! -name 'SHA256SUMS' -print0 | sort -z | xargs -0 shasum -a 256
-  ) > "${checksums_tmp}"
-  mv "${checksums_tmp}" "${MODELS_DIR}/SHA256SUMS"
+if [[ "$VERIFY_ONLY" == 1 ]]; then
+  echo "models verified (${MANIFEST#"${ROOT_DIR}/"})"
+else
+  echo "models ok (${MANIFEST#"${ROOT_DIR}/"}${synced:+, fetched $synced})"
 fi

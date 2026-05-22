@@ -362,24 +362,28 @@ constructor() : GatekeepingModel {
 object GatekeeperModelIds {
     const val BERT_VOCAB = "gatekeeper_bert_vocab"
     const val BERT_CPU = "gatekeeper_bert_v0_cpu"
+    const val BERT_GOOGLE_TENSOR_G5 = "gatekeeper_bert_v0_google_tensor_g5"
     const val BERT_EDGETPU_P24 = "gatekeeper_bert_v0_p24"
     const val BERT_EDGETPU_P25 = "gatekeeper_bert_v0_p25"
     const val BERT_NPU_MT6989 = "gatekeeper_bert_v0_mt6989"
     const val AUDIO_FRONTEND = "gatekeeper_audio_frontend"
     const val AUDIO_GATEKEEPER = "gatekeeper_audio_gatekeeper"
     const val INHERENT_V0 = "gatekeeper_inherent_v0"
+    const val INHERENT_V0_GOOGLE_TENSOR_G5 = "gatekeeper_inherent_v0_google_tensor_g5"
     const val INHERENT_V0_METADATA = "gatekeeper_inherent_v0_metadata"
 
     private val FILENAMES =
         mapOf(
             BERT_VOCAB to "bert_vocab.txt",
             BERT_CPU to "bert_v0_cpu.tflite",
+            BERT_GOOGLE_TENSOR_G5 to "bert_v0_google_tensor_g5.tflite",
             BERT_EDGETPU_P24 to "bert_v0_p24.tflite",
             BERT_EDGETPU_P25 to "bert_v0_p25.tflite",
             BERT_NPU_MT6989 to "bert_v0_mt6989.tflite",
             AUDIO_FRONTEND to "audio_frontend.tflite",
             AUDIO_GATEKEEPER to "audio_gatekeeper_edgetpu.tflite",
             INHERENT_V0 to "inherent.tflite",
+            INHERENT_V0_GOOGLE_TENSOR_G5 to "inherent_v0_google_tensor_g5.tflite",
             INHERENT_V0_METADATA to "inherent.metadata.json"
         )
 

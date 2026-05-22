@@ -128,6 +128,46 @@ class GatekeepingModelTest {
     }
 
     @Test
+    fun nativeBertFallsBackFromGoogleTensorG5WhenRunFails() = runTest {
+        val loader =
+            fakeLoader(
+                mapOf(
+                    GatekeeperModelIds.BERT_VOCAB to byteArrayOf(1),
+                    GatekeeperModelIds.BERT_GOOGLE_TENSOR_G5 to byteArrayOf(2),
+                    GatekeeperModelIds.BERT_CPU to byteArrayOf(3)
+                )
+            )
+        val createResults = ArrayDeque(listOf(7L, 8L))
+        val attempts = mutableListOf<NativeCreateAttempt>()
+        val destroyedHandles = mutableListOf<Long>()
+        val model =
+            BertClassifierGatekeepingModel(
+                loadAssetBytes = loader,
+                socProvider = { SocClass.GOOGLE_TENSOR },
+                nativeCreate = { _, modelBytes, tpu ->
+                    attempts += NativeCreateAttempt(modelBytes, tpu)
+                    createResults.removeFirst()
+                },
+                nativeRun = { handle, _, _ ->
+                    if (handle == 7L) null else FloatArray(19) { index -> if (index == 2) 0.75f else 0f }
+                },
+                nativeDestroy = { handle -> destroyedHandles += handle }
+            )
+
+        val result = model.predict("Screen: define polymorphism")
+
+        assertEquals(GatekeepingDetector.BERT, result.detector)
+        assertEquals(
+            listOf(
+                NativeCreateAttempt(model = byteArrayOf(2), tpu = true),
+                NativeCreateAttempt(model = byteArrayOf(3), tpu = false)
+            ),
+            attempts
+        )
+        assertEquals(listOf(7L), destroyedHandles)
+    }
+
+    @Test
     fun nativeBertSkipsEdgeTpuCandidatesOnMediaTekSoc() = runTest {
         val loader =
             fakeLoader(

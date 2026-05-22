@@ -176,6 +176,9 @@ android {
     packaging {
         jniLibs {
             pickFirsts += setOf("**/libtensorflowlite_jni.so")
+            // LiteRT NPU dispatch discovery needs a real filesystem directory for
+            // kLiteRtEnvOptionTagDispatchLibraryDir during local APK installs.
+            useLegacyPackaging = true
         }
         resources {
             excludes +=
@@ -226,14 +229,26 @@ androidComponents {
     }
 }
 
+tasks.register<Exec>("syncModelsFromS3") {
+    group = "cosmo"
+    description =
+        "Downloads versioned gatekeeper/inherent models from S3 into app/src/main/assets/models (see config/models-s3.env)."
+    workingDir = rootProject.layout.projectDirectory.asFile
+    commandLine("bash", "scripts/download-models.sh")
+}
+
 tasks.register<Exec>("verifyCosmoReleaseModelManifest") {
     group = "verification"
     description =
         "Release-only gate: non-empty model manifest and required bundled assets must match checksum/size (scripts/download-models.sh --verify-only)."
     workingDir = rootProject.layout.projectDirectory.asFile
-    val args = mutableListOf("scripts/download-models.sh", "--verify-only")
+    val args =
+        mutableListOf(
+            "scripts/download-models.sh",
+            "--verify-only",
+        )
     if (allowMissingRecoveredBinaries()) {
-        args += "--allow-missing-binaries"
+        args += "--bundled-only"
     }
     commandLine("bash", *args.toTypedArray())
 }

@@ -1,73 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cosmo.local/schemas/model-manifest.schema.json",
   "type": "object",
-  "required": [
-    "version",
-    "assetRoot",
-    "models"
-  ],
-  "additionalProperties": false,
+  "required": ["version", "assetRoot", "models"],
   "properties": {
-    "version": {
-      "const": 1
-    },
-    "assetRoot": {
-      "const": "app/src/main/assets/models"
-    },
-    "description": {
-      "type": "string"
-    },
+    "version": { "const": 1 },
+    "modelVersion": { "type": "string" },
+    "assetRoot": { "const": "app/src/main/assets/models" },
     "models": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "id",
-          "filename",
-          "delivery",
-          "sha256",
-          "sizeBytes",
-          "mediaType",
-          "required"
-        ],
-        "additionalProperties": false,
+        "required": ["id", "filename", "url", "sha256", "sizeBytes", "required"],
         "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "filename": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9._-]+$"
-          },
-          "url": {
-            "type": "string",
-            "format": "uri",
-            "pattern": "^https://"
-          },
-          "delivery": {
-            "type": "string",
-            "enum": [
-              "bundled",
-              "remote"
-            ]
-          },
-          "sha256": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "mediaType": {
-            "type": "string",
-            "minLength": 1
-          },
-          "required": {
-            "type": "boolean"
-          }
+          "id": { "type": "string" },
+          "filename": { "type": "string" },
+          "url": { "type": "string", "pattern": "^s3://" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "sizeBytes": { "type": "integer", "minimum": 1 },
+          "required": { "type": "boolean" },
+          "localPath": { "type": "string" },
+          "extractTo": { "type": "string" }
         }
       }
     }

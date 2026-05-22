@@ -41,7 +41,7 @@ single utterance update, and `AudioTrack` playback.
 
 **Implementation status:** wired in `SherpaVoiceOutput` with the official
 Sherpa-ONNX Android runtime and `supertonic-3` model. Hydrate the gitignored
-model assets with `scripts/download-voice-models.sh`. The recovered-compatible
+model assets with `scripts/download-models.sh`. The recovered-compatible
 `lib/tts` facade is present for `TTS`, `VoiceLMTTS`, `LocalTTS`,
 `AudioRenderer`, and `AudioResampler`; launch generation delegates to the
 selected `VoiceOutput` backend rather than Vogo.

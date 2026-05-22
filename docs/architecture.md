@@ -1158,7 +1158,7 @@ The selected launch model is `supertonic-3`. Local Sherpa benchmarking across
 synthesis 0.728s, compared with Kitten at aggregate RTF 0.441 and mean
 synthesis 2.114s on the same host run. The model lives under
 `app/src/main/assets/models/tts/supertonic-3` when hydrated, but that directory
-is gitignored; rehydrate from Hugging Face with `scripts/download-voice-models.sh`.
+is gitignored; rehydrate with `scripts/download-models.sh` (S3 manifest). Maintainers bootstrap from HF via `scripts/bootstrap-tts-from-upstream.sh`, then `scripts/pack-tts-archives.sh` + `scripts/upload-models-to-s3.sh`.
 Kitten remains a fallback/benchmark bundle. If later hardware acceleration
 makes another model practical, switch only the model bundle; the `VoiceOutput`
 interface and playback architecture stay unchanged.

@@ -81,6 +81,11 @@ constructor(
         scope.launch { runTextClassifier(input, ContextSource.USER_QUERY) }
     }
 
+    /** Publishes debug-injected classifications (adb audio fixtures) into [results]. */
+    fun publishDebugClassification(result: GatekeepingResult) {
+        scope.launch { emitResult(result) }
+    }
+
     override fun close() {
         jobs.forEach { it.cancel() }
         jobs.clear()

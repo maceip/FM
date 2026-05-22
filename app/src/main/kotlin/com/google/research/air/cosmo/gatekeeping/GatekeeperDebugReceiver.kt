@@ -175,6 +175,7 @@ constructor(
                 )
             )
         Log.i(TAG, "audio inject ambient: name=$fixtureName result=$result")
+        result?.let { gatekeeper.publishDebugClassification(it) }
     }
 
     private suspend fun feedConformer(
@@ -242,6 +243,7 @@ constructor(
                     )
                 )
             Log.i(TAG, "audio inject soda gatekeeper: name=$fixtureName result=$result")
+            result?.let { gatekeeper.publishDebugClassification(it) }
         }
     }
 

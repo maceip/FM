@@ -10,10 +10,9 @@ usage() {
   cat >&2 <<'EOF'
 usage: scripts/runtime-binaries.sh [download|verify|upload|verify-remote] [--include-optional] [--manifest path]
 
-Hydrates or verifies the private S3-backed runtime binary set described by
-config/assets/runtime-binaries.json. Required artifacts cover APK model assets,
-SODA language packs, and recovered native libraries. Optional artifacts include
-large local-only model bundles such as LiteRT-LM.
+Hydrates or verifies SODA language packs and recovered native libraries from
+config/assets/runtime-binaries.json (legacy fm-runtime bucket). Gatekeeper/TTS/LLM
+models use scripts/download-models.sh and app/src/main/assets/model-manifest.json.
 EOF
 }
 

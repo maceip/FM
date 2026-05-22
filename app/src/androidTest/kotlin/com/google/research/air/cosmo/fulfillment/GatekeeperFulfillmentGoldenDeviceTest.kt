@@ -4,8 +4,10 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.research.air.cosmo.gatekeeping.Gatekeeper
-import com.google.research.air.cosmo.gatekeeping.GatekeeperOutputSource
 import com.google.research.air.cosmo.gatekeeping.util.GatekeeperResultUtils
+import com.google.research.air.cosmo.presence.CardPayload
+import com.google.research.air.cosmo.presence.PresenceController
+import com.google.research.air.cosmo.presence.PresenceState
 import com.google.research.air.cosmo.setting.CosmoSettingStore
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -48,6 +50,8 @@ class GatekeeperFulfillmentGoldenDeviceTest {
 
     @Inject lateinit var settings: CosmoSettingStore
 
+    @Inject lateinit var presenceController: PresenceController
+
     @Test(timeout = 120_000)
     fun gatekeeperTimerIntentProducesAddTimerActionOnActionDeck() {
         runBlocking {
@@ -64,6 +68,7 @@ class GatekeeperFulfillmentGoldenDeviceTest {
             // Eager-init orchestrator listeners (CosmoApp does not inject orchestrator until UI/work).
             checkNotNull(fulfillmentOrchestrator)
             gatekeeper.start()
+            presenceController.start()
             delay(500)
 
             assumeTrue("Gatekeeper must be enabled", settings.isGatekeeperEnabled())
@@ -122,6 +127,18 @@ class GatekeeperFulfillmentGoldenDeviceTest {
             )
             assertEquals(listOf(timer.id), gatekeeperHistory.actionIds)
             Log.i(TAG, "gatekeeper_golden fulfillmentId=${gatekeeperHistory.fulfillmentId} trigger=GATEKEEPER_TRIGGER")
+
+            val presence =
+                withTimeout(15_000) {
+                    presenceController.state.first { it is PresenceState.Ready }
+                } as PresenceState.Ready
+            assertEquals(timer.id, presence.cards.single().id)
+            assertTrue(
+                "Presence should surface timer card payload",
+                presence.cards.single().payload is CardPayload.CalendarTime,
+            )
+            assertEquals("review:${timer.id}", presence.primaryAction?.id)
+            Log.i(TAG, "gatekeeper_golden presence taskId=${presence.taskId} card=${presence.cards.single().id}")
         }
     }
 

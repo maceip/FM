@@ -9,7 +9,7 @@ fail() {
   exit 66
 }
 
-scripts/download-models.sh --verify-only
+scripts/download-models.sh --verify-only --bundled-only
 scripts/verify-architecture-delta.sh
 scripts/verify-relocation-safety.sh
 scripts/verify-dogfood-contract-gates.sh
@@ -22,8 +22,8 @@ if ! grep -Fq "scripts/verify-dogfood-contract-gates.sh" ".github/workflows/ci.y
   fail "CI does not run the dogfood contract gate"
 fi
 
-if ! grep -Fq "scripts/download-models.sh --verify-only" ".github/workflows/ci.yml"; then
-  fail "CI does not run the strict model manifest gate"
+if ! grep -Fq "scripts/download-models.sh --verify-only --bundled-only" ".github/workflows/ci.yml"; then
+  fail "CI does not run the bundled model manifest gate"
 fi
 
 if ! grep -Fq "scripts/verify-relocation-safety.sh" ".github/workflows/ci.yml"; then
@@ -82,6 +82,39 @@ fi
 if ! grep -Fq "bertCpuModelReturnsFiniteNineteenFloatVector" \
   "app/src/androidTest/kotlin/com/google/research/air/cosmo/gatekeeping/GatekeepingRuntimeSmokeTest.kt"; then
   fail "Missing androidTest CPU BERT runtime smoke"
+fi
+
+if ! grep -Fq "gatekeeperTimerIntentProducesAddTimerActionOnActionDeck" \
+  "app/src/test/kotlin/com/google/research/air/cosmo/fulfillment/GatekeeperFulfillmentGoldenTest.kt"; then
+  fail "Missing JVM gatekeeper fulfillment golden test"
+fi
+
+if ! grep -Fq "publishDebugClassification" \
+  "app/src/main/kotlin/com/google/research/air/cosmo/gatekeeping/GatekeepingPipeline.kt"; then
+  fail "Gatekeeper must publish debug audio classifications into results flow"
+fi
+
+if ! grep -Fq "publishDebugClassification_emitsToResultsFlow" \
+  "app/src/test/kotlin/com/google/research/air/cosmo/gatekeeping/GatekeeperPublishDebugTest.kt"; then
+  fail "Missing unit test for debug gatekeeper result publish"
+fi
+
+if ! grep -Fq "cosmo.gatekeeperAudioGolden" \
+  "app/src/androidTest/kotlin/com/google/research/air/cosmo/fulfillment/GatekeeperAudioGoldenDeviceTest.kt"; then
+  fail "Missing device gatekeeper audio golden test"
+fi
+
+if ! grep -Fq "cosmo.releaseInternalLlmSmoke" \
+  "app/src/androidTest/kotlin/com/google/research/air/cosmo/lib/llm/ReleaseInternalLlmDeviceSmokeTest.kt"; then
+  fail "Missing release-internal LLM device smoke"
+fi
+
+if [[ ! -x "scripts/run-gatekeeper-golden.sh" ]]; then
+  fail "scripts/run-gatekeeper-golden.sh must exist and be executable"
+fi
+
+if [[ ! -x "scripts/run-launch-device-proofs.sh" ]]; then
+  fail "scripts/run-launch-device-proofs.sh must exist and be executable"
 fi
 
 if ! grep -Fq "rememberSaveable" \

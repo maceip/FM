@@ -2,6 +2,7 @@ package com.google.research.air.cosmo.gatekeeping
 
 import android.content.Context
 import android.os.Build
+import com.google.research.air.cosmo.gatekeeping.models.AudioGatekeeperLiteRtImpl
 import com.google.research.air.cosmo.gatekeeping.models.BertEncoderImpl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -41,6 +42,7 @@ class BertClassifierGatekeepingModel internal constructor(
     // `SocClass.Companion::current`, which inlines the `Build.SOC_MANUFACTURER` read.
     private val socProvider: () -> SocClass,
     private val nativeRuntimeSupported: () -> Boolean = { true },
+    private val googleTensorNpuSupported: () -> Boolean = { true },
     private val nativeCreate: (ByteArray, ByteArray, Boolean) -> Long,
     private val nativeRun: (Long, String, Int) -> FloatArray?,
     private val nativeDestroy: (Long) -> Unit
@@ -52,8 +54,14 @@ class BertClassifierGatekeepingModel internal constructor(
         loadAssetBytes = GatekeeperModelIds.byteLoaderFor(context),
         socProvider = SocClass.Companion::current,
         nativeRuntimeSupported = NativeBertRuntimeGuard::isSupportedOnThisDevice,
+        googleTensorNpuSupported = AudioGatekeeperLiteRtImpl::nativeCanInitializeGoogleTensorNpu,
         nativeCreate = { vocabBuffer, modelBuffer, isTpuEnabled ->
-            BertEncoderImpl.nativeCreate(vocabBuffer, modelBuffer, isTpuEnabled)
+            BertEncoderImpl.nativeCreate(
+                vocabBuffer,
+                modelBuffer,
+                isTpuEnabled,
+                context.applicationInfo.nativeLibraryDir
+            )
         },
         nativeRun = { handle, query, segmentIdOverride ->
             BertEncoderImpl.nativeRunStandardEncoder(handle, query, segmentIdOverride)
@@ -63,6 +71,8 @@ class BertClassifierGatekeepingModel internal constructor(
 
     @Volatile private var handle: Long = 0L
     @Volatile private var unavailableReason: String? = null
+    @Volatile private var activeBackend: Backend? = null
+    private val failedBackends = mutableSetOf<String>()
 
     override suspend fun predict(input: String): GatekeepingResult {
         val source = GatekeepingInputSource.fromInput(input)
@@ -88,27 +98,31 @@ class BertClassifierGatekeepingModel internal constructor(
     override fun close() {
         val current = handle
         handle = 0L
+        activeBackend = null
         if (current != 0L) {
             runCatching { nativeDestroy(current) }
         }
     }
 
     private fun runBert(input: String): FloatArray? {
-        val currentHandle = ensureHandle()
-        if (currentHandle == 0L) return null
-        val output =
-            runCatching { nativeRun(currentHandle, input, DEFAULT_SEGMENT_ID_OVERRIDE) }
-                .getOrElse {
-                    unavailableReason = "bert_native_run_failed:${it.javaClass.simpleName}"
-                    return null
-                }
-        if (output == null || output.size != OUTPUT_SIZE || output.any { !it.isFinite() }) {
-            unavailableReason = "bert_native_invalid_output"
-            return null
+        while (true) {
+            val currentHandle = ensureHandle()
+            if (currentHandle == 0L) return null
+            val outputResult = runCatching { nativeRun(currentHandle, input, DEFAULT_SEGMENT_ID_OVERRIDE) }
+            if (outputResult.isFailure) {
+                retireActiveBackend("bert_native_run_failed:${outputResult.exceptionOrNull()?.javaClass?.simpleName ?: "unknown"}")
+                continue
+            }
+            val output = outputResult.getOrNull()
+            if (output == null || output.size != OUTPUT_SIZE || output.any { !it.isFinite() }) {
+                retireActiveBackend("bert_native_invalid_output")
+                continue
+            }
+            return output
         }
-        return output
     }
 
+    @Synchronized
     private fun ensureHandle(): Long {
         if (handle != 0L || unavailableReason != null) return handle
         if (!nativeRuntimeSupported()) {
@@ -122,7 +136,12 @@ class BertClassifierGatekeepingModel internal constructor(
         }
         val socClass = socProvider()
         val failures = mutableListOf<String>()
-        for (backend in BACKENDS.filter { socClass in it.supportedSocs }) {
+        for (backend in BACKENDS.filter { socClass in it.supportedSocs && it.id !in failedBackends }) {
+            if (backend.tpu && socClass == SocClass.GOOGLE_TENSOR && !googleTensorNpuSupported()) {
+                failures += "bert_google_tensor_npu_runtime_unavailable:${backend.id}"
+                failedBackends += backend.id
+                continue
+            }
             val modelBytes = loadAssetBytes(backend.id)
             if (modelBytes == null) {
                 failures += "bert_model_unavailable:${backend.id}"
@@ -133,15 +152,33 @@ class BertClassifierGatekeepingModel internal constructor(
                     .getOrElse {
                         failures += "bert_native_create_failed:${backend.id}:${it.javaClass.simpleName}"
                         0L
-                    }
+            }
             if (created != 0L) {
                 handle = created
+                activeBackend = backend
                 return created
             }
             failures += "bert_native_create_returned_zero:${backend.id}"
         }
         unavailableReason = "bert_all_backends_unavailable:${socClass}:${failures.joinToString("|")}"
         return 0L
+    }
+
+    @Synchronized
+    private fun retireActiveBackend(reason: String) {
+        val currentHandle = handle
+        val backend = activeBackend
+        handle = 0L
+        activeBackend = null
+        unavailableReason = null
+        if (backend == null) {
+            unavailableReason = reason
+            return
+        }
+        failedBackends += backend.id
+        if (currentHandle != 0L) {
+            runCatching { nativeDestroy(currentHandle) }
+        }
     }
 
     private fun mapBertOutputToSkills(
@@ -201,6 +238,7 @@ class BertClassifierGatekeepingModel internal constructor(
 
         val BACKENDS =
             listOf(
+                Backend(GatekeeperModelIds.BERT_GOOGLE_TENSOR_G5, tpu = true, supportedSocs = setOf(SocClass.GOOGLE_TENSOR)),
                 Backend(GatekeeperModelIds.BERT_EDGETPU_P25, tpu = true, supportedSocs = setOf(SocClass.GOOGLE_TENSOR)),
                 Backend(GatekeeperModelIds.BERT_EDGETPU_P24, tpu = true, supportedSocs = setOf(SocClass.GOOGLE_TENSOR)),
                 Backend(GatekeeperModelIds.BERT_NPU_MT6989, tpu = true, supportedSocs = setOf(SocClass.MEDIATEK)),

@@ -19,9 +19,61 @@
 namespace {
 
 constexpr char kLogTag[] = "AudioGatekeeperJni";
+constexpr bool kEnableGoogleTensorDispatchRuntime = true;
 
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, kLogTag, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, kLogTag, __VA_ARGS__)
+
+void LogGoogleTensorLibraryLoad(const char* library_name) {
+  dlerror();
+  void* handle = dlopen(library_name, RTLD_NOW | RTLD_GLOBAL);
+  if (handle == nullptr) {
+    LOGW("Google Tensor dependency dlopen failed: %s: %s", library_name, dlerror());
+    return;
+  }
+  LOGW("Google Tensor dependency dlopen ok: %s", library_name);
+}
+
+bool CanInitializeGoogleTensorSouthBound() {
+  if (!kEnableGoogleTensorDispatchRuntime) {
+    LOGW("Google Tensor LiteRT dispatch disabled pending a non-aborting runtime package");
+    return false;
+  }
+  LogGoogleTensorLibraryLoad("libedgetpu_util.so");
+  LogGoogleTensorLibraryLoad("com.google.edgetpu_vendor_service-V2-ndk.so");
+  LogGoogleTensorLibraryLoad("libedgetpu_client.google.so");
+  LogGoogleTensorLibraryLoad("libedgetpu_tachyon.google.so");
+
+  dlerror();
+  void* south_bound_lib = dlopen("libedgetpu_litert.so", RTLD_NOW | RTLD_GLOBAL);
+  if (south_bound_lib == nullptr) {
+    LOGW("Google Tensor SouthBound dlopen failed: %s", dlerror());
+    return false;
+  }
+
+  dlerror();
+  void* thr_initialize = dlsym(south_bound_lib, "thrInitialize");
+  const char* dlsym_error = dlerror();
+  if (thr_initialize == nullptr || dlsym_error != nullptr) {
+    LOGW("Google Tensor SouthBound thrInitialize lookup failed: %s",
+         dlsym_error != nullptr ? dlsym_error : "symbol unavailable");
+    return false;
+  }
+  using ThrGetStringFn = const char* (*)();
+  dlerror();
+  auto thr_get_vendor_api_version =
+      reinterpret_cast<ThrGetStringFn>(dlsym(south_bound_lib, "thrGetVendorApiVersion"));
+  const char* vendor_api_version =
+      thr_get_vendor_api_version == nullptr ? "(unavailable)" : thr_get_vendor_api_version();
+  dlerror();
+  auto thr_get_vendor_id =
+      reinterpret_cast<ThrGetStringFn>(dlsym(south_bound_lib, "thrGetVendorId"));
+  const char* vendor_id = thr_get_vendor_id == nullptr ? "(unavailable)" : thr_get_vendor_id();
+  LOGW("Google Tensor SouthBound available for audio LiteRT dispatch: api=%s vendor=%s",
+       vendor_api_version == nullptr ? "(null)" : vendor_api_version,
+       vendor_id == nullptr ? "(null)" : vendor_id);
+  return true;
+}
 
 std::optional<std::vector<uint8_t>> CopyByteArray(JNIEnv* env, jbyteArray array) {
   if (array == nullptr) {
@@ -37,6 +89,19 @@ std::optional<std::vector<uint8_t>> CopyByteArray(JNIEnv* env, jbyteArray array)
     return std::nullopt;
   }
   return bytes;
+}
+
+std::string CopyString(JNIEnv* env, jstring value) {
+  if (value == nullptr) {
+    return {};
+  }
+  const char* chars = env->GetStringUTFChars(value, nullptr);
+  if (chars == nullptr) {
+    return {};
+  }
+  std::string copy(chars);
+  env->ReleaseStringUTFChars(value, chars);
+  return copy;
 }
 
 std::optional<std::vector<int32_t>> CopyIntArray(JNIEnv* env, jintArray array) {
@@ -115,15 +180,17 @@ class LiteRtAudioModel {
  public:
   bool Initialize(const std::vector<uint8_t>& model_bytes, bool use_npu,
                   std::vector<int32_t> expected_input_shape,
-                  std::vector<int32_t> expected_output_shape) {
+                  std::vector<int32_t> expected_output_shape,
+                  std::string dispatch_library_dir) {
     model_bytes_ = model_bytes;
     use_npu_ = use_npu;
     expected_input_shape_ = std::move(expected_input_shape);
     expected_output_shape_ = std::move(expected_output_shape);
+    dispatch_library_dir_ = std::move(dispatch_library_dir);
     if (!LoadLiteRtSymbols()) {
       return false;
     }
-    if (!Check(api_.CreateEnvironment(0, nullptr, &environment_), "LiteRtCreateEnvironment") ||
+    if (!CreateEnvironment() ||
         !Check(api_.CreateModelFromBuffer(model_bytes_.data(), model_bytes_.size(), &model_),
                "LiteRtCreateModelFromBuffer") ||
         !ValidateModelContract() ||
@@ -131,17 +198,18 @@ class LiteRtAudioModel {
       Destroy();
       return false;
     }
-    const LiteRtHwAcceleratorSet accelerators =
-        use_npu_ ? kLiteRtHwAcceleratorNpu : kLiteRtHwAcceleratorCpu;
-    if (!Check(api_.SetOptionsHardwareAccelerators(options_, accelerators),
-               "LiteRtSetOptionsHardwareAccelerators") ||
-        !Check(api_.CreateCompiledModel(environment_, model_, options_, &compiled_model_),
-               "LiteRtCreateCompiledModel")) {
-      Destroy();
-      return false;
-    }
-    return true;
-  }
+	    const LiteRtHwAcceleratorSet accelerators =
+	        use_npu_ ? kLiteRtHwAcceleratorNpu : kLiteRtHwAcceleratorCpu;
+	    if (!Check(api_.SetOptionsHardwareAccelerators(options_, accelerators),
+	               "LiteRtSetOptionsHardwareAccelerators") ||
+	        !Check(api_.CreateCompiledModel(environment_, model_, options_, &compiled_model_),
+	               "LiteRtCreateCompiledModel") ||
+	        !CreateTensorBuffers()) {
+	      Destroy();
+	      return false;
+	    }
+	    return true;
+	  }
 
   bool Run(JNIEnv* env, jobject input_buffer, jobject output_buffer) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -168,34 +236,52 @@ class LiteRtAudioModel {
       return false;
     }
 
-    LiteRtTensorBuffer input_tensor = nullptr;
-    LiteRtTensorBuffer output_tensor = nullptr;
-    const bool created =
-        Check(api_.CreateTensorBufferFromHostMemory(&input_type_, input,
-                                                    input_element_count_ * sizeof(float),
-                                                    nullptr, &input_tensor),
-              "LiteRtCreateTensorBufferFromHostMemory(input)") &&
-        Check(api_.CreateTensorBufferFromHostMemory(&output_type_, output,
-                                                    output_element_count_ * sizeof(float),
-                                                    nullptr, &output_tensor),
-              "LiteRtCreateTensorBufferFromHostMemory(output)");
-    if (!created) {
-      DestroyBuffer(input_tensor);
-      DestroyBuffer(output_tensor);
-      return false;
-    }
-    const bool ran =
-        Check(api_.RunCompiledModel(compiled_model_, 0, 1, &input_tensor, 1, &output_tensor),
-              "LiteRtRunCompiledModel(audio)");
-    DestroyBuffer(input_tensor);
-    DestroyBuffer(output_tensor);
-    return ran;
-  }
+	    if (input_buffer_ == nullptr || output_buffer_ == nullptr) {
+	      LOGE("LiteRT audio tensor buffers are not initialized");
+	      return false;
+	    }
 
-  void Destroy() {
-    if (compiled_model_ != nullptr && api_.DestroyCompiledModel != nullptr) {
-      api_.DestroyCompiledModel(compiled_model_);
-      compiled_model_ = nullptr;
+	    void* input_addr = nullptr;
+	    if (!Check(api_.LockTensorBuffer(input_buffer_, &input_addr,
+	                                     kLiteRtTensorBufferLockModeWrite),
+	               "LiteRtLockTensorBuffer(input)") ||
+	        input_addr == nullptr) {
+	      return false;
+	    }
+	    std::memcpy(input_addr, input, input_element_count_ * sizeof(float));
+	    if (!Check(api_.UnlockTensorBuffer(input_buffer_),
+	               "LiteRtUnlockTensorBuffer(input)")) {
+	      return false;
+	    }
+
+	    const bool ran =
+	        Check(api_.RunCompiledModel(compiled_model_, 0, 1, &input_buffer_, 1,
+	                                    &output_buffer_),
+	              "LiteRtRunCompiledModel(audio)");
+	    if (!ran) {
+	      return false;
+	    }
+
+	    void* output_addr = nullptr;
+	    if (!Check(api_.LockTensorBuffer(output_buffer_, &output_addr,
+	                                     kLiteRtTensorBufferLockModeRead),
+	               "LiteRtLockTensorBuffer(output)") ||
+	        output_addr == nullptr) {
+	      return false;
+	    }
+	    std::memcpy(output, output_addr, output_element_count_ * sizeof(float));
+	    return Check(api_.UnlockTensorBuffer(output_buffer_),
+	                 "LiteRtUnlockTensorBuffer(output)");
+	  }
+
+	  void Destroy() {
+	    DestroyBuffer(input_buffer_);
+	    input_buffer_ = nullptr;
+	    DestroyBuffer(output_buffer_);
+	    output_buffer_ = nullptr;
+	    if (compiled_model_ != nullptr && api_.DestroyCompiledModel != nullptr) {
+	      api_.DestroyCompiledModel(compiled_model_);
+	      compiled_model_ = nullptr;
     }
     if (options_ != nullptr && api_.DestroyOptions != nullptr) {
       api_.DestroyOptions(options_);
@@ -212,6 +298,22 @@ class LiteRtAudioModel {
   }
 
  private:
+  bool CreateEnvironment() {
+    LiteRtEnvOption option{};
+    const LiteRtEnvOption* options = nullptr;
+    int option_count = 0;
+    if (!dispatch_library_dir_.empty()) {
+      option.tag = kLiteRtEnvOptionTagDispatchLibraryDir;
+      option.value.type = kLiteRtAnyTypeString;
+      option.value.str_value = dispatch_library_dir_.c_str();
+      options = &option;
+      option_count = 1;
+      LOGW("Using LiteRT dispatch library dir: %s", dispatch_library_dir_.c_str());
+    }
+    return Check(api_.CreateEnvironment(option_count, options, &environment_),
+                 "LiteRtCreateEnvironment");
+  }
+
   bool LoadLiteRtSymbols() {
     if (litert_lib_ != nullptr) {
       return true;
@@ -238,13 +340,24 @@ class LiteRtAudioModel {
            Resolve("LiteRtDestroyOptions", &api_.DestroyOptions) &&
            Resolve("LiteRtSetOptionsHardwareAccelerators",
                    &api_.SetOptionsHardwareAccelerators) &&
-           Resolve("LiteRtCreateCompiledModel", &api_.CreateCompiledModel) &&
-           Resolve("LiteRtDestroyCompiledModel", &api_.DestroyCompiledModel) &&
-           Resolve("LiteRtCreateTensorBufferFromHostMemory",
-                   &api_.CreateTensorBufferFromHostMemory) &&
-           Resolve("LiteRtDestroyTensorBuffer", &api_.DestroyTensorBuffer) &&
-           Resolve("LiteRtRunCompiledModel", &api_.RunCompiledModel) &&
-           ResolveOptional("LiteRtGetStatusString", &api_.GetStatusString);
+	          Resolve("LiteRtCreateCompiledModel", &api_.CreateCompiledModel) &&
+	          Resolve("LiteRtDestroyCompiledModel", &api_.DestroyCompiledModel) &&
+	          Resolve("LiteRtGetCompiledModelInputBufferRequirements",
+	                  &api_.GetCompiledModelInputBufferRequirements) &&
+	          Resolve("LiteRtGetCompiledModelOutputBufferRequirements",
+	                  &api_.GetCompiledModelOutputBufferRequirements) &&
+	          Resolve("LiteRtCreateTensorBufferFromHostMemory",
+	                  &api_.CreateTensorBufferFromHostMemory) &&
+	          Resolve("LiteRtCreateManagedTensorBufferFromRequirements",
+	                  &api_.CreateManagedTensorBufferFromRequirements) &&
+	          Resolve("LiteRtLockTensorBuffer", &api_.LockTensorBuffer) &&
+	          Resolve("LiteRtUnlockTensorBuffer", &api_.UnlockTensorBuffer) &&
+	          Resolve("LiteRtDestroyTensorBuffer", &api_.DestroyTensorBuffer) &&
+	          Resolve("LiteRtRunCompiledModel", &api_.RunCompiledModel) &&
+           ResolveOptional("LiteRtGetStatusString", &api_.GetStatusString) &&
+           ResolveOptional("LiteRtGetDefaultLogger", &api_.GetDefaultLogger) &&
+           ResolveOptional("LiteRtSetMinLoggerSeverity", &api_.SetMinLoggerSeverity) &&
+           EnableVerboseLiteRtLogging();
   }
 
   template <typename Fn>
@@ -281,6 +394,25 @@ class LiteRtAudioModel {
     LOGE("%s failed: status=%d%s%s", context, static_cast<int>(status),
          detail == nullptr ? "" : " ", detail == nullptr ? "" : detail);
     return false;
+  }
+
+  bool EnableVerboseLiteRtLogging() const {
+    if (api_.GetDefaultLogger == nullptr || api_.SetMinLoggerSeverity == nullptr) {
+      return true;
+    }
+    constexpr int8_t kLiteRtLogSeverityDebug = -1;
+    LiteRtLogger logger = api_.GetDefaultLogger();
+    if (logger == nullptr) {
+      LOGW("LiteRT default logger is unavailable; keeping default log severity");
+      return true;
+    }
+    const LiteRtStatus status = api_.SetMinLoggerSeverity(logger, kLiteRtLogSeverityDebug);
+    if (status != kLiteRtStatusOk) {
+      LOGW("LiteRT verbose logging setup failed: %d", static_cast<int>(status));
+    } else {
+      LOGW("LiteRT native logger set to debug for Google Tensor dispatch diagnostics");
+    }
+    return true;
   }
 
   bool ReadTensorType(LiteRtTensor tensor, const char* role, LiteRtRankedTensorType* out) const {
@@ -354,21 +486,48 @@ class LiteRtAudioModel {
     return true;
   }
 
-  void DestroyBuffer(LiteRtTensorBuffer buffer) const {
-    if (buffer != nullptr && api_.DestroyTensorBuffer != nullptr) {
-      api_.DestroyTensorBuffer(buffer);
-    }
-  }
+	  void DestroyBuffer(LiteRtTensorBuffer buffer) const {
+	    if (buffer != nullptr && api_.DestroyTensorBuffer != nullptr) {
+	      api_.DestroyTensorBuffer(buffer);
+	    }
+	  }
 
-  std::vector<uint8_t> model_bytes_;
+	  bool CreateTensorBuffers() {
+	    LiteRtTensorBufferRequirements input_requirements = nullptr;
+	    LiteRtTensorBufferRequirements output_requirements = nullptr;
+	    if (!Check(api_.GetCompiledModelInputBufferRequirements(
+	                   compiled_model_, 0, 0, &input_requirements),
+	               "LiteRtGetCompiledModelInputBufferRequirements") ||
+	        !Check(api_.GetCompiledModelOutputBufferRequirements(
+	                   compiled_model_, 0, 0, &output_requirements),
+	               "LiteRtGetCompiledModelOutputBufferRequirements") ||
+	        !Check(api_.CreateManagedTensorBufferFromRequirements(
+	                   environment_, &input_type_, input_requirements, &input_buffer_),
+	               "LiteRtCreateManagedTensorBufferFromRequirements(input)") ||
+	        !Check(api_.CreateManagedTensorBufferFromRequirements(
+	                   environment_, &output_type_, output_requirements, &output_buffer_),
+	               "LiteRtCreateManagedTensorBufferFromRequirements(output)")) {
+	      DestroyBuffer(input_buffer_);
+	      input_buffer_ = nullptr;
+	      DestroyBuffer(output_buffer_);
+	      output_buffer_ = nullptr;
+	      return false;
+	    }
+	    return true;
+	  }
+
+	  std::vector<uint8_t> model_bytes_;
   bool use_npu_ = false;
+  std::string dispatch_library_dir_;
   void* litert_lib_ = nullptr;
   LiteRtApi api_;
   LiteRtEnvironment environment_ = nullptr;
-  LiteRtModel model_ = nullptr;
-  LiteRtOptions options_ = nullptr;
-  LiteRtCompiledModel compiled_model_ = nullptr;
-  LiteRtRankedTensorType input_type_{};
+	  LiteRtModel model_ = nullptr;
+	  LiteRtOptions options_ = nullptr;
+	  LiteRtCompiledModel compiled_model_ = nullptr;
+	  LiteRtTensorBuffer input_buffer_ = nullptr;
+	  LiteRtTensorBuffer output_buffer_ = nullptr;
+	  LiteRtRankedTensorType input_type_{};
   LiteRtRankedTensorType output_type_{};
   std::vector<int32_t> expected_input_shape_;
   std::vector<int32_t> expected_output_shape_;
@@ -382,8 +541,11 @@ class LiteRtAudioModel {
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_google_research_air_cosmo_gatekeeping_models_AudioGatekeeperLiteRtImpl_nativeCreate(
     JNIEnv* env, jclass clazz, jbyteArray model_buffer, jboolean use_npu,
-    jintArray expected_input_shape, jintArray expected_output_shape) {
+    jintArray expected_input_shape, jintArray expected_output_shape, jstring dispatch_library_dir) {
   (void)clazz;
+  if (use_npu == JNI_TRUE && !CanInitializeGoogleTensorSouthBound()) {
+    return 0;
+  }
   auto model_bytes = CopyByteArray(env, model_buffer);
   if (!model_bytes.has_value()) {
     LOGE("nativeCreate received null or unreadable model buffer");
@@ -397,10 +559,18 @@ Java_com_google_research_air_cosmo_gatekeeping_models_AudioGatekeeperLiteRtImpl_
   }
   auto model = std::make_unique<LiteRtAudioModel>();
   if (!model->Initialize(*model_bytes, use_npu == JNI_TRUE, std::move(*input_shape),
-                         std::move(*output_shape))) {
+                         std::move(*output_shape), CopyString(env, dispatch_library_dir))) {
     return 0;
   }
   return reinterpret_cast<jlong>(model.release());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_google_research_air_cosmo_gatekeeping_models_AudioGatekeeperLiteRtImpl_nativeCanInitializeGoogleTensorNpu(
+    JNIEnv* env, jclass clazz) {
+  (void)env;
+  (void)clazz;
+  return CanInitializeGoogleTensorSouthBound() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

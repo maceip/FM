@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "backend": "litert",
   "artifact_format": "tflite",
-  "training_hash": "15f92fff6cd5e62048c9674313b79f9fe11d4f88:a8fe955e6a8b5231",
+  "training_hash": "nogit:8feff1c5ce2168c2",
   "input_tensor": "mel_spectrogram",
   "output_tensor": "intent_output",
   "head_order": [
@@ -50,59 +50,57 @@
     "has_calling_agent_intent": 0.9,
     "has_start_timer_intent": 0.9
   },
-  "artifact_size_bytes": 254368,
+  "artifact_size_bytes": 10554256,
   "reports": {
-    "onnx_parity": "artifacts/fixture-quality/runtime-static-export/reports/onnx_parity.json",
-    "delegate_cpu": "artifacts/fixture-quality/runtime-static-export/delegates/cpu.json",
-    "delegate_npu": "artifacts/fixture-quality/runtime-static-export/delegates/npu.json",
-    "delegate_tpu": "artifacts/fixture-quality/runtime-static-export/delegates/tpu.json"
+    "onnx_parity": "artifacts/model-groups/ec2-person-event-supertonic/export/litert/reports/onnx_parity.json",
+    "delegate_cpu": "artifacts/model-groups/ec2-person-event-supertonic/export/litert/delegates/cpu.json"
   },
   "config": {
     "model": {
       "backbone": "small_conformer",
       "num_heads": 13,
-      "hidden_size": 64,
-      "num_layers": 1,
+      "hidden_size": 256,
+      "num_layers": 6,
       "num_attention_heads": 4,
-      "conv_kernel_size": 15,
+      "conv_kernel_size": 31,
       "mel_bins": 128,
       "max_frames": 3000
     },
     "training": {
       "batch_size": 8,
-      "learning_rate": 0.001,
-      "weight_decay": 0.0001,
-      "warmup_steps": 0,
-      "max_steps": 1000,
-      "eval_every_steps": 100,
-      "save_every_steps": 100,
+      "learning_rate": 0.0001,
+      "weight_decay": 0.01,
+      "warmup_steps": 500,
+      "max_steps": 40000,
+      "eval_every_steps": 2000,
+      "save_every_steps": 2000,
       "loss": "focal_bce",
-      "focal_gamma": 1.0,
-      "class_weights": "none",
-      "sampler": "shuffle",
-      "padding": "runtime_static",
-      "train_manifest": "artifacts/fixture-quality/mels_manifest.csv",
-      "eval_manifest": "artifacts/fixture-quality/mels_manifest.csv",
+      "focal_gamma": 2.0,
+      "class_weights": "balanced",
+      "sampler": "label_balanced",
+      "padding": "dynamic",
+      "train_manifest": "data/quality_train_manifest.csv",
+      "eval_manifest": "data/quality_eval_manifest.csv",
       "num_workers": 0,
-      "device": "mps",
+      "device": "cuda",
       "seed": 1337
     },
     "export": {
-      "backend": "tflite",
+      "backend": "all",
       "delegates": [
         "cpu",
-        "npu",
+        "gpu",
         "tpu"
       ],
       "quantization": "int8",
-      "representative_dataset_size": 64,
+      "representative_dataset_size": 500,
       "target_size_mb": 50,
-      "output_path": "artifacts/fixture-quality/export/inherent.tflite",
-      "metadata_path": "artifacts/fixture-quality/export/inherent.metadata.json",
-      "onnx_path": "artifacts/fixture-quality/export/inherent.onnx",
-      "onnx_metadata_path": "artifacts/fixture-quality/export/inherent.onnx.metadata.json",
-      "mlx_dir": "artifacts/fixture-quality/export/mlx",
-      "litertlm_path": "artifacts/fixture-quality/export/inherent.litertlm",
+      "output_path": "artifacts/quality/inherent.tflite",
+      "metadata_path": "artifacts/quality/inherent.metadata.json",
+      "onnx_path": "artifacts/quality/inherent.onnx",
+      "onnx_metadata_path": "artifacts/quality/inherent.onnx.metadata.json",
+      "mlx_dir": "artifacts/quality/mlx",
+      "litertlm_path": "artifacts/quality/inherent.litertlm",
       "onnx_opset": 17,
       "onnx_sample_frames": 50,
       "onnx_static_frames": 3000,
@@ -111,11 +109,9 @@
     }
   },
   "delegates": [
-    "cpu",
-    "npu",
-    "tpu"
+    "cpu"
   ],
-  "tflite_size_bytes": 254368,
+  "tflite_size_bytes": 10554256,
   "tflite_io": {
     "input_name": "serving_default_mel_spectrogram:0",
     "input_shape": [

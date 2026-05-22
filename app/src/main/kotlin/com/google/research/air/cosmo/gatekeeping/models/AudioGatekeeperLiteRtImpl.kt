@@ -16,8 +16,12 @@ class AudioGatekeeperLiteRtImpl private constructor() {
             modelBuffer: ByteArray,
             useNpu: Boolean,
             expectedInputShape: IntArray,
-            expectedOutputShape: IntArray
+            expectedOutputShape: IntArray,
+            dispatchLibraryDir: String?
         ): Long
+
+        @JvmStatic
+        external fun nativeCanInitializeGoogleTensorNpu(): Boolean
 
         @JvmStatic
         external fun nativeRun(

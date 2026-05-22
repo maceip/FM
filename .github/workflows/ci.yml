@@ -2,8 +2,8 @@ name: fm-ci
 
 # Lean PR gate: compile, lint, unit-test, static analysis, and minified release
 # assembly. Recovered binary assets are gitignored and not distributed to the
-# runner, so CI permits missing binaries while still checking manifest shape and
-# build correctness. Local release gates remain strict by default.
+# runner, so CI verifies bundled model-manifest assets only (--bundled-only) and
+# tolerates missing SODA/native binaries via COSMO_ALLOW_MISSING_BINARIES.
 #
 # The emu validation gate described in PLAN.md runs against
 # emu.devkeys.net via workflow_dispatch (manual trigger) below until
@@ -47,8 +47,8 @@ jobs:
       - name: Dogfood contract gate
         run: scripts/verify-dogfood-contract-gates.sh
 
-      - name: Model manifest (tolerant of missing binaries on CI)
-        run: scripts/download-models.sh --verify-only --allow-missing-binaries
+      - name: Model manifest (bundled APK assets only on CI)
+        run: scripts/download-models.sh --verify-only --bundled-only
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest

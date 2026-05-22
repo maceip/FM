@@ -8,8 +8,8 @@ import org.junit.Test
 /**
  * Closes the drift gap that remained after [GatekeepingModelLoader] / [ManifestGatekeepingModelLoader]
  * were deleted (architecture-delta C4 row 5). Adding a model now requires updating two files:
- *  - `app/src/main/assets/model-manifest.json` — used by `scripts/download-models.sh --verify-only`
- *    in CI to enforce sha256 + sizeBytes for bundled assets.
+ *  - `app/src/main/assets/model-manifest.json` (gatekeeper_* ids only) — used by
+ *    `scripts/download-models.sh --verify-only` in CI. TTS bundles use separate manifest ids.
  *  - `GatekeeperModelIds.FILENAMES` (and the corresponding `const val` id) — the runtime
  *    asset-bytes loader's id → filename map.
  *
@@ -18,18 +18,44 @@ import org.junit.Test
  * build if any manifest entry is missing from the Kotlin map (or vice versa).
  */
 class GatekeeperModelManifestDriftTest {
+    /**
+     * Runtime-reserved model ids not yet published in [model-manifest.json] / S3.
+     * Still must exist in [GatekeeperModelIds.FILENAMES] so backend selection can probe assets.
+     */
+    private val kotlinOnlyReservedIds =
+        setOf(GatekeeperModelIds.BERT_NPU_MT6989)
+
     @Test
     fun manifestAndKotlinMapAgreeOnEveryEntry() {
-        val manifest = readManifestEntries()
+        val manifest =
+            readManifestEntries().filterKeys { id ->
+                id.startsWith("gatekeeper_")
+            }
         val kotlinMap = enumerateKotlinFilenameMap()
 
-        // Both directions: every manifest id → filename pair must be in the Kotlin map, and
-        // vice versa. Asymmetric checks would let one side drift silently.
+        // Every shipped manifest entry must match the Kotlin id → filename map exactly.
+        manifest.forEach { (id, filename) ->
+            assertEquals(
+                "Manifest id $id filename must match GatekeeperModelIds",
+                filename,
+                kotlinMap[id]
+            )
+        }
+
+        // Kotlin may list reserved ids ahead of S3 publication; no other extras allowed.
+        val unexpectedKotlinOnly = kotlinMap.keys - manifest.keys - kotlinOnlyReservedIds
         assertEquals(
-            "Manifest entries (id → filename) must equal GatekeeperModelIds.FILENAMES",
-            manifest,
-            kotlinMap
+            "Unexpected GatekeeperModelIds entries not in manifest: $unexpectedKotlinOnly",
+            emptySet<String>(),
+            unexpectedKotlinOnly
         )
+        kotlinOnlyReservedIds.forEach { id ->
+            assertEquals(
+                "Reserved id $id must stay in GatekeeperModelIds.FILENAMES",
+                kotlinMap[id],
+                GatekeeperModelIds.filenameFor(id)
+            )
+        }
     }
 
     private fun readManifestEntries(): Map<String, String> {
@@ -52,12 +78,14 @@ class GatekeeperModelManifestDriftTest {
         listOf(
             GatekeeperModelIds.BERT_VOCAB,
             GatekeeperModelIds.BERT_CPU,
+            GatekeeperModelIds.BERT_GOOGLE_TENSOR_G5,
             GatekeeperModelIds.BERT_EDGETPU_P24,
             GatekeeperModelIds.BERT_EDGETPU_P25,
             GatekeeperModelIds.BERT_NPU_MT6989,
             GatekeeperModelIds.AUDIO_FRONTEND,
             GatekeeperModelIds.AUDIO_GATEKEEPER,
             GatekeeperModelIds.INHERENT_V0,
+            GatekeeperModelIds.INHERENT_V0_GOOGLE_TENSOR_G5,
             GatekeeperModelIds.INHERENT_V0_METADATA
         ).associateWith { id ->
             requireNotNull(GatekeeperModelIds.filenameFor(id)) {

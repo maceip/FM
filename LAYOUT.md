@@ -34,8 +34,8 @@ The canonical home for FM is `~/neural`. This file is the answer to
 │   │   └── *.jinja2 / *.textproto  # prompts + schemas — tracked
 │   ├── src/main/jniLibs/arm64-v8a/ # *.so files — gitignored, provisioned externally
 │   ├── src/main/AndroidManifest.xml
-│   ├── src/test/kotlin/            # JVM unit tests
-│   └── src/androidTest/kotlin/     # Instrumented tests (need attached device)
+│   ├── src/test/kotlin/            # JVM unit tests (incl. GatekeeperFulfillmentGoldenTest)
+│   └── src/androidTest/kotlin/     # Instrumented tests (GatekeeperFulfillmentGoldenDeviceTest, …)
 │
 ├── baselineprofile/                # Baseline-profile generator module
 │

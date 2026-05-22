@@ -44,6 +44,12 @@ As of 2026-05-18, Steps 1 through 5 are green on `codex/ship-plan-audit`.
   AICore was visible as `com.google.android.aicore`; the production route was
   `LOCAL_LLM / LOCAL_ELIGIBLE` with redacted output `ok`. Artifacts:
   `artifacts/device-model-routing/20260518-020349-pixel10/`.
+- Gatekeeper fulfillment golden path is covered by
+  `GatekeeperFulfillmentGoldenTest` (JVM) and
+  `GatekeeperFulfillmentGoldenDeviceTest` (instrumentation). Run all launch proofs with
+  `scripts/run-launch-device-proofs.sh` when iterating on head → intent → orchestrator
+  → action deck → presence; Pixel 10 Pro Fold passed 2026-05-19
+  (`artifacts/device-gatekeeper-golden/20260519-140610/`).
 - Xiaomi core capability smoke passed on device with
   `scripts/run-device-core-capability-smoke.sh`: gatekeeper timer detection,
   debug/test fulfillment actions for timer/list/doc/calendar/search/email,
@@ -360,7 +366,7 @@ These facts were checked on `main` / the audit branch on 2026-05-15:
   `minifyReleaseInternalWithR8` on missing SODA/Flogger/protobuf/desugar
   classes.
 - `scripts/verify-architecture-delta.sh` passes.
-- `scripts/download-models.sh --verify-only --allow-missing-binaries` passes.
+- `scripts/download-models.sh --verify-only --bundled-only` passes on CI (gatekeeper/TTS in APK assets).
 
 ## Reference Docs
 
